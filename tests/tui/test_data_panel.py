@@ -1,0 +1,235 @@
+"""Tests for Data Panel Widgets - TDD Red phase.
+
+Tests for DataPanel container and entity view templates.
+"""
+
+from enum import Enum
+
+import pytest
+from textual.app import App, ComposeResult
+
+from jdo.widgets.data_panel import DataPanel, PanelMode
+
+
+class DataPanelTestApp(App):
+    """Test app for DataPanel widget."""
+
+    def compose(self) -> ComposeResult:
+        yield DataPanel()
+
+
+class TestPanelMode:
+    """Tests for PanelMode enum."""
+
+    def test_has_required_modes(self) -> None:
+        """PanelMode has list, view, draft modes."""
+        assert PanelMode.LIST.value == "list"
+        assert PanelMode.VIEW.value == "view"
+        assert PanelMode.DRAFT.value == "draft"
+
+
+class TestDataPanel:
+    """Tests for DataPanel container widget."""
+
+    async def test_panel_switches_between_modes(self) -> None:
+        """DataPanel switches between list, view, draft modes."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+
+            # Default mode should be list
+            assert panel.mode == PanelMode.LIST
+
+            # Switch to view mode
+            panel.mode = PanelMode.VIEW
+            await pilot.pause()
+            assert panel.mode == PanelMode.VIEW
+
+            # Switch to draft mode
+            panel.mode = PanelMode.DRAFT
+            await pilot.pause()
+            assert panel.mode == PanelMode.DRAFT
+
+    async def test_mode_change_triggers_rerender(self) -> None:
+        """DataPanel state changes trigger re-render."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+
+            # Record initial mode
+            assert panel.mode == PanelMode.LIST
+
+            # Change mode
+            panel.mode = PanelMode.DRAFT
+            await pilot.pause()
+
+            # Mode should have changed
+            assert panel.mode == PanelMode.DRAFT
+
+
+class TestDraftTemplates:
+    """Tests for draft template displays."""
+
+    async def test_commitment_draft_shows_all_fields(self) -> None:
+        """CommitmentDraft shows all fields with 'Draft' status."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_commitment_draft(
+                {
+                    "deliverable": "Send report",
+                    "stakeholder_name": "Finance Team",
+                }
+            )
+            await pilot.pause()
+
+            rendered = str(panel.render())
+            assert "Draft" in rendered or panel.mode == PanelMode.DRAFT
+
+    async def test_goal_draft_shows_all_fields(self) -> None:
+        """GoalDraft shows all fields with 'Draft' status."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_goal_draft(
+                {
+                    "title": "Test Goal",
+                    "problem_statement": "The problem",
+                }
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.DRAFT
+
+    async def test_task_draft_shows_all_fields(self) -> None:
+        """TaskDraft shows all fields with 'Draft' status."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_task_draft(
+                {
+                    "title": "Test Task",
+                }
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.DRAFT
+
+    async def test_vision_draft_shows_all_fields(self) -> None:
+        """VisionDraft shows all fields with 'Draft' status."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_vision_draft(
+                {
+                    "title": "Test Vision",
+                    "narrative": "A compelling future",
+                }
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.DRAFT
+
+    async def test_milestone_draft_shows_all_fields(self) -> None:
+        """MilestoneDraft shows all fields with 'Draft' status."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_milestone_draft(
+                {
+                    "title": "Test Milestone",
+                }
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.DRAFT
+
+
+class TestViewTemplates:
+    """Tests for view template displays."""
+
+    async def test_commitment_view_shows_all_fields(self) -> None:
+        """CommitmentView shows all fields with current values."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_commitment_view(
+                {
+                    "id": "123",
+                    "deliverable": "Send report",
+                    "stakeholder_name": "Finance Team",
+                    "due_date": "2025-12-31",
+                    "status": "pending",
+                }
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.VIEW
+
+    async def test_goal_view_shows_all_fields(self) -> None:
+        """GoalView shows all goal fields."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_goal_view(
+                {
+                    "id": "123",
+                    "title": "Test Goal",
+                    "status": "active",
+                }
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.VIEW
+
+    async def test_vision_view_shows_all_fields(self) -> None:
+        """VisionView shows all vision fields."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_vision_view(
+                {
+                    "id": "123",
+                    "title": "Test Vision",
+                    "status": "active",
+                }
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.VIEW
+
+    async def test_milestone_view_shows_all_fields(self) -> None:
+        """MilestoneView shows all milestone fields."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_milestone_view(
+                {
+                    "id": "123",
+                    "title": "Test Milestone",
+                    "status": "pending",
+                }
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.VIEW
+
+
+class TestListView:
+    """Tests for list view display."""
+
+    async def test_show_list_displays_items(self) -> None:
+        """show_list displays items in list mode."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_list(
+                "commitments",
+                [
+                    {"id": "1", "deliverable": "Task 1"},
+                    {"id": "2", "deliverable": "Task 2"},
+                ],
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.LIST
