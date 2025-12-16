@@ -1,0 +1,111 @@
+# Capability: Goal Management
+
+Goals provide high-level organization for commitments. They represent outcomes with a clear problem statement and solution vision. Goals can be nested under other goals.
+
+**Note**: This spec defines the base Goal model. Extensions in other proposals:
+- `update-goal-vision-focus`: extends review system, removes `target_date`
+- `add-vision-milestone-hierarchy`: adds `vision_id` field for Vision linkage
+
+## ADDED Requirements
+
+### Requirement: Goal Model
+
+The system SHALL provide a `Goal` SQLModel with the following validated fields:
+- `id` (UUID): Unique identifier, auto-generated
+- `title` (str): Short descriptive name, required, non-empty
+- `problem_statement` (str): Description of the problem being solved, required, non-empty
+- `solution_vision` (str): Description of the desired end state, required, non-empty
+- `motivation` (str | None): Why this goal matters to the user (growth mindset reinforcement)
+- `parent_goal_id` (UUID | None): Optional reference to parent Goal for nesting
+- `status` (GoalStatus enum): One of `active`, `on_hold`, `achieved`, `abandoned`; defaults to `active`
+- `next_review_date` (date | None): When the user should next review this goal
+- `review_interval_days` (int | None): Recurring review cadence; only 7 (weekly), 30 (monthly), or 90 (quarterly) allowed
+- `last_reviewed_at` (datetime | None): When the user last reviewed this goal
+- `created_at` (datetime): Auto-set on creation, timezone-aware (EST default)
+- `updated_at` (datetime): Auto-updated on modification, timezone-aware (EST default)
+
+**Future extension**: FRC defines a Vision entity that will sit above Goals. The `problem_statement` and `solution_vision` fields may be restructured when Vision is introduced.
+
+#### Scenario: Create goal with required fields
+- **WHEN** user creates a Goal with title, problem_statement, and solution_vision
+- **THEN** a valid Goal is created with status="active" and auto-generated timestamps
+
+#### Scenario: Reject goal without problem statement
+- **WHEN** user creates a Goal with an empty problem_statement
+- **THEN** SQLModel validation raises an error
+
+#### Scenario: Reject goal without solution vision
+- **WHEN** user creates a Goal with an empty solution_vision
+- **THEN** SQLModel validation raises an error
+
+### Requirement: Goal Nesting
+
+The system SHALL support hierarchical goal organization through parent-child relationships with a soft limit of 3 nesting levels.
+
+#### Scenario: Create nested goal
+- **WHEN** user creates a Goal with parent_goal_id referencing an existing Goal
+- **THEN** the new Goal is associated as a child of the parent Goal
+
+#### Scenario: Retrieve child goals
+- **WHEN** user queries for children of a parent Goal
+- **THEN** the system returns all Goals with parent_goal_id matching the parent's id
+
+#### Scenario: Prevent circular nesting
+- **WHEN** user attempts to set a Goal's parent_goal_id to itself or to a descendant Goal
+- **THEN** the system raises a validation error
+
+#### Scenario: Warn on deep nesting
+- **WHEN** user creates a Goal that would be at nesting level 4 or deeper
+- **THEN** the AI warns "This goal would be 4 levels deep. Consider simplifying your goal hierarchy." but allows creation
+
+#### Scenario: Display nesting depth
+- **WHEN** viewing a deeply nested goal
+- **THEN** the system shows the full hierarchy path (e.g., "Parent > Child > Grandchild > This Goal")
+
+### Requirement: Goal Persistence
+
+The system SHALL persist Goal entities to SQLite with full CRUD operations via SQLModel sessions.
+
+#### Scenario: Save and retrieve goal
+- **WHEN** user saves a new Goal via a database session
+- **THEN** the Goal is persisted to SQLite and can be retrieved by id
+
+#### Scenario: List goals with filters
+- **WHEN** user queries goals with status filter (e.g., status="active")
+- **THEN** the system returns only goals matching the filter criteria
+
+#### Scenario: Delete goal without commitments or children
+- **WHEN** user deletes a Goal that has no associated commitments and no child goals
+- **THEN** the Goal is removed from the database
+
+#### Scenario: Prevent deletion of goal with commitments
+- **WHEN** user attempts to delete a Goal that has associated commitments
+- **THEN** the system raises an error indicating the Goal cannot be deleted
+
+#### Scenario: Prevent deletion of goal with children
+- **WHEN** user attempts to delete a Goal that has child goals
+- **THEN** the system raises an error indicating the Goal cannot be deleted
+
+#### Scenario: Prevent deletion of goal with recurring commitments
+- **WHEN** user attempts to delete a Goal that has associated RecurringCommitments
+- **THEN** the system raises an error indicating the Goal cannot be deleted
+
+### Requirement: Goal Status Transitions
+
+The system SHALL enforce valid status transitions for Goals.
+
+#### Scenario: Mark goal achieved
+- **WHEN** user changes Goal status from "active" to "achieved"
+- **THEN** the status is updated and updated_at is refreshed
+
+#### Scenario: Mark goal abandoned
+- **WHEN** user changes Goal status from "active" to "abandoned"
+- **THEN** the status is updated and updated_at is refreshed
+
+#### Scenario: Put goal on hold
+- **WHEN** user changes Goal status from "active" to "on_hold"
+- **THEN** the status is updated and updated_at is refreshed
+
+#### Scenario: Reactivate goal
+- **WHEN** user changes Goal status from "achieved", "abandoned", or "on_hold" back to "active"
+- **THEN** the status is updated and updated_at is refreshed
