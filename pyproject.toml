@@ -131,7 +131,7 @@ invalid-annotation = "error"
 redundant-cast = "warn"
 unsupported-operation = "error"
 # Disabled: SQLModel uses __tablename__ pattern that pyrefly doesn't understand
-bad-override = "warn"
+bad-override = false
 unannotated-parameter = "warn"
 unannotated-return = "warn"
 implicit-any = "warn"

@@ -4,6 +4,7 @@ import json
 import stat
 import sys
 from pathlib import Path
+from typing import Any
 
 from pydantic import TypeAdapter
 
@@ -31,7 +32,7 @@ class AuthStore:
         self.path = path if path is not None else get_auth_path()
         self._adapter: TypeAdapter[OAuthCredentials | ApiKeyCredentials] = TypeAdapter(ProviderAuth)
 
-    def _read_store(self) -> dict[str, dict]:
+    def _read_store(self) -> dict[str, dict[str, Any]]:
         """Read the current auth store from disk.
 
         Returns:
@@ -46,7 +47,7 @@ class AuthStore:
         except (json.JSONDecodeError, OSError):
             return {}
 
-    def _write_store(self, data: dict[str, dict]) -> None:
+    def _write_store(self, data: dict[str, dict[str, Any]]) -> None:
         """Write the auth store to disk with secure permissions.
 
         Args:
