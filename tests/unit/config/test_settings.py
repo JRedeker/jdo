@@ -115,6 +115,54 @@ class TestJDOSettings:
         assert settings.ai_provider is not None
         assert settings.ai_model is not None
 
+    def test_timezone_env_var_sets_field(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """JDO_TIMEZONE env var sets timezone field."""
+        from jdo.config.settings import JDOSettings
+
+        monkeypatch.setenv("JDO_TIMEZONE", "Europe/London")
+
+        with patch("jdo.config.settings.get_database_path", return_value=tmp_path / "test.db"):
+            settings = JDOSettings()
+
+        assert settings.timezone == "Europe/London"
+
+    def test_timezone_default_value(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """timezone defaults to America/New_York."""
+        from jdo.config.settings import JDOSettings
+
+        monkeypatch.delenv("JDO_TIMEZONE", raising=False)
+
+        with patch("jdo.config.settings.get_database_path", return_value=tmp_path / "test.db"):
+            settings = JDOSettings()
+
+        assert settings.timezone == "America/New_York"
+
+    def test_log_level_env_var_sets_field(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """JDO_LOG_LEVEL env var sets log_level field."""
+        from jdo.config.settings import JDOSettings
+
+        monkeypatch.setenv("JDO_LOG_LEVEL", "DEBUG")
+
+        with patch("jdo.config.settings.get_database_path", return_value=tmp_path / "test.db"):
+            settings = JDOSettings()
+
+        assert settings.log_level == "DEBUG"
+
+    def test_log_level_default_value(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """log_level defaults to INFO."""
+        from jdo.config.settings import JDOSettings
+
+        monkeypatch.delenv("JDO_LOG_LEVEL", raising=False)
+
+        with patch("jdo.config.settings.get_database_path", return_value=tmp_path / "test.db"):
+            settings = JDOSettings()
+
+        assert settings.log_level == "INFO"
+
 
 class TestSettingsSingleton:
     """Tests for settings singleton pattern."""

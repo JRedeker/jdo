@@ -30,6 +30,10 @@ class JDOSettings(BaseSettings):
     # Database settings
     database_path: Path | None = None
 
+    # Application settings
+    timezone: str = "America/New_York"
+    log_level: str = "INFO"
+
     @model_validator(mode="after")
     def set_database_path_default(self) -> Self:
         """Set default database path if not provided."""
