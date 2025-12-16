@@ -35,21 +35,29 @@ class TestChatScreenFlows:
 
     @pytest.fixture
     def chat_app(self) -> type[App]:
-        """Create an app with ChatScreen."""
+        """Create an app that pushes ChatScreen.
+
+        Note: Screens must be pushed, not yielded in compose().
+        Yielding a Screen in compose() causes focus tracking issues.
+        """
 
         class ChatTestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
+            def on_mount(self) -> None:
+                self.push_screen(ChatScreen())
 
         return ChatTestApp
 
     async def test_chat_screen_shows_prompt_and_panel(self, chat_app: type[App]) -> None:
         """ChatScreen displays both prompt input and data panel."""
         async with chat_app().run_test() as pilot:
+            # Wait for screen to mount
+            await pilot.pause()
+            screen = pilot.app.screen
+
             # Verify both main components exist
-            prompt = pilot.app.query_one(PromptInput)
-            panel = pilot.app.query_one(DataPanel)
-            container = pilot.app.query_one(ChatContainer)
+            prompt = screen.query_one(PromptInput)
+            panel = screen.query_one(DataPanel)
+            container = screen.query_one(ChatContainer)
 
             assert prompt is not None
             assert panel is not None
@@ -58,7 +66,11 @@ class TestChatScreenFlows:
     async def test_typing_message_in_prompt(self, chat_app: type[App]) -> None:
         """User can type a message in the prompt input."""
         async with chat_app().run_test() as pilot:
-            prompt = pilot.app.query_one(PromptInput)
+            # Wait for screen to mount
+            await pilot.pause()
+            screen = pilot.app.screen
+
+            prompt = screen.query_one(PromptInput)
 
             # Focus the prompt and type
             prompt.focus()
@@ -72,7 +84,11 @@ class TestChatScreenFlows:
     async def test_panel_starts_in_list_mode(self, chat_app: type[App]) -> None:
         """DataPanel starts in list mode by default."""
         async with chat_app().run_test() as pilot:
-            panel = pilot.app.query_one(DataPanel)
+            # Wait for screen to mount
+            await pilot.pause()
+            screen = pilot.app.screen
+
+            panel = screen.query_one(DataPanel)
 
             assert panel.mode == PanelMode.LIST
 
