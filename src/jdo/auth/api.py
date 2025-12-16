@@ -1,0 +1,131 @@
+"""Public API for authentication operations."""
+
+import os
+
+from jdo.auth.models import ApiKeyCredentials, OAuthCredentials
+from jdo.auth.store import AuthStore
+from jdo.paths import get_auth_path
+
+# Environment variable mapping for providers
+ENV_VAR_MAP = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+}
+
+
+def _get_store() -> AuthStore:
+    """Get the default auth store."""
+    return AuthStore(get_auth_path())
+
+
+def _get_env_credentials(provider_id: str) -> ApiKeyCredentials | None:
+    """Get credentials from environment variable fallback.
+
+    Args:
+        provider_id: The provider identifier.
+
+    Returns:
+        ApiKeyCredentials if env var is set, None otherwise.
+    """
+    env_var = ENV_VAR_MAP.get(provider_id)
+    if env_var:
+        api_key = os.environ.get(env_var)
+        if api_key:
+            return ApiKeyCredentials(api_key=api_key)
+    return None
+
+
+def get_credentials(
+    provider_id: str,
+) -> OAuthCredentials | ApiKeyCredentials | None:
+    """Get credentials for a provider.
+
+    Checks stored credentials first, then falls back to environment variables.
+
+    Args:
+        provider_id: The provider identifier (e.g., "anthropic", "openai").
+
+    Returns:
+        Credentials if found, None otherwise.
+    """
+    # Check stored credentials first
+    store = _get_store()
+    stored = store.get(provider_id)
+    if stored is not None:
+        return stored
+
+    # Fall back to environment variable
+    return _get_env_credentials(provider_id)
+
+
+def save_credentials(
+    provider_id: str,
+    credentials: OAuthCredentials | ApiKeyCredentials,
+) -> None:
+    """Save credentials for a provider.
+
+    Args:
+        provider_id: The provider identifier.
+        credentials: The credentials to save.
+    """
+    store = _get_store()
+    store.save(provider_id, credentials)
+
+
+def clear_credentials(provider_id: str) -> None:
+    """Clear credentials for a provider.
+
+    This operation is idempotent.
+
+    Args:
+        provider_id: The provider identifier to clear.
+    """
+    store = _get_store()
+    store.delete(provider_id)
+
+
+def is_authenticated(provider_id: str) -> bool:
+    """Check if a provider has valid credentials.
+
+    Checks both stored credentials and environment variables.
+
+    Args:
+        provider_id: The provider identifier.
+
+    Returns:
+        True if credentials exist, False otherwise.
+    """
+    return get_credentials(provider_id) is not None
+
+
+def get_auth_headers(provider_id: str) -> dict[str, str] | None:
+    """Get HTTP authentication headers for a provider.
+
+    Returns appropriate headers based on credential type:
+    - OAuth (Anthropic): Authorization: Bearer + anthropic-beta header
+    - API key (Anthropic): x-api-key header
+    - API key (OpenAI/OpenRouter): Authorization: Bearer header
+
+    Args:
+        provider_id: The provider identifier.
+
+    Returns:
+        Dictionary of headers if authenticated, None otherwise.
+    """
+    creds = get_credentials(provider_id)
+    if creds is None:
+        return None
+
+    if isinstance(creds, OAuthCredentials):
+        return {
+            "Authorization": f"Bearer {creds.access_token}",
+            "anthropic-beta": "oauth-2025-04-20",
+        }
+
+    # API key credentials
+    if provider_id == "anthropic":
+        return {"x-api-key": creds.api_key}
+
+    # OpenAI, OpenRouter use Bearer token format
+    return {"Authorization": f"Bearer {creds.api_key}"}
