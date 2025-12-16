@@ -38,8 +38,9 @@ dev = [
 ]
 
 # ------------------------------------------------------------------------------
-# Ruff - Linting & Formatting
+# Ruff - Linting & Formatting (STRICT)
 # ------------------------------------------------------------------------------
+# Run after every change: uv run ruff check --fix src/ tests/ && uv run ruff format src/ tests/
 [tool.ruff]
 line-length = 100
 target-version = "py311"
@@ -50,49 +51,68 @@ select = [
     "ALL",  # Enable all rules, then selectively ignore
 ]
 ignore = [
-    # Conflicts or not applicable
-    "D1",      # Missing docstrings (too noisy early on, enable later)
+    # Conflicts with formatter
     "COM812",  # Missing trailing comma (conflicts with formatter)
     "ISC001",  # Single line implicit string concatenation (conflicts with formatter)
-    # Project preferences
-    "TD",      # TODO comments format
-    "FIX",     # Fixme comments
-    "ERA",     # Commented out code (useful during development)
+    # Project preferences (minimal exceptions)
+    "TD",      # TODO comments format - we use simple TODOs
+    "FIX",     # Fixme comments - allow during development
 ]
+# Strict: Do NOT add noqa comments without documenting why in pyproject.toml
+# Prefer per-file-ignores over inline noqa comments
 
 [tool.ruff.lint.per-file-ignores]
+# Tests have relaxed rules for readability and practicality
 "tests/**/*.py" = [
-    "S101",    # Allow assert in tests
-    "S105",    # Allow hardcoded password strings in tests (fake tokens)
-    "S106",    # Allow hardcoded password arguments in tests (fake tokens)
-    "ARG",     # Unused arguments (fixtures)
-    "PLR2004", # Magic values in tests OK
-    "D",       # No docstrings required in tests
-    "PLC0415", # Allow imports inside functions (for test isolation)
-    "PT012",   # Allow multiple statements in pytest.raises blocks
-    "ANN",     # No type annotations required in tests
-    "DTZ",     # Allow naive datetime in tests
-    "RET504",  # Unnecessary assignment before return OK in tests
-    "SLF001",  # Allow private member access in tests
-    "F401",    # Allow unused imports in tests (for fixtures)
-    "RUF059",  # Allow unpacked variables that are unused
+    "S101",    # assert is the pytest way
+    "S105",    # Fake tokens in tests
+    "S106",    # Fake credentials in tests
+    "ARG",     # Fixtures appear unused
+    "PLR2004", # Magic values OK in tests
+    "D",       # No docstrings needed
+    "PLC0415", # Imports in functions for test isolation
+    "PT012",   # Multi-statement pytest.raises OK
+    "ANN",     # Type annotations optional in tests
+    "DTZ",     # Naive datetime OK in tests
+    "RET504",  # Extra assignment OK for clarity
+    "SLF001",  # Private member access for testing
+    "F401",    # Unused imports (fixtures)
+    "F841",    # Unused variables OK in tests (setup, intermediate values)
+    "RUF059",  # Unused unpacked variables
+    "RUF012",  # ClassVar not needed in test helper classes
+    "PERF401", # Async list comprehensions less readable in tests
 ]
+# Source code - minimal exceptions, document each one
 "src/**/*.py" = [
-    "PLW0603", # Allow global statement for singletons
+    "PLW0603", # Global statement needed for singleton pattern (engine, settings)
 ]
 "src/jdo/auth/oauth.py" = [
-    "S105",    # TOKEN_URL is not a password
-    "PLR2004", # HTTP 401 status code is clear
-    "TRY003",  # Exception messages are clear
-    "EM101",   # String literal in exception OK here
-    "EM102",   # f-string in exception OK here
+    "S105",    # TOKEN_URL constant is not a secret
+    "PLR2004", # HTTP status codes are self-documenting
+    "TRY003",  # OAuth errors need descriptive messages
+    "EM101",   # String literals in OAuth exceptions
+    "EM102",   # f-strings in OAuth exceptions
 ]
 "src/jdo/auth/screens.py" = [
-    "RUF012",  # BINDINGS is a Textual pattern
-    "FBT003",  # Boolean dismiss() is Textual API
+    "RUF012",  # BINDINGS - Textual requires this exact pattern
+    "FBT003",  # dismiss(True/False) - Textual API
 ]
 "src/jdo/auth/store.py" = [
-    "BLE001",  # Catching Exception for validation errors is intentional
+    "BLE001",  # Catching Exception for JSON parse failures is intentional
+]
+"src/jdo/widgets/**/*.py" = [
+    "A002",    # 'id' parameter - Textual widget convention, cannot change
+    "RUF012",  # BINDINGS/DEFAULT_CSS - Textual patterns
+]
+"src/jdo/screens/**/*.py" = [
+    "A002",    # 'id' parameter - Textual widget convention, cannot change
+    "RUF012",  # BINDINGS/DEFAULT_CSS - Textual patterns
+    "FBT001",  # push_screen callbacks require positional bool - Textual API
+]
+"src/jdo/commands/handlers.py" = [
+    "ARG002",  # Unused cmd/context args - handlers implement common interface
+    "ANN401",  # Any for goal_id - accepts UUID or other ID types from context
+    "RUF012",  # ClassVar for _ENTITY_MAP, _COMMAND_HELP - immutable at runtime
 ]
 
 [tool.ruff.lint.isort]
@@ -110,14 +130,16 @@ indent-style = "space"
 docstring-code-format = true
 
 # ------------------------------------------------------------------------------
-# Pyrefly - Type Checking (strict mode)
+# Pyrefly - Type Checking (STRICT)
 # ------------------------------------------------------------------------------
+# Run after every change: uvx pyrefly check src/
+# NOTE: pyrefly has known false positives with SQLModel/SQLAlchemy - check runtime if unsure
 [tool.pyrefly]
 python-version = "3.11.0"
 project-includes = ["src"]
 
 [tool.pyrefly.errors]
-# Strict type checking - all critical errors enabled
+# All type errors are errors (strict mode)
 missing-argument = "error"
 unexpected-keyword = "error"
 bad-return = "error"
@@ -128,13 +150,46 @@ unbound-name = "error"
 missing-attribute = "error"
 not-callable = "error"
 invalid-annotation = "error"
-redundant-cast = "warn"
 unsupported-operation = "error"
-# Disabled: SQLModel uses __tablename__ pattern that pyrefly doesn't understand
-bad-override = false
+# Warnings for gradual typing
+redundant-cast = "warn"
 unannotated-parameter = "warn"
 unannotated-return = "warn"
 implicit-any = "warn"
+# Known pyrefly limitations with SQLModel/Textual/Rich
+bad-override = false  # SQLModel __tablename__ pattern
+
+# Sub-configs for files with known pyrefly false positives (verified working at runtime)
+[[tool.pyrefly.sub-config]]
+# SQLAlchemy column comparisons (.join), .in_(), .order_by() - pyrefly doesn't understand SQLModel column descriptors
+matches = "src/jdo/ai/tools.py"
+[tool.pyrefly.sub-config.errors]
+bad-argument-type = false
+missing-attribute = false
+
+[[tool.pyrefly.sub-config]]
+# Rich Text.append() with VisualType - pyrefly has incorrect type narrowing for Rich
+matches = "src/jdo/widgets/chat_message.py"
+[tool.pyrefly.sub-config.errors]
+bad-argument-type = false
+
+[[tool.pyrefly.sub-config]]
+# len() on Optional value that's already been checked - pyrefly doesn't narrow correctly
+matches = "src/jdo/commands/handlers.py"
+[tool.pyrefly.sub-config.errors]
+bad-argument-type = false
+
+[[tool.pyrefly.sub-config]]
+# f-string format in list.append() - pyrefly incorrectly flags LiteralString constraint
+matches = "src/jdo/ai/extraction.py"
+[tool.pyrefly.sub-config.errors]
+bad-argument-type = false
+
+[[tool.pyrefly.sub-config]]
+# SQLAlchemy .in_() method on status enum - pyrefly doesn't understand SQLModel column descriptors
+matches = "src/jdo/db/session.py"
+[tool.pyrefly.sub-config.errors]
+missing-attribute = false
 
 # ------------------------------------------------------------------------------
 # Pytest
