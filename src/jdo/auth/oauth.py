@@ -22,10 +22,8 @@ class AuthenticationError(Exception):
     """Raised when authentication fails."""
 
 
-
 class TokenRevokedError(AuthenticationError):
     """Raised when a refresh token has been revoked."""
-
 
 
 def generate_pkce_pair() -> tuple[str, str]:
