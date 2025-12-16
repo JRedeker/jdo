@@ -177,7 +177,7 @@ class TestTaskPersistence:
         from jdo.db.engine import get_engine, reset_engine
         from jdo.db.session import get_session
         from jdo.models.commitment import Commitment
-        from jdo.models.goal import Goal  # noqa: F401 - needed for FK
+        from jdo.models.goal import Goal
         from jdo.models.stakeholder import Stakeholder, StakeholderType
 
         reset_engine()
@@ -234,7 +234,7 @@ class TestTaskPersistence:
         from jdo.db.engine import get_engine, reset_engine
         from jdo.db.session import get_session
         from jdo.models.commitment import Commitment
-        from jdo.models.goal import Goal  # noqa: F401 - needed for FK
+        from jdo.models.goal import Goal
         from jdo.models.stakeholder import Stakeholder, StakeholderType
 
         reset_engine()

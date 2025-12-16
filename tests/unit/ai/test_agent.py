@@ -64,10 +64,10 @@ class TestCreateAgent:
         agent = create_agent_with_model(TestModel())
 
         # Verify system prompt is set (accessing internal _system_prompts)
-        assert agent._system_prompts is not None  # noqa: SLF001
-        assert len(agent._system_prompts) > 0  # noqa: SLF001
+        assert agent._system_prompts is not None
+        assert len(agent._system_prompts) > 0
         # The first system prompt should be our SYSTEM_PROMPT
-        assert SYSTEM_PROMPT in agent._system_prompts  # noqa: SLF001
+        assert SYSTEM_PROMPT in agent._system_prompts
 
     async def test_agent_can_run_with_test_model(self) -> None:
         """Agent can be run with TestModel for testing."""

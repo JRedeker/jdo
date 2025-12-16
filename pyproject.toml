@@ -63,6 +63,8 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = [
     "S101",    # Allow assert in tests
+    "S105",    # Allow hardcoded password strings in tests (fake tokens)
+    "S106",    # Allow hardcoded password arguments in tests (fake tokens)
     "ARG",     # Unused arguments (fixtures)
     "PLR2004", # Magic values in tests OK
     "D",       # No docstrings required in tests
@@ -71,9 +73,26 @@ ignore = [
     "ANN",     # No type annotations required in tests
     "DTZ",     # Allow naive datetime in tests
     "RET504",  # Unnecessary assignment before return OK in tests
+    "SLF001",  # Allow private member access in tests
+    "F401",    # Allow unused imports in tests (for fixtures)
+    "RUF059",  # Allow unpacked variables that are unused
 ]
 "src/**/*.py" = [
     "PLW0603", # Allow global statement for singletons
+]
+"src/jdo/auth/oauth.py" = [
+    "S105",    # TOKEN_URL is not a password
+    "PLR2004", # HTTP 401 status code is clear
+    "TRY003",  # Exception messages are clear
+    "EM101",   # String literal in exception OK here
+    "EM102",   # f-string in exception OK here
+]
+"src/jdo/auth/screens.py" = [
+    "RUF012",  # BINDINGS is a Textual pattern
+    "FBT003",  # Boolean dismiss() is Textual API
+]
+"src/jdo/auth/store.py" = [
+    "BLE001",  # Catching Exception for validation errors is intentional
 ]
 
 [tool.ruff.lint.isort]
