@@ -1,0 +1,136 @@
+[project]
+name = "jdo"
+version = "0.1.0"
+description = "A terminal application built with Textual"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "textual>=0.89.1",
+    "rich>=13.9.4",
+    "pydantic>=2.10.3",
+    "sqlmodel>=0.0.24",
+    "pydantic-settings>=2.0.0",
+    "platformdirs>=4.0.0",
+    "pydantic-ai>=0.1.0",
+    "rapidfuzz>=3.0.0",
+    "httpx>=0.27.0",
+]
+
+[project.scripts]
+jdo = "jdo.app:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jdo"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.8.0",
+    "lizard>=1.17.0",
+]
+
+# ------------------------------------------------------------------------------
+# Ruff - Linting & Formatting
+# ------------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "ALL",  # Enable all rules, then selectively ignore
+]
+ignore = [
+    # Conflicts or not applicable
+    "D1",      # Missing docstrings (too noisy early on, enable later)
+    "COM812",  # Missing trailing comma (conflicts with formatter)
+    "ISC001",  # Single line implicit string concatenation (conflicts with formatter)
+    # Project preferences
+    "TD",      # TODO comments format
+    "FIX",     # Fixme comments
+    "ERA",     # Commented out code (useful during development)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",    # Allow assert in tests
+    "ARG",     # Unused arguments (fixtures)
+    "PLR2004", # Magic values in tests OK
+    "D",       # No docstrings required in tests
+    "PLC0415", # Allow imports inside functions (for test isolation)
+    "PT012",   # Allow multiple statements in pytest.raises blocks
+]
+"src/**/*.py" = [
+    "PLW0603", # Allow global statement for singletons
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["jdo"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.pylint]
+max-args = 6
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+# ------------------------------------------------------------------------------
+# Pyrefly - Type Checking (strict mode)
+# ------------------------------------------------------------------------------
+[tool.pyrefly]
+python-version = "3.11.0"
+project-includes = ["src"]
+
+[tool.pyrefly.errors]
+# Strict type checking - all critical errors enabled
+missing-argument = "error"
+unexpected-keyword = "error"
+bad-return = "error"
+bad-argument-type = "error"
+bad-assignment = "error"
+missing-import = "error"
+unbound-name = "error"
+missing-attribute = "error"
+not-callable = "error"
+invalid-annotation = "error"
+redundant-cast = "warn"
+unsupported-operation = "error"
+# Disabled: SQLModel uses __tablename__ pattern that pyrefly doesn't understand
+bad-override = "warn"
+unannotated-parameter = "warn"
+unannotated-return = "warn"
+implicit-any = "warn"
+
+# ------------------------------------------------------------------------------
+# Pytest
+# ------------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = [
+    "-ra",
+    "-q",
+    "--strict-markers",
+]
+
+# ------------------------------------------------------------------------------
+# Lizard - Cyclomatic Complexity Analysis
+# ------------------------------------------------------------------------------
+# Run: uv run lizard src/ -C 10 -L 50 -a 6 -w
+# Thresholds:
+#   -C 10: Max cyclomatic complexity per function
+#   -L 50: Max lines of code per function
+#   -a 6:  Max parameters per function
+#   -w:    Show only warnings (functions exceeding thresholds)
