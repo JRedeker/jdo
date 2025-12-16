@@ -2,7 +2,7 @@
 
 This task list follows Test-Driven Development: write failing tests first, then implement to pass.
 
-**Dependencies**: Requires `add-core-domain-models` for domain entities.
+**Dependencies**: Requires `add-core-domain-models` for domain entities, `refactor-core-libraries` for AI agent foundation.
 
 ## Phase 1: Draft Model
 
@@ -19,18 +19,24 @@ This task list follows Test-Driven Development: write failing tests first, then 
 - [ ] Add draft CRUD operations
 - [ ] Run tests - all should pass
 
-## Phase 2: AI Provider Interface
+## Phase 2: AI Agent Tools
 
-### 2.1 AI Protocol Tests (Red)
-- [ ] Test: AIProvider protocol defines send_message method
-- [ ] Test: AIProvider protocol defines stream_response method
-- [ ] Test: StubProvider returns canned responses
-- [ ] Test: StubProvider simulates streaming delay
+*Moved from `refactor-core-libraries` - tools need a consumer (the TUI) to define the interface.*
 
-### 2.2 Implement AI Protocol (Green)
-- [ ] Define `AIProvider` protocol in `src/jdo/ai/protocol.py`
-- [ ] Create `StubProvider` in `src/jdo/ai/stub_provider.py`
+### 2.1 Agent Tools Tests (Red)
+- [ ] Test: get_current_commitments tool returns pending/in-progress commitments
+- [ ] Test: get_overdue_commitments tool returns commitments past due date
+- [ ] Test: get_commitments_for_goal tool returns commitments for goal_id
+- [ ] Test: Tools access database via JDODependencies.session
+- [ ] Test: Tools return structured dicts suitable for AI response
+
+### 2.2 Implement Agent Tools (Green)
+- [ ] Create `src/jdo/ai/tools.py` with commitment query tools
+- [ ] Register tools with the agent
 - [ ] Run tests - all should pass
+
+### 2.3 Agent Integration Test
+- [ ] Test: Agent can query commitments via tools (end-to-end with TestModel)
 
 ## Phase 3: Command Parser
 
@@ -229,6 +235,19 @@ This task list follows Test-Driven Development: write failing tests first, then 
 ### 9.2 Implement Home Screen (Green)
 - [ ] Create `HomeScreen` in `src/jdo/screens/home.py`
 - [ ] Add keyboard bindings
+- [ ] Run tests - all should pass
+
+### 9.3 Settings Screen Tests (Red)
+*Moved from `add-provider-auth` - requires TUI infrastructure.*
+- [ ] Test: Settings screen shows auth status per provider
+- [ ] Test: Settings screen launches OAuth flow for Claude (uses `OAuthScreen`)
+- [ ] Test: Settings screen launches API key flow for others (uses `ApiKeyScreen`)
+- [ ] Test: Provider switch prompts for new auth if needed
+- [ ] Test: Settings shows current AI provider and model
+
+### 9.4 Implement Settings Screen (Green)
+- [ ] Create `SettingsScreen` in `src/jdo/screens/settings.py`
+- [ ] Integrate with `jdo.auth` module (`is_authenticated`, `get_auth_methods`, screens)
 - [ ] Run tests - all should pass
 
 ## Phase 10: AI Integration
