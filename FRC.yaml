@@ -1,0 +1,701 @@
+# Future Roadmap Considerations (FRC)
+# 
+# This document tracks features and enhancements that are out of scope for the 
+# initial implementation but should be considered for future development.
+#
+# Priority: critical, high, medium, low
+# Complexity: low, medium, high, very_high
+# Status: proposed, approved, in_progress, completed, deferred
+
+metadata:
+  version: "2.0"
+  last_updated: "2025-12-15"
+  philosophy: |
+    JDO is built on Meta Performance™ Institute (MPI) principles:
+    - Commitments are promises, not preferences - make fewer, keep them all
+    - Integrity = deliver, notify, clean up - it's the engine of workability
+    - Vision leads - goals and commitments must trace back to a vivid future picture
+
+# =============================================================================
+# CORE PHILOSOPHY FEATURES (High Priority - Aligned with MPI)
+# =============================================================================
+
+features:
+
+  # ---------------------------------------------------------------------------
+  # Honor-Your-Word Protocol
+  # ---------------------------------------------------------------------------
+  honor_your_word_protocol:
+    title: "Honor-Your-Word Protocol"
+    priority: critical
+    complexity: high
+    status: proposed
+    category: integrity
+    
+    description: |
+      Implements MPI's three integrity rules:
+      1. Do what you said by when you said
+      2. Notify the right people as soon as you know you won't
+      3. Clean up the mess caused
+      
+      This transforms "abandoned" commitments into a structured recovery workflow
+      that maintains integrity even when commitments can't be met.
+    
+    current_behavior: |
+      Commitments have only `abandoned` status with no structured recovery.
+      No stakeholder notification system. No cleanup tracking.
+    
+    proposed_changes:
+      commitment_status_extension:
+        description: "Add 'at_risk' status between in_progress and abandoned"
+        new_statuses:
+          - name: "at_risk"
+            meaning: "Commitment may not be met; stakeholder notification required"
+            triggers:
+              - "User flags commitment as at-risk"
+              - "AI detects commitment is overdue or likely to miss deadline"
+            required_actions:
+              - "Select stakeholders to notify"
+              - "Provide reason for risk"
+              - "Propose new deadline or indicate cannot complete"
+      
+      cleanup_plan_model:
+        description: "New CleanupPlan entity linked to commitment"
+        fields:
+          - name: "id"
+            type: "UUID"
+          - name: "commitment_id"
+            type: "UUID"
+            required: true
+          - name: "impact_description"
+            type: "text"
+            description: "What impact does missing this have?"
+          - name: "mitigation_actions"
+            type: "list[str]"
+            description: "What will you do to mitigate the impact?"
+          - name: "stakeholders_notified"
+            type: "list[UUID]"
+            description: "Which stakeholders were notified?"
+          - name: "notified_at"
+            type: "datetime"
+          - name: "status"
+            type: "enum"
+            values: ["planned", "in_progress", "completed"]
+          - name: "completed_at"
+            type: "datetime | None"
+          - name: "created_at"
+            type: "datetime"
+      
+      notification_workflow:
+        description: "Stakeholder notification when commitment is at risk"
+        steps:
+          - step: 1
+            action: "User marks commitment as at_risk"
+            system_response: "Display stakeholder selection from commitment's stakeholder + related stakeholders"
+          - step: 2
+            action: "User selects stakeholders and writes message"
+            system_response: "AI helps draft notification with: delay reason, impact, proposed resolution"
+          - step: 3
+            action: "User sends notification"
+            system_response: "Record notified_at timestamp, create CleanupPlan draft"
+          - step: 4
+            action: "User completes cleanup actions"
+            system_response: "Mark CleanupPlan as completed, update integrity metrics"
+      
+      ai_risk_detection:
+        description: "AI proactively identifies at-risk commitments"
+        triggers:
+          - "Commitment is overdue"
+          - "Commitment due within 24 hours with no task progress"
+          - "User hasn't interacted with commitment approaching deadline"
+        response: "AI asks: 'Your commitment to [stakeholder] is due [time]. Are you on track?'"
+    
+    commands:
+      - command: "/atrisk"
+        description: "Mark current commitment as at-risk, start notification workflow"
+      - command: "/cleanup"
+        description: "View or update cleanup plan for at-risk/abandoned commitment"
+      - command: "/notify"
+        description: "Send stakeholder notification about commitment status"
+    
+    acceptance_criteria:
+      - "Marking at_risk requires stakeholder notification within the session"
+      - "Cannot mark commitment as abandoned without completed CleanupPlan"
+      - "AI proactively warns about commitments at risk of missing deadline"
+      - "Notification history is preserved and linked to commitment"
+      - "CleanupPlan completion is tracked and affects integrity score"
+    
+    references:
+      - "MPI Integrity Rules"
+      - "MPI 'Honor Your Word' framework"
+
+  # ---------------------------------------------------------------------------
+  # Integrity Metrics & Scoring
+  # ---------------------------------------------------------------------------
+  integrity_metrics:
+    title: "Integrity Metrics & Scoring"
+    priority: high
+    complexity: high
+    status: proposed
+    category: integrity
+    
+    description: |
+      Track and display reliability metrics based on MPI's integrity framework.
+      Provides visibility into commitment-keeping patterns to reinforce behavior.
+    
+    current_behavior: |
+      No metrics or scoring. User has no visibility into their reliability patterns.
+    
+    proposed_changes:
+      metrics_tracked:
+        - name: "on_time_delivery_rate"
+          calculation: "completed_on_time / total_completed"
+          description: "Percentage of commitments completed by due date"
+        
+        - name: "notification_timeliness"
+          calculation: "avg(due_date - notified_at) for at_risk commitments"
+          description: "Average lead time when notifying stakeholders of risk"
+        
+        - name: "cleanup_completion_rate"
+          calculation: "cleanup_completed / cleanup_required"
+          description: "Percentage of cleanup plans fully completed"
+        
+        - name: "reliability_streak"
+          calculation: "consecutive days/weeks with all commitments met"
+          description: "Current streak of perfect reliability"
+        
+        - name: "commitment_volume"
+          calculation: "commitments made per week/month"
+          description: "Track if user is over-committing"
+        
+        - name: "stakeholder_impact_score"
+          calculation: "weighted by stakeholder importance and miss frequency"
+          description: "Which stakeholders are most affected by misses"
+      
+      integrity_score:
+        description: "Composite score reflecting overall integrity/workability"
+        formula: |
+          (on_time_rate * 0.4) + 
+          (notification_timeliness_score * 0.25) + 
+          (cleanup_completion_rate * 0.25) + 
+          (streak_bonus * 0.1)
+        display: "Shown as percentage or letter grade (A/B/C/D)"
+      
+      dashboard_views:
+        - name: "Weekly Integrity Report"
+          shows:
+            - "Commitments made vs completed"
+            - "On-time rate trend"
+            - "Current streak"
+            - "At-risk handling timeliness"
+        
+        - name: "Stakeholder Reliability View"
+          shows:
+            - "Reliability rate per stakeholder"
+            - "Most impacted stakeholders"
+            - "Notification patterns"
+    
+    commands:
+      - command: "/integrity"
+        description: "Show integrity dashboard with key metrics"
+      - command: "/streak"
+        description: "Show current reliability streak and history"
+    
+    acceptance_criteria:
+      - "Metrics update in real-time as commitments change status"
+      - "User can view integrity score from home screen"
+      - "Historical trends are preserved and chartable"
+      - "AI references integrity patterns in coaching conversations"
+    
+    references:
+      - "MPI Integrity Framework"
+      - "MPI 'Workability' concept"
+
+  # ---------------------------------------------------------------------------
+  # Vision Model & Canvas
+  # ---------------------------------------------------------------------------
+  vision_model:
+    title: "Vision Model & Canvas"
+    priority: high
+    complexity: medium
+    status: proposed
+    category: planning_hierarchy
+    
+    description: |
+      Introduce a top-level Vision entity that sits above Goals in the hierarchy.
+      Vision represents a vivid, inspiring picture of the future that ignites passion.
+      
+      New hierarchy: Vision → Goal → Milestone → Commitment → Task
+    
+    current_behavior: |
+      Goals have solution_vision field but no separate Vision entity.
+      Hierarchy is: Goal → Commitment → Task
+    
+    proposed_changes:
+      vision_model:
+        description: "New Vision SQLModel entity"
+        fields:
+          - name: "id"
+            type: "UUID"
+          - name: "title"
+            type: "str"
+            description: "Short inspiring headline"
+            required: true
+          - name: "timeframe"
+            type: "str"
+            description: "When this vision is realized (e.g., '5 years', '2027')"
+          - name: "narrative"
+            type: "text"
+            description: "Vivid description of the future state"
+            required: true
+          - name: "metrics"
+            type: "list[str]"
+            description: "How will you know you've achieved this?"
+          - name: "why_it_matters"
+            type: "text"
+            description: "Why this vision ignites passion"
+          - name: "status"
+            type: "enum"
+            values: ["active", "achieved", "evolved", "abandoned"]
+          - name: "last_reviewed_at"
+            type: "datetime | None"
+          - name: "created_at"
+            type: "datetime"
+          - name: "updated_at"
+            type: "datetime"
+      
+      goal_model_changes:
+        description: "Link Goal to Vision instead of having inline vision fields"
+        changes:
+          - "Add vision_id (UUID | None) foreign key"
+          - "Keep solution_vision field for goal-specific vision (optional)"
+          - "Remove or repurpose problem_statement (move to Vision?)"
+      
+      vision_canvas_ui:
+        description: "Dedicated UI for creating and reviewing Visions"
+        features:
+          - "Structured form with inspiring prompts"
+          - "AI helps refine vision to be vivid and measurable"
+          - "Visual display of vision → goals → milestones hierarchy"
+          - "Quarterly review prompts for each vision"
+    
+    commands:
+      - command: "/vision"
+        description: "List all visions"
+      - command: "/vision new"
+        description: "Create new vision with guided prompts"
+      - command: "/vision review"
+        description: "Review visions due for quarterly check"
+    
+    acceptance_criteria:
+      - "Vision is the top of the planning hierarchy"
+      - "Goals can be linked to a Vision"
+      - "Vision review is prompted quarterly"
+      - "AI helps articulate vivid, inspiring visions"
+    
+    references:
+      - "MPI GO LIVE 'Vision' value"
+      - "MPI Vision-first planning"
+
+  # ---------------------------------------------------------------------------
+  # Milestone Model
+  # ---------------------------------------------------------------------------
+  milestone_model:
+    title: "Milestone Model"
+    priority: high
+    complexity: medium
+    status: proposed
+    category: planning_hierarchy
+    
+    description: |
+      Introduce Milestone entity between Goal and Commitment.
+      Milestones are concrete checkpoints with dates that break down goals
+      into achievable chunks. Commitments are then made toward milestones.
+      
+      Hierarchy: Vision → Goal → Milestone → Commitment → Task
+    
+    current_behavior: |
+      Commitments link directly to Goals. No intermediate milestone concept.
+    
+    proposed_changes:
+      milestone_model:
+        description: "New Milestone SQLModel entity"
+        fields:
+          - name: "id"
+            type: "UUID"
+          - name: "goal_id"
+            type: "UUID"
+            required: true
+          - name: "title"
+            type: "str"
+            required: true
+          - name: "description"
+            type: "text | None"
+          - name: "target_date"
+            type: "date"
+            required: true
+            description: "Unlike goals, milestones have concrete dates"
+          - name: "status"
+            type: "enum"
+            values: ["pending", "in_progress", "completed", "missed"]
+          - name: "completed_at"
+            type: "datetime | None"
+          - name: "created_at"
+            type: "datetime"
+          - name: "updated_at"
+            type: "datetime"
+      
+      commitment_model_changes:
+        description: "Link Commitment to Milestone instead of Goal"
+        changes:
+          - "Add milestone_id (UUID | None) foreign key"
+          - "Keep goal_id for direct goal linkage (for simpler cases)"
+          - "Commitment can link to milestone OR goal, not required to have both"
+      
+      milestone_ui:
+        description: "UI for managing milestones within goals"
+        features:
+          - "Timeline view of milestones for a goal"
+          - "Progress indicator based on commitment completion"
+          - "AI suggests milestones when creating ambitious goals"
+    
+    commands:
+      - command: "/milestone"
+        description: "List milestones for current goal"
+      - command: "/milestone new"
+        description: "Create milestone for current goal"
+    
+    acceptance_criteria:
+      - "Milestones have concrete target dates"
+      - "Commitments can be linked to milestones"
+      - "Goal progress is calculated from milestone completion"
+      - "AI suggests breaking goals into milestones"
+    
+    references:
+      - "MPI Planning Hierarchy"
+
+  # ---------------------------------------------------------------------------
+  # Vision Alignment Reports
+  # ---------------------------------------------------------------------------
+  vision_alignment:
+    title: "Vision Alignment Reports"
+    priority: medium
+    complexity: medium
+    status: proposed
+    category: integrity
+    
+    description: |
+      Track and report on how well commitments align with vision.
+      Surface "drift" where user is making commitments that don't connect
+      to any vision or goal.
+    
+    proposed_changes:
+      alignment_metrics:
+        - name: "vision_linked_rate"
+          calculation: "commitments with vision ancestry / total commitments"
+          description: "What % of commitments trace back to a vision?"
+        
+        - name: "orphan_commitment_count"
+          calculation: "commitments with no goal_id and no milestone_id"
+          description: "Commitments not connected to larger purpose"
+        
+        - name: "goal_coverage"
+          calculation: "goals with active commitments / total active goals"
+          description: "Are all goals being worked toward?"
+        
+        - name: "vision_drift_alert"
+          calculation: "orphan_commitment_rate > threshold"
+          description: "Warn when too many commitments lack vision alignment"
+      
+      reports:
+        - name: "Quarterly Vision Alignment Report"
+          shows:
+            - "% commitments linked to vision"
+            - "Goals without recent commitments"
+            - "Orphan commitments list"
+            - "Suggested goal/vision links"
+    
+    commands:
+      - command: "/alignment"
+        description: "Show vision alignment dashboard"
+    
+    acceptance_criteria:
+      - "Orphan commitments are surfaced for user attention"
+      - "AI suggests linking orphan commitments to goals"
+      - "Quarterly report prompts vision alignment review"
+
+# =============================================================================
+# COACHING & GROWTH FEATURES
+# =============================================================================
+
+  # ---------------------------------------------------------------------------
+  # GO LIVE Value Prompts
+  # ---------------------------------------------------------------------------
+  go_live_prompts:
+    title: "GO LIVE Value Prompts"
+    priority: medium
+    complexity: low
+    status: proposed
+    category: coaching
+    
+    description: |
+      Lightweight prompts reinforcing MPI's GO LIVE values:
+      Growth, Ownership, Love, Integrity, Vision, Energy
+    
+    proposed_changes:
+      prompt_types:
+        - trigger: "Starting work on commitment"
+          prompt: "Where is your ownership in this?"
+        
+        - trigger: "Completing a commitment"
+          prompt: "What growth did this create?"
+        
+        - trigger: "Daily check-in"
+          prompt: "What expands your energy today?"
+        
+        - trigger: "Goal review"
+          prompt: "Does this still ignite passion?"
+        
+        - trigger: "After missing commitment"
+          prompt: "What can you learn from this?"
+      
+      settings:
+        - "Prompts can be enabled/disabled per type"
+        - "Frequency can be adjusted (every time, daily, weekly)"
+    
+    acceptance_criteria:
+      - "Prompts appear at appropriate moments"
+      - "User can disable prompts they find unhelpful"
+      - "Prompts are brief and non-intrusive"
+    
+    references:
+      - "MPI GO LIVE values"
+
+  # ---------------------------------------------------------------------------
+  # Coaching Hooks & Vision Calls
+  # ---------------------------------------------------------------------------
+  coaching_hooks:
+    title: "Coaching Hooks & Vision Calls"
+    priority: low
+    complexity: medium
+    status: proposed
+    category: coaching
+    
+    description: |
+      Support for coaching sessions with structured agendas and feedback.
+      Based on MPI Foundations emphasis on vision calls.
+    
+    proposed_changes:
+      vision_call_agenda:
+        description: "Generate agenda for coaching/accountability sessions"
+        includes:
+          - "Recent commitments and their status"
+          - "Commitments at risk or missed"
+          - "Cleanup plan status"
+          - "Integrity metrics summary"
+          - "Goals due for review"
+          - "Suggested discussion topics"
+      
+      feedback_model:
+        description: "Capture feedback after coaching sessions"
+        fields:
+          - name: "id"
+            type: "UUID"
+          - name: "session_date"
+            type: "date"
+          - name: "insights"
+            type: "text"
+          - name: "action_items"
+            type: "list[str]"
+          - name: "next_session_date"
+            type: "date | None"
+    
+    commands:
+      - command: "/agenda"
+        description: "Generate coaching session agenda"
+      - command: "/feedback"
+        description: "Log feedback from coaching session"
+    
+    acceptance_criteria:
+      - "Agenda export to markdown or text"
+      - "Feedback linked to relevant commitments/goals"
+
+# =============================================================================
+# EXISTING FRC ITEMS (Migrated from original format)
+# =============================================================================
+
+  graceful_degradation:
+    title: "Graceful Degradation Mode"
+    priority: medium
+    complexity: medium
+    status: proposed
+    category: ai
+    
+    description: |
+      When AI provider is unavailable (no auth, rate limited, network error),
+      allow slash commands to work while disabling natural language processing.
+    
+    current_behavior: "Full block with error message when AI unavailable"
+    
+    proposed_changes:
+      features:
+        - "Detect AI availability on startup and during use"
+        - "Fall back to command-only mode"
+        - "Queue natural language messages for processing when AI returns"
+        - "Show clear indicator of degraded mode in UI"
+
+  ai_intelligent_sorting:
+    title: "AI-Intelligent Commitment Sorting"
+    priority: medium
+    complexity: medium
+    status: proposed
+    category: ai
+    
+    description: "Smart sorting that surfaces what matters most"
+    
+    current_behavior: "Static sort by due date ascending"
+    
+    proposed_changes:
+      factors:
+        - "Overdue status"
+        - "Stakeholder importance"
+        - "Goal alignment"
+        - "User patterns"
+        - "Risk level"
+      features:
+        - "Toggle between 'smart' and 'due date' sorting"
+
+  ai_intelligent_review_urging:
+    title: "AI-Intelligent Review Urging"
+    priority: low
+    complexity: high
+    status: proposed
+    category: ai
+    
+    description: "AI suggests review timing based on activity patterns"
+    
+    current_behavior: "Static review intervals set by user"
+    
+    proposed_changes:
+      features:
+        - "AI analyzes goal progress and commitment completion patterns"
+        - "Suggests review timing based on activity"
+        - "Proactively reminds user when goals seem stale"
+        - "Adjusts urgency based on goal importance"
+
+  cloud_sync:
+    title: "Cloud Sync"
+    priority: low
+    complexity: very_high
+    status: proposed
+    category: data
+    
+    description: "Optional cloud backup and multi-device support"
+    
+    current_behavior: "Single-user local SQLite storage"
+    
+    proposed_changes:
+      features:
+        - "Optional cloud backup/sync"
+        - "Multi-device support"
+        - "Conflict resolution for concurrent edits"
+
+  import_export:
+    title: "Import/Export"
+    priority: medium
+    complexity: medium
+    status: proposed
+    category: data
+    
+    description: "Data migration and backup capabilities"
+    
+    proposed_changes:
+      features:
+        - "Import from Todoist, Things, OmniFocus, etc."
+        - "Export to standard formats (JSON, CSV, iCal)"
+        - "Backup/restore functionality"
+
+  mobile_web_interface:
+    title: "Mobile/Web Interface"
+    priority: low
+    complexity: very_high
+    status: proposed
+    category: ui
+    
+    description: "Access JDO beyond the terminal"
+    
+    current_behavior: "TUI-only"
+    
+    proposed_changes:
+      features:
+        - "Textual-web for browser access"
+        - "Mobile-friendly interface"
+        - "API for third-party integrations"
+
+  notifications:
+    title: "Notifications"
+    priority: medium
+    complexity: medium
+    status: proposed
+    category: ui
+    
+    description: "Proactive reminders and alerts"
+    
+    current_behavior: "No notification system"
+    
+    proposed_changes:
+      features:
+        - "Desktop notifications for due commitments"
+        - "Daily digest emails"
+        - "Slack/Discord integration"
+        - "Commitment reminder schedule ahead of due time"
+
+  commitment_reminders:
+    title: "Commitment Reminders & Escalation"
+    priority: medium
+    complexity: medium
+    status: proposed
+    category: integrity
+    
+    description: |
+      Automated reminder schedule ahead of commitment due dates.
+      Escalation if risk is detected.
+    
+    proposed_changes:
+      reminder_schedule:
+        - trigger: "24 hours before due"
+          action: "Gentle reminder"
+        - trigger: "2 hours before due"
+          action: "Urgent reminder if not in_progress"
+        - trigger: "At due time"
+          action: "Check-in prompt"
+        - trigger: "Overdue"
+          action: "Escalation to at_risk workflow"
+      
+      settings:
+        - "Customizable reminder timing"
+        - "Per-commitment reminder preferences"
+        - "Quiet hours support"
+
+# =============================================================================
+# NOTES
+# =============================================================================
+
+notes:
+  review_cadence: |
+    This document should be reviewed when:
+    - Starting a new development cycle
+    - User feedback suggests feature gaps
+    - New MPI guidance becomes available
+  
+  promotion_criteria: |
+    Items are promoted to active development when:
+    - Priority is critical or high AND resources available
+    - User demand is demonstrated
+    - Prerequisite features are complete
+  
+  philosophy_alignment: |
+    All features should align with MPI principles:
+    - Does this help users keep commitments?
+    - Does this support integrity (deliver, notify, cleanup)?
+    - Does this connect actions to vision?
