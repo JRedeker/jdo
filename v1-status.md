@@ -5,43 +5,57 @@
 ### Tier 1: Foundation (No dependencies on other changes)
 | Order | Change | Status | Rationale |
 |-------|--------|--------|-----------|
-| **1** | `add-testing-infrastructure` | Pending | Dev tooling only - enables better testing for everything else |
-| **2** | `add-provider-auth` | Pending | Depends only on `refactor-core-libraries` ✅. Required for AI to work. |
+| **1** | `refactor-core-libraries` | ✅ Archived | Core infrastructure: paths, settings, database, AI agent foundation |
+| **2** | `add-testing-infrastructure` | ✅ Archived | Dev tooling: pytest fixtures, markers, coverage config |
+| **3** | `add-provider-auth` | ✅ Archived | OAuth/API key auth for Anthropic, OpenAI, OpenRouter |
 
 ### Tier 2: Core Domain
 | Order | Change | Status | Rationale |
 |-------|--------|--------|-----------|
-| **3** | `add-core-domain-models` + `add-vision-milestone-hierarchy` | Pending | Implement **together** per vision-milestone's own note. Establishes the complete entity hierarchy (Vision → Milestone → Goal → Commitment → Task) |
+| **4** | `add-core-domain-models` | ✅ Ready to archive | Domain models complete (Stakeholder, Goal, Commitment, Task). TUI screens moved to add-conversational-tui. |
+| **5** | `add-vision-milestone-hierarchy` | Pending | Adds Vision → Milestone hierarchy above Goals |
 
 ### Tier 3: User Interface
 | Order | Change | Status | Rationale |
 |-------|--------|--------|-----------|
-| **4** | `add-conversational-tui` | Pending | Depends on domain models + AI agent. This is the primary user interface. |
+| **6** | `add-conversational-tui` | Pending | AI-driven chat interface, includes all TUI screens |
 
 ### Tier 4: Feature Extensions (all depend on TUI + domain models)
 | Order | Change | Status | Rationale |
 |-------|--------|--------|-----------|
-| **5** | `update-goal-vision-focus` | Pending | Enhances Goal model, needs TUI commands |
-| **6** | `add-integrity-protocol` | Pending | Adds commitment lifecycle management |
-| **7** | `add-recurring-commitments` | Pending | Adds recurring commitment feature |
+| **7** | `update-goal-vision-focus` | Pending | Enhances Goal model, needs TUI commands |
+| **8** | `add-integrity-protocol` | Pending | Adds commitment lifecycle management |
+| **9** | `add-recurring-commitments` | Pending | Adds recurring commitment feature |
 
 ## Quick Reference
 
 ```
-1. add-testing-infrastructure     (standalone)
-2. add-provider-auth              (needs: refactor-core-libraries ✅)
-3. add-core-domain-models }       (implement together)
-   add-vision-milestone-hierarchy }
-4. add-conversational-tui         (needs: #3)
-5. update-goal-vision-focus       (needs: #3, #4)
-6. add-integrity-protocol         (needs: #3, #4)
-7. add-recurring-commitments      (needs: #3, #4)
+COMPLETED:
+✅ 1. refactor-core-libraries        (archived 2025-12-16)
+✅ 2. add-testing-infrastructure     (archived 2025-12-16)
+✅ 3. add-provider-auth              (archived 2025-12-16)
+✅ 4. add-core-domain-models         (ready to archive)
+
+PENDING:
+5. add-vision-milestone-hierarchy   (needs: #4)
+6. add-conversational-tui           (needs: #4, #5)
+7. update-goal-vision-focus         (needs: #6)
+8. add-integrity-protocol           (needs: #6)
+9. add-recurring-commitments        (needs: #6)
 ```
 
-Items 5-7 can be done in any order after #4, or in parallel.
+Items 7-9 can be done in any order after #6, or in parallel.
 
-## Completed
+## Archived Changes
 
 | Change | Archived | Notes |
 |--------|----------|-------|
 | `refactor-core-libraries` | 2025-12-16 | Core infrastructure: paths, settings, database, AI agent foundation |
+| `add-testing-infrastructure` | 2025-12-16 | pytest fixtures, coverage config, test markers |
+| `add-provider-auth` | 2025-12-16 | OAuth PKCE, API key auth, TUI auth screens |
+
+## Current Stats
+
+- **Tests**: 182 passed, 5 skipped
+- **Coverage**: 81%
+- **Specs**: 4 created (ai-provider, app-config, data-persistence, provider-auth)
