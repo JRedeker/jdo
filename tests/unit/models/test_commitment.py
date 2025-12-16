@@ -30,6 +30,7 @@ class TestCommitmentModel:
         assert "deliverable" in fields
         assert "stakeholder_id" in fields
         assert "goal_id" in fields
+        assert "milestone_id" in fields  # NEW: Milestone hierarchy link
         assert "due_date" in fields
         assert "due_time" in fields
         assert "timezone" in fields
@@ -109,6 +110,7 @@ class TestCommitmentValidation:
         )
 
         assert commitment.goal_id is None
+        assert commitment.milestone_id is None  # NEW: Milestone hierarchy link
         assert commitment.completed_at is None
         assert commitment.notes is None
 
@@ -149,6 +151,18 @@ class TestCommitmentForeignKeys:
         )
 
         assert commitment.goal_id == goal_id
+
+    def test_accepts_optional_milestone_id(self) -> None:
+        """Commitment accepts optional milestone_id."""
+        milestone_id = uuid4()
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=uuid4(),
+            milestone_id=milestone_id,
+            due_date=date(2025, 12, 31),
+        )
+
+        assert commitment.milestone_id == milestone_id
 
 
 class TestCommitmentPersistence:
@@ -293,5 +307,196 @@ class TestCommitmentPersistence:
 
                 assert result is not None
                 assert result.deliverable == "Work toward goal"
+
+        reset_engine()
+
+    def test_foreign_key_to_milestone(self, tmp_path: Path) -> None:
+        """Commitment has optional FK to milestones table."""
+        from sqlmodel import select
+
+        from jdo.db.engine import get_engine, reset_engine
+        from jdo.db.session import get_session
+        from jdo.models.goal import Goal
+        from jdo.models.milestone import Milestone
+        from jdo.models.stakeholder import Stakeholder, StakeholderType
+
+        reset_engine()
+        db_path = tmp_path / "test.db"
+
+        with patch("jdo.db.engine.get_settings") as mock_settings:
+            mock_settings.return_value.database_path = db_path
+            engine = get_engine()
+            SQLModel.metadata.create_all(engine)
+
+            stakeholder = Stakeholder(name="Carol", type=StakeholderType.PERSON)
+            stakeholder_id = stakeholder.id
+
+            goal = Goal(
+                title="Test Goal",
+                problem_statement="Problem",
+                solution_vision="Vision",
+            )
+            goal_id = goal.id
+
+            with get_session() as session:
+                session.add(stakeholder)
+                session.add(goal)
+
+            milestone = Milestone(
+                goal_id=goal_id,
+                title="First Milestone",
+                target_date=date(2025, 6, 1),
+            )
+            milestone_id = milestone.id
+
+            with get_session() as session:
+                session.add(milestone)
+
+            commitment = Commitment(
+                deliverable="Work toward milestone",
+                stakeholder_id=stakeholder_id,
+                milestone_id=milestone_id,
+                due_date=date(2025, 5, 1),
+            )
+
+            with get_session() as session:
+                session.add(commitment)
+
+            # Query commitments by milestone
+            with get_session() as session:
+                result = session.exec(
+                    select(Commitment).where(Commitment.milestone_id == milestone_id)
+                ).first()
+
+                assert result is not None
+                assert result.deliverable == "Work toward milestone"
+
+        reset_engine()
+
+
+class TestCommitmentOrphanTracking:
+    """Tests for Commitment orphan tracking (no goal AND no milestone)."""
+
+    def test_is_orphan_with_neither_goal_nor_milestone(self) -> None:
+        """Commitment without goal_id AND milestone_id is orphan."""
+        commitment = Commitment(
+            deliverable="Unlinked task",
+            stakeholder_id=uuid4(),
+            due_date=date(2025, 12, 31),
+        )
+
+        assert commitment.is_orphan()
+
+    def test_is_not_orphan_with_goal_id(self) -> None:
+        """Commitment with goal_id is NOT orphan."""
+        commitment = Commitment(
+            deliverable="Task with goal",
+            stakeholder_id=uuid4(),
+            goal_id=uuid4(),
+            due_date=date(2025, 12, 31),
+        )
+
+        assert not commitment.is_orphan()
+
+    def test_is_not_orphan_with_milestone_id(self) -> None:
+        """Commitment with milestone_id is NOT orphan (even without goal_id)."""
+        commitment = Commitment(
+            deliverable="Task with milestone",
+            stakeholder_id=uuid4(),
+            milestone_id=uuid4(),
+            due_date=date(2025, 12, 31),
+        )
+
+        assert not commitment.is_orphan()
+
+    def test_is_not_orphan_with_both(self) -> None:
+        """Commitment with both goal_id and milestone_id is NOT orphan."""
+        commitment = Commitment(
+            deliverable="Task with both",
+            stakeholder_id=uuid4(),
+            goal_id=uuid4(),
+            milestone_id=uuid4(),
+            due_date=date(2025, 12, 31),
+        )
+
+        assert not commitment.is_orphan()
+
+    def test_query_orphan_commitments(self, tmp_path: Path) -> None:
+        """Query commitments without goal AND without milestone."""
+        from sqlmodel import select
+
+        from jdo.db.engine import get_engine, reset_engine
+        from jdo.db.session import get_session
+        from jdo.models.goal import Goal
+        from jdo.models.milestone import Milestone
+        from jdo.models.stakeholder import Stakeholder, StakeholderType
+
+        reset_engine()
+        db_path = tmp_path / "test.db"
+
+        with patch("jdo.db.engine.get_settings") as mock_settings:
+            mock_settings.return_value.database_path = db_path
+            engine = get_engine()
+            SQLModel.metadata.create_all(engine)
+
+            stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+            stakeholder_id = stakeholder.id
+
+            goal = Goal(
+                title="Test Goal",
+                problem_statement="Problem",
+                solution_vision="Vision",
+            )
+            goal_id = goal.id
+
+            with get_session() as session:
+                session.add(stakeholder)
+                session.add(goal)
+
+            milestone = Milestone(
+                goal_id=goal_id,
+                title="Test Milestone",
+                target_date=date(2025, 6, 1),
+            )
+            milestone_id = milestone.id
+
+            with get_session() as session:
+                session.add(milestone)
+
+            # Create various commitments
+            orphan = Commitment(
+                deliverable="Orphan task",
+                stakeholder_id=stakeholder_id,
+                due_date=date(2025, 12, 31),
+            )
+            with_goal = Commitment(
+                deliverable="Task with goal",
+                stakeholder_id=stakeholder_id,
+                goal_id=goal_id,
+                due_date=date(2025, 12, 31),
+            )
+            with_milestone = Commitment(
+                deliverable="Task with milestone",
+                stakeholder_id=stakeholder_id,
+                milestone_id=milestone_id,
+                due_date=date(2025, 12, 31),
+            )
+
+            with get_session() as session:
+                session.add(orphan)
+                session.add(with_goal)
+                session.add(with_milestone)
+
+            # Query orphans
+            with get_session() as session:
+                result = session.exec(
+                    select(Commitment).where(
+                        Commitment.goal_id.is_(None),  # type: ignore[union-attr]
+                        Commitment.milestone_id.is_(None),  # type: ignore[union-attr]
+                    )
+                ).all()
+
+                assert len(result) == 1
+                assert result[0].deliverable == "Orphan task"
 
         reset_engine()

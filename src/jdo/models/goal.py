@@ -42,6 +42,7 @@ class Goal(SQLModel, table=True):
     solution_vision: str = Field(min_length=1)
     motivation: str | None = Field(default=None)
     parent_goal_id: UUID | None = Field(default=None, foreign_key="goals.id")
+    vision_id: UUID | None = Field(default=None, foreign_key="visions.id")
     status: GoalStatus = Field(default=GoalStatus.ACTIVE)
     next_review_date: date | None = Field(default=None)
     review_interval_days: int | None = Field(default=None)

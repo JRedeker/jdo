@@ -39,6 +39,7 @@ class Commitment(SQLModel, table=True):
     deliverable: str = Field(min_length=1)
     stakeholder_id: UUID = Field(foreign_key="stakeholders.id")
     goal_id: UUID | None = Field(default=None, foreign_key="goals.id")
+    milestone_id: UUID | None = Field(default=None, foreign_key="milestones.id")
     due_date: date
     due_time: time = Field(default_factory=default_due_time)
     timezone: str = Field(default="America/New_York")
@@ -47,3 +48,14 @@ class Commitment(SQLModel, table=True):
     notes: str | None = Field(default=None)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+    def is_orphan(self) -> bool:
+        """Check if this commitment is an orphan.
+
+        A commitment is considered orphan if it has neither a goal_id nor a
+        milestone_id. Orphan commitments should be surfaced for user attention.
+
+        Returns:
+            True if orphan (no goal_id AND no milestone_id), False otherwise.
+        """
+        return self.goal_id is None and self.milestone_id is None

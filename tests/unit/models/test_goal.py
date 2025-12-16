@@ -31,6 +31,7 @@ class TestGoalModel:
         assert "solution_vision" in fields
         assert "motivation" in fields
         assert "parent_goal_id" in fields
+        assert "vision_id" in fields  # NEW: Vision hierarchy link
         assert "status" in fields
         assert "next_review_date" in fields
         assert "review_interval_days" in fields
@@ -99,6 +100,7 @@ class TestGoalValidation:
 
         assert goal.motivation is None
         assert goal.parent_goal_id is None
+        assert goal.vision_id is None  # NEW: Vision hierarchy link
         assert goal.next_review_date is None
         assert goal.review_interval_days is None
         assert goal.last_reviewed_at is None
@@ -231,5 +233,137 @@ class TestGoalPersistence:
 
                 assert result is not None
                 assert result.title == "Child Goal"
+
+        reset_engine()
+
+
+class TestGoalVisionLink:
+    """Tests for Goal-Vision linkage."""
+
+    def test_accepts_vision_id(self) -> None:
+        """Goal accepts optional vision_id."""
+        vision_id = uuid4()
+        goal = Goal(
+            title="Goal with Vision",
+            problem_statement="Problem",
+            solution_vision="Vision",
+            vision_id=vision_id,
+        )
+
+        assert goal.vision_id == vision_id
+
+    def test_goal_without_vision_id(self) -> None:
+        """Goal can be created without vision_id."""
+        goal = Goal(
+            title="Standalone Goal",
+            problem_statement="Problem",
+            solution_vision="Vision",
+        )
+
+        assert goal.vision_id is None
+
+    def test_goal_links_to_vision_in_database(self, tmp_path: Path) -> None:
+        """Goal with vision_id links to Vision in database."""
+        from sqlmodel import select
+
+        from jdo.db.engine import get_engine, reset_engine
+        from jdo.db.session import get_session
+        from jdo.models.vision import Vision
+
+        reset_engine()
+        db_path = tmp_path / "test.db"
+
+        with patch("jdo.db.engine.get_settings") as mock_settings:
+            mock_settings.return_value.database_path = db_path
+            engine = get_engine()
+            SQLModel.metadata.create_all(engine)
+
+            # Create a vision first
+            vision = Vision(
+                title="Test Vision",
+                narrative="Test narrative",
+            )
+            vision_id = vision.id
+
+            with get_session() as session:
+                session.add(vision)
+
+            # Create a goal linked to the vision
+            goal = Goal(
+                title="Goal Linked to Vision",
+                problem_statement="Problem",
+                solution_vision="Vision",
+                vision_id=vision_id,
+            )
+            goal_id = goal.id
+
+            with get_session() as session:
+                session.add(goal)
+
+            with get_session() as session:
+                result = session.exec(select(Goal).where(Goal.id == goal_id)).first()
+
+                assert result is not None
+                assert result.vision_id == vision_id
+
+        reset_engine()
+
+    def test_query_goals_by_vision_id(self, tmp_path: Path) -> None:
+        """Query goals linked to a specific vision."""
+        from sqlmodel import select
+
+        from jdo.db.engine import get_engine, reset_engine
+        from jdo.db.session import get_session
+        from jdo.models.vision import Vision
+
+        reset_engine()
+        db_path = tmp_path / "test.db"
+
+        with patch("jdo.db.engine.get_settings") as mock_settings:
+            mock_settings.return_value.database_path = db_path
+            engine = get_engine()
+            SQLModel.metadata.create_all(engine)
+
+            # Create two visions
+            vision1 = Vision(title="Vision 1", narrative="Narrative 1")
+            vision2 = Vision(title="Vision 2", narrative="Narrative 2")
+            vision1_id = vision1.id
+            vision2_id = vision2.id
+
+            with get_session() as session:
+                session.add(vision1)
+                session.add(vision2)
+
+            # Create goals linked to different visions
+            goal1 = Goal(
+                title="Goal 1 for Vision 1",
+                problem_statement="Problem",
+                solution_vision="Vision",
+                vision_id=vision1_id,
+            )
+            goal2 = Goal(
+                title="Goal 2 for Vision 1",
+                problem_statement="Problem",
+                solution_vision="Vision",
+                vision_id=vision1_id,
+            )
+            goal3 = Goal(
+                title="Goal for Vision 2",
+                problem_statement="Problem",
+                solution_vision="Vision",
+                vision_id=vision2_id,
+            )
+
+            with get_session() as session:
+                session.add(goal1)
+                session.add(goal2)
+                session.add(goal3)
+
+            with get_session() as session:
+                result = session.exec(select(Goal).where(Goal.vision_id == vision1_id)).all()
+
+                assert len(result) == 2
+                titles = {g.title for g in result}
+                assert titles == {"Goal 1 for Vision 1", "Goal 2 for Vision 1"}
 
         reset_engine()
