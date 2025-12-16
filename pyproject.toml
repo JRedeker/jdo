@@ -31,6 +31,8 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=4.0.0",
+    "pytest-textual-snapshot>=1.0.0",
+    "pytest-httpx>=0.30.0",
     "ruff>=0.8.0",
     "lizard>=1.17.0",
 ]
@@ -66,6 +68,9 @@ ignore = [
     "D",       # No docstrings required in tests
     "PLC0415", # Allow imports inside functions (for test isolation)
     "PT012",   # Allow multiple statements in pytest.raises blocks
+    "ANN",     # No type annotations required in tests
+    "DTZ",     # Allow naive datetime in tests
+    "RET504",  # Unnecessary assignment before return OK in tests
 ]
 "src/**/*.py" = [
     "PLW0603", # Allow global statement for singletons
@@ -124,6 +129,33 @@ addopts = [
     "-q",
     "--strict-markers",
 ]
+markers = [
+    "unit: Unit tests (fast, no external dependencies)",
+    "integration: Integration tests (database, file system)",
+    "tui: TUI tests (Textual Pilot-based)",
+]
+
+# ------------------------------------------------------------------------------
+# Coverage
+# ------------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["src/jdo"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
+fail_under = 70
+show_missing = true
+skip_covered = false
 
 # ------------------------------------------------------------------------------
 # Lizard - Cyclomatic Complexity Analysis
