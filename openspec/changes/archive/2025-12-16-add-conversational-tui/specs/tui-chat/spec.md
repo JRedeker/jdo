@@ -1,6 +1,6 @@
 # Capability: Conversational TUI Chat Interface
 
-The TUI provides an AI-driven conversational interface for creating and managing Goals, Commitments, and Tasks. The interface follows Elia's keyboard-centric design with a split-panel layout showing chat on the left and structured data on the right.
+The TUI provides an AI-driven conversational interface for creating and managing Visions, Goals, Milestones, Commitments, and Tasks. The interface follows Elia's keyboard-centric design with a split-panel layout showing chat on the left and structured data on the right.
 
 **Implementation Notes** (Textual-specific):
 - Use `Horizontal` container with `width: 60%` / `width: 40%` for split-panel layout
@@ -95,6 +95,14 @@ The system SHALL display a structured template in the data panel when drafting a
 - **WHEN** AI proposes a task from conversation
 - **THEN** the data panel shows: Title, Scope, Sub-tasks, Status (Draft), and parent Commitment
 
+#### Scenario: Vision draft template
+- **WHEN** AI proposes a vision from conversation
+- **THEN** the data panel shows: Title, Timeframe, Narrative, Metrics, Why It Matters, Status (Draft)
+
+#### Scenario: Milestone draft template
+- **WHEN** AI proposes a milestone from conversation
+- **THEN** the data panel shows: Title, Description, Target Date, Status (Draft), and parent Goal
+
 #### Scenario: Real-time field updates
 - **WHEN** user provides additional details in chat that modify the draft
 - **THEN** the data panel updates the relevant fields immediately
@@ -119,6 +127,14 @@ The system SHALL display full details of an existing domain object in the data p
 - **WHEN** user views a task via command or selection
 - **THEN** the panel shows task fields including scope and sub-task completion status
 
+#### Scenario: View vision
+- **WHEN** user views a vision via command or selection
+- **THEN** the panel shows all vision fields with metrics as bullet list and linked goals count
+
+#### Scenario: View milestone
+- **WHEN** user views a milestone via command or selection
+- **THEN** the panel shows milestone fields including target date, status, and linked commitments count
+
 ### Requirement: Data Panel - List Mode
 
 The system SHALL display a scrollable list of domain objects in the data panel.
@@ -139,6 +155,22 @@ The system SHALL display a scrollable list of domain objects in the data panel.
 - **WHEN** user executes `/show stakeholders`
 - **THEN** the panel shows a list of stakeholders with name and type
 
+#### Scenario: List visions
+- **WHEN** user executes `/show visions`
+- **THEN** the panel shows a list of visions sorted by status (active first), then next_review_date
+
+#### Scenario: List milestones
+- **WHEN** user executes `/show milestones`
+- **THEN** the panel shows milestones for the current goal sorted by target_date ascending
+
+#### Scenario: Show hierarchy
+- **WHEN** user executes `/show hierarchy`
+- **THEN** the panel shows a tree view: Vision > Goal > Milestone > Commitment
+
+#### Scenario: Show orphan goals
+- **WHEN** user executes `/show orphan-goals`
+- **THEN** the panel shows all goals where vision_id is NULL and status is active
+
 #### Scenario: Navigate list
 - **WHEN** panel is focused and user presses j/k
 - **THEN** selection moves down/up through the list
@@ -158,6 +190,10 @@ The system SHALL support the `/commit` command to create a commitment from conve
 #### Scenario: Prompt for goal linkage
 - **WHEN** AI creates a commitment draft without a goal_id
 - **THEN** AI asks: "Would you like to link this commitment to a goal? Linking helps maintain alignment with your vision." and shows available goals
+
+#### Scenario: Prompt for milestone linkage
+- **WHEN** AI creates a commitment draft and the selected goal has milestones
+- **THEN** AI asks: "Which milestone is this commitment working toward?" and shows available milestones
 
 #### Scenario: Allow unlinked commitment
 - **WHEN** user declines to link commitment to a goal
@@ -190,6 +226,62 @@ The system SHALL support the `/goal` command to create a goal from conversation 
 #### Scenario: Associate goal with parent
 - **WHEN** user specifies a parent goal during creation
 - **THEN** the new goal is linked to the parent goal
+
+#### Scenario: Prompt for vision linkage
+- **WHEN** AI creates a goal draft and active visions exist
+- **THEN** AI asks: "Would you like to link this goal to one of your visions?" and shows available visions
+
+### Requirement: Command - Create Vision
+
+The system SHALL support the `/vision` command to create and manage visions.
+
+#### Scenario: Create vision from context
+- **WHEN** user types `/vision` or `/vision new` after discussing a vision
+- **THEN** AI extracts title, narrative, timeframe, and metrics from conversation and updates draft panel
+
+#### Scenario: Vision creation prompts
+- **WHEN** AI creates a vision draft
+- **THEN** AI guides with prompts like: "Describe a day in your life when this vision is realized. What do you see, hear, feel?"
+
+#### Scenario: AI suggests metrics
+- **WHEN** user has a narrative but no metrics
+- **THEN** AI suggests: "How will you know you've achieved this? Let's define 2-3 measurable outcomes."
+
+#### Scenario: Confirm vision creation
+- **WHEN** user confirms the proposed vision
+- **THEN** the vision is saved to the database with next_review_date set to 90 days from now
+
+#### Scenario: List visions
+- **WHEN** user types `/vision` without arguments
+- **THEN** the data panel shows list of all visions
+
+#### Scenario: Review visions due
+- **WHEN** user types `/vision review`
+- **THEN** the data panel shows visions where next_review_date <= today
+
+### Requirement: Command - Create Milestone
+
+The system SHALL support the `/milestone` command to create milestones for goals.
+
+#### Scenario: Create milestone from context
+- **WHEN** user types `/milestone` or `/milestone new` while viewing a goal
+- **THEN** AI extracts title, description, and target_date from conversation and updates draft panel
+
+#### Scenario: Milestone requires goal context
+- **WHEN** user types `/milestone new` without a goal context
+- **THEN** AI prompts user to select a goal first: "Which goal is this milestone for?"
+
+#### Scenario: AI suggests milestones
+- **WHEN** user creates a goal without milestones
+- **THEN** AI offers: "Would you like to break this goal into milestones? Milestones are concrete checkpoints with dates."
+
+#### Scenario: Confirm milestone creation
+- **WHEN** user confirms the proposed milestone
+- **THEN** the milestone is saved to the database linked to the goal
+
+#### Scenario: List milestones
+- **WHEN** user types `/milestone` without arguments while viewing a goal
+- **THEN** the data panel shows milestones for that goal sorted by target_date
 
 ### Requirement: Command - Create Task
 
@@ -355,6 +447,18 @@ The system SHALL treat conversations as ephemeral working sessions.
 - **WHEN** user starts the application with no pending draft
 - **THEN** a new empty conversation begins
 
+#### Scenario: Vision review prompt on launch
+- **WHEN** user starts the application and a vision has next_review_date <= today
+- **THEN** AI prompts: "Your vision '[title]' is due for review. Would you like to reflect on it now?"
+
+#### Scenario: Vision review snooze
+- **WHEN** user declines to review a vision when prompted
+- **THEN** the prompt does not repeat until the next app session
+
+#### Scenario: Milestone overdue check on launch
+- **WHEN** user starts the application and a milestone has target_date < today and status is pending
+- **THEN** the milestone status is automatically transitioned to "missed"
+
 #### Scenario: Restore draft on launch
 - **WHEN** user starts the application with a pending draft
 - **THEN** AI asks "You have an unfinished [type]. Would you like to continue?"
@@ -404,6 +508,18 @@ The system SHALL support comprehensive keyboard navigation following Elia conven
 #### Scenario: Quick access commitments (prompt focused or home)
 - **WHEN** user presses 'c' while prompt input is focused or on home screen
 - **THEN** the data panel shows commitments list
+
+#### Scenario: Quick access visions (prompt focused or home)
+- **WHEN** user presses 'v' while prompt input is focused or on home screen
+- **THEN** the data panel shows visions list
+
+#### Scenario: Quick access milestones (prompt focused or home)
+- **WHEN** user presses 'm' while prompt input is focused or on home screen
+- **THEN** the data panel shows milestones list for current goal context (or prompts for goal)
+
+#### Scenario: Quick access hierarchy (prompt focused or home)
+- **WHEN** user presses 'h' while prompt input is focused or on home screen
+- **THEN** the data panel shows hierarchy tree view
 
 #### Scenario: Open settings (home screen)
 - **WHEN** user presses 's' on home screen
@@ -525,6 +641,10 @@ The system SHALL provide guidance when the user has no commitments, goals, or co
 #### Scenario: Empty goals list
 - **WHEN** user views goals and none exist
 - **THEN** the data panel shows guidance: "No goals yet. Goals give your commitments meaning. Type '/goal' to create one."
+
+#### Scenario: Empty visions list
+- **WHEN** user views visions and none exist
+- **THEN** the data panel shows guidance: "No visions yet. Visions are inspiring pictures of your future. Type '/vision' to create one."
 
 ### Requirement: Error Display
 

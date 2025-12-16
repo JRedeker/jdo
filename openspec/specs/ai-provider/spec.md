@@ -1,7 +1,7 @@
 # ai-provider Specification
 
 ## Purpose
-TBD - created by archiving change refactor-core-libraries. Update Purpose after archive.
+Define the PydanticAI agent configuration for commitment management assistance, including provider setup, dependency injection, commitment tools, streaming responses, and structured output extraction.
 ## Requirements
 ### Requirement: Agent Configuration
 

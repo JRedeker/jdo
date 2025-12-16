@@ -4,7 +4,7 @@ This spec extends the base Commitment model from `add-core-domain-models` to add
 
 **Cross-reference**: See `add-core-domain-models/specs/commitment` for the base Commitment model definition.
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Commitment-Milestone Association
 

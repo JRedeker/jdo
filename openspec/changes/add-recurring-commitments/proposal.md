@@ -32,5 +32,5 @@ Many commitments repeat on a schedule—weekly reports, monthly reviews, daily s
   - `src/jdo/persistence/` — New repository, schema changes
   - `src/jdo/screens/` or chat commands — Recurring management UI
 - Dependencies:
-  - Builds on `add-core-domain-models` (Commitment, Task models)
-  - Integrates with `add-conversational-tui` (commands for recurring)
+  - Builds on core domain models (Commitment, Task) - already implemented
+  - Integrates with `implement-jdo-app` (TUI app shell for commands)

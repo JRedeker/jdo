@@ -6,7 +6,7 @@ The form-based TUI approach in `add-core-domain-models` requires users to naviga
 
 ## What Changes
 
-- **REMOVED** `tui-views` capability from `add-core-domain-models` (replaced by this spec)
+- **EXTENDS** `tui-views` capability (base TUI structure spec created during add-core-domain-models)
 - **ADDED** `tui-chat` capability: Elia-style conversational interface with AI-driven data creation
 - **ADDED** Split-panel layout: Chat on left, structured data template on right
 - **ADDED** Explicit commands for data extraction (e.g., `/commit`, `/goal`, `/task`)
@@ -33,13 +33,15 @@ This spec requires a separate `ai-provider` capability spec to define:
 ## Impact
 
 - Affected specs:
-  - `tui-views` (REMOVED - replaced by `tui-chat`)
-  - `tui-chat` (ADDED - new capability)
+  - `tui-views` (exists at `openspec/specs/tui-views/spec.md` - defines base TUI structure)
+  - `tui-chat` (ADDED - conversational AI interface extending tui-views)
 - Affected code:
   - `src/jdo/app.py` — Complete rewrite for chat-driven interface
   - `src/jdo/screens/` — New chat screen, home screen architecture
   - `src/jdo/widgets/` — Chat widgets, data panel, prompt input
   - `src/jdo/persistence/` — Add conversation storage
-- Dependencies:
-  - Requires `ai-provider` spec (to be created separately)
-  - Builds on domain models from `add-core-domain-models`
+- Dependencies (all completed):
+  - `ai-provider` spec ✅ - Created at `openspec/specs/ai-provider/spec.md`
+  - `add-core-domain-models` ✅ - Archived, domain models implemented
+  - `add-provider-auth` ✅ - Archived, auth screens implemented
+  - `add-vision-milestone-hierarchy` - Pending (adds Vision/Milestone models)

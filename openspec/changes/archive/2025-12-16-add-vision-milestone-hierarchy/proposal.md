@@ -48,7 +48,10 @@ The MPI planning hierarchy should be: **Vision → Goal → Milestone → Commit
 
 ## Dependencies
 
-This change should be implemented **before** `add-core-domain-models` to establish the correct hierarchy from the start, avoiding a later migration.
+This change extends the domain models from `add-core-domain-models` (now archived). The base hierarchy (Stakeholder → Goal → Commitment → Task) is complete. This change adds Vision and Milestone to create the full MPI hierarchy.
+
+**Requires (completed):**
+- `add-core-domain-models` - Provides Goal, Commitment, Task models to extend
 
 ## References
 

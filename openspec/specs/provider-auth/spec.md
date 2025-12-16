@@ -1,7 +1,7 @@
 # provider-auth Specification
 
 ## Purpose
-TBD - created by archiving change add-provider-auth. Update Purpose after archive.
+Define the authentication system for AI providers, supporting OAuth 2.0 with PKCE for Claude Max/Pro and API key authentication for OpenAI and OpenRouter, with secure credential storage and TUI modal screens.
 ## Requirements
 ### Requirement: Credential Storage
 
@@ -286,7 +286,7 @@ The system SHALL maintain a registry mapping provider IDs to their supported aut
 
 ### Requirement: Provider Selection Settings
 
-The system SHALL provide a settings menu for switching between configured AI providers. Active provider selection is stored in `settings.json` via the RuntimeSettings model defined in `refactor-core-libraries` design.
+The system SHALL provide a settings menu for switching between configured AI providers. Active provider selection is stored in `settings.json` via the JDOSettings model defined in the `app-config` spec.
 
 #### Scenario: Access settings from home
 - **WHEN** user presses 's' on home screen

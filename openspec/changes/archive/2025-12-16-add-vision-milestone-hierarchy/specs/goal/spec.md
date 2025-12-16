@@ -7,7 +7,7 @@ This spec extends the base Goal model from `add-core-domain-models` to add Visio
 - See `update-goal-vision-focus/specs/goal` for review system enhancements.
 - Goal progress can show both milestone-based progress (this spec) and commitment-based progress (`update-goal-vision-focus`).
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Goal-Vision Association
 

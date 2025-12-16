@@ -1,7 +1,7 @@
 # data-persistence Specification
 
 ## Purpose
-TBD - created by archiving change refactor-core-libraries. Update Purpose after archive.
+Define the SQLite database layer using SQLModel, including engine management, session context handling, schema creation, CRUD operations, and relationship loading patterns.
 ## Requirements
 ### Requirement: Database Engine Management
 

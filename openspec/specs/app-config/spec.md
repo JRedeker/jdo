@@ -1,7 +1,7 @@
 # app-config Specification
 
 ## Purpose
-TBD - created by archiving change refactor-core-libraries. Update Purpose after archive.
+Define the application configuration system using pydantic-settings, supporting environment variables, .env files, and sensible defaults for database path, AI provider, timezone, and logging.
 ## Requirements
 ### Requirement: Settings Model
 

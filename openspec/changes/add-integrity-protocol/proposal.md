@@ -74,8 +74,8 @@ Proactive checks on app launch for:
 
 ## Dependencies
 
-- Requires `add-core-domain-models` (Commitment, Task, Stakeholder models)
-- Should be implemented after `add-conversational-tui` (TUI commands infrastructure)
+- Requires core domain models (Commitment, Task, Stakeholder) - already implemented
+- Should be implemented after `implement-jdo-app` (TUI app shell and commands infrastructure)
 
 ## References
 

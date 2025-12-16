@@ -3,8 +3,8 @@
 This task list follows Test-Driven Development: write failing tests first, then implement to pass.
 
 **Dependencies**: 
-- Requires `add-core-domain-models` (Commitment, Task)
-- Requires `add-conversational-tui` (TUI command infrastructure)
+- Requires core domain models (Commitment, Task) - already implemented
+- Requires `implement-jdo-app` (TUI app shell and command infrastructure)
 
 ## Phase 1: RecurringCommitment Model
 
