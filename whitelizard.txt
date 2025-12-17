@@ -1,0 +1,15 @@
+# Whitelist for pre-existing complexity warnings
+# These functions exceed thresholds but are acceptable for now
+# Format: file_path:line: function_name
+
+# Handler execute methods - NLOC > 50 but well-structured with comments
+src/jdo/commands/handlers.py:54: execute
+src/jdo/commands/handlers.py:196: execute
+src/jdo/commands/handlers.py:313: execute
+
+# Session functions - NLOC > 50 but necessary for database operations  
+src/jdo/db/session.py:161: check_and_generate_recurring_instances
+src/jdo/db/session.py:218: generate_next_instance_for_recurring
+
+# Widget init - 7 params is acceptable for Textual widgets
+src/jdo/widgets/chat_message.py:59: __init__

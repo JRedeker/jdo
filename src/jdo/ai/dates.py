@@ -252,35 +252,49 @@ def parse_time(text: str) -> time:
 
     text = text.strip().lower()
 
-    # Check for named times
+    # Check for named times first
     if text in NAMED_TIMES:
         return NAMED_TIMES[text]
 
-    # Handle 12-hour format with am/pm (3pm, 3 pm, 3:30pm, 3:30 pm)
-    time_12h_match = re.match(
-        r"^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$",
-        text,
-    )
-    if time_12h_match:
-        hour = int(time_12h_match.group(1))
-        minute = int(time_12h_match.group(2) or 0)
-        period = time_12h_match.group(3)
+    # Try parsing as 12-hour format
+    result = _parse_12h_time(text)
+    if result is not None:
+        return result
 
-        if period == "pm" and hour != NOON_HOUR:
-            hour += NOON_HOUR
-        elif period == "am" and hour == NOON_HOUR:
-            hour = MIDNIGHT_HOUR
-
-        return time(hour, minute)
-
-    # Handle 24-hour format (15:00)
-    time_24h_match = re.match(r"^(\d{1,2}):(\d{2})$", text)
-    if time_24h_match:
-        hour, minute = map(int, time_24h_match.groups())
-        return time(hour, minute)
+    # Try parsing as 24-hour format
+    result = _parse_24h_time(text)
+    if result is not None:
+        return result
 
     msg = f"Could not parse time: '{text}'"
     raise ParseError(msg)
+
+
+def _parse_12h_time(text: str) -> time | None:
+    """Parse 12-hour format time (3pm, 3:30pm, etc.)."""
+    match = re.match(r"^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$", text)
+    if not match:
+        return None
+
+    hour = int(match.group(1))
+    minute = int(match.group(2) or 0)
+    period = match.group(3)
+
+    if period == "pm" and hour != NOON_HOUR:
+        hour += NOON_HOUR
+    elif period == "am" and hour == NOON_HOUR:
+        hour = MIDNIGHT_HOUR
+
+    return time(hour, minute)
+
+
+def _parse_24h_time(text: str) -> time | None:
+    """Parse 24-hour format time (15:00, etc.)."""
+    match = re.match(r"^(\d{1,2}):(\d{2})$", text)
+    if not match:
+        return None
+    hour, minute = map(int, match.groups())
+    return time(hour, minute)
 
 
 def parse_datetime(text: str) -> tuple[date, time]:
