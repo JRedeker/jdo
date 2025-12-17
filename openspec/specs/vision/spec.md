@@ -13,7 +13,7 @@ The system SHALL provide a `Vision` SQLModel with the following validated fields
 - `metrics` (list[str]): How will you know you've achieved this? Stored as JSON array
 - `why_it_matters` (str | None): Why this vision ignites passion
 - `status` (VisionStatus enum): One of `active`, `achieved`, `evolved`, `abandoned`; defaults to `active`
-- `next_review_date` (date | None): When the user should next review this vision; defaults to 90 days from creation
+- `next_review_date` (date): When the user should next review this vision; defaults to 90 days from creation (non-nullable)
 - `last_reviewed_at` (datetime | None): When the user last reviewed this vision
 - `created_at` (datetime): Auto-set on creation, timezone-aware (EST default)
 - `updated_at` (datetime): Auto-updated on modification, timezone-aware (EST default)

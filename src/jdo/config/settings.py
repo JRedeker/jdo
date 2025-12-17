@@ -1,12 +1,15 @@
 """Application settings using pydantic-settings."""
 
 from pathlib import Path
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from jdo.paths import get_database_path
+
+# Valid AI providers
+AIProvider = Literal["anthropic", "openai", "openrouter"]
 
 
 class JDOSettings(BaseSettings):
@@ -24,7 +27,7 @@ class JDOSettings(BaseSettings):
     )
 
     # AI Provider settings
-    ai_provider: str = "anthropic"
+    ai_provider: AIProvider = "anthropic"
     ai_model: str = "claude-sonnet-4-20250514"
 
     # Database settings

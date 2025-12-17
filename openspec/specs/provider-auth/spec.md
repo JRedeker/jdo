@@ -286,7 +286,7 @@ The system SHALL maintain a registry mapping provider IDs to their supported aut
 
 ### Requirement: Provider Selection Settings
 
-The system SHALL provide a settings menu for switching between configured AI providers. Active provider selection is stored in `settings.json` via the JDOSettings model defined in the `app-config` spec.
+The system SHALL provide a settings menu for switching between configured AI providers. Active provider selection is stored via the JDOSettings model defined in the `app-config` spec (using environment variables or `.env` file with `JDO_` prefix).
 
 #### Scenario: Access settings from home
 - **WHEN** user presses 's' on home screen
@@ -294,7 +294,7 @@ The system SHALL provide a settings menu for switching between configured AI pro
 
 #### Scenario: Switch active provider
 - **WHEN** user selects a different provider in settings
-- **THEN** the active provider is changed and persisted to `settings.json`
+- **THEN** the active provider is changed and persisted to the `.env` file
 
 #### Scenario: Show only configured providers
 - **WHEN** settings menu displays provider options

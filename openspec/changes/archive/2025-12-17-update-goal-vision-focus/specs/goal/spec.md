@@ -184,10 +184,6 @@ The system SHALL display goals with emphasis on vision over completion.
 - **WHEN** displaying goal status options
 - **THEN** "achieved" is presented as a rare, intentional choice, not the expected outcome
 
-## REMOVED Requirements
+## Notes
 
-### Requirement: Target Date Field
-
-**Reason**: Goals should not have due dates. If any legacy `target_date` field exists, it should be removed as it implies deadline-based completion which conflicts with the vision-focused philosophy.
-
-**Migration**: If `target_date` data exists, convert values to `next_review_date`. Goals with target dates become goals with a one-time review scheduled.
+**Design Decision**: Goals intentionally do not have due dates (`target_date` field). This reflects the vision-focused philosophy where goals are aspirational directions reviewed periodically, not deadline-based targets.

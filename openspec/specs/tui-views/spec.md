@@ -39,6 +39,22 @@ The system SHALL provide a Home screen showing commitments due soon and quick ac
 - **WHEN** user presses the new commitment shortcut on Home screen
 - **THEN** the Commitment creation flow starts
 
+#### Scenario: Display goals due for review
+- **WHEN** user opens the Home screen and goals are due for review
+- **THEN** a subtle indicator shows: "X goal(s) due for review" (non-blocking, below commitments)
+
+#### Scenario: Goal review indicator is subtle
+- **WHEN** goals are due for review
+- **THEN** the indicator does not block or interrupt the primary commitment focus
+
+#### Scenario: Navigate to goal review from home
+- **WHEN** user activates the goal review indicator (click or shortcut)
+- **THEN** the `/goal review` flow starts
+
+#### Scenario: Quick access goals shortcut
+- **WHEN** user presses 'g' on home screen
+- **THEN** the data panel shows the goals list
+
 ### Requirement: Commitment List Screen
 
 The system SHALL provide a screen listing all commitments with filtering and sorting.
@@ -119,13 +135,41 @@ The system SHALL provide a screen displaying goals in a hierarchical structure.
 - **WHEN** goals are displayed
 - **THEN** each goal shows its status and commitment count
 
+#### Scenario: Show review due indicator in list
+- **WHEN** a goal in the list has next_review_date <= today
+- **THEN** a review indicator (e.g., 🔄 or "review") appears next to the goal title
+
+#### Scenario: Show on-hold goals dimmed
+- **WHEN** a goal has status on_hold
+- **THEN** the goal appears with reduced emphasis (dimmed or different color)
+
 ### Requirement: Goal Detail Screen
 
 The system SHALL provide a screen for viewing and editing a single goal with its commitments.
 
 #### Scenario: Display goal details
 - **WHEN** user opens a Goal Detail screen
-- **THEN** title, problem statement, solution vision, status, and target date are displayed
+- **THEN** title, problem statement, solution vision, and status are displayed
+
+#### Scenario: Display motivation prominently
+- **WHEN** viewing a goal that has a motivation set
+- **THEN** the motivation is displayed under a "Why This Matters" heading, positioned prominently after the title
+
+#### Scenario: Display commitment progress
+- **WHEN** viewing a goal that has commitments
+- **THEN** a progress summary shows: "Commitments: ✓ X completed, ● Y in progress, ○ Z pending, ✗ W abandoned"
+
+#### Scenario: Display commitment progress percentage
+- **WHEN** viewing a goal with non-abandoned commitments
+- **THEN** completion rate is shown as percentage (completed / non-abandoned)
+
+#### Scenario: Display review schedule
+- **WHEN** viewing a goal with next_review_date set
+- **THEN** the panel shows "Next Review: [date]" with interval label (Weekly/Monthly/Quarterly) if set
+
+#### Scenario: Display due for review indicator
+- **WHEN** viewing a goal where next_review_date <= today
+- **THEN** a "Due for Review" indicator appears with option to start review
 
 #### Scenario: Display child commitments
 - **WHEN** viewing a goal that has commitments
@@ -138,6 +182,10 @@ The system SHALL provide a screen for viewing and editing a single goal with its
 #### Scenario: Create commitment from goal
 - **WHEN** user presses create commitment shortcut on goal detail
 - **THEN** commitment creation starts with goal_id pre-filled
+
+#### Scenario: De-emphasize achieved status
+- **WHEN** viewing goal status options or displaying status
+- **THEN** "achieved" is presented as a rare, intentional choice, not the expected outcome
 
 ### Requirement: Goal Creation Flow
 

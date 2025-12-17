@@ -1,9 +1,17 @@
 """Database engine configuration."""
 
-from sqlalchemy import Engine
+from sqlalchemy import Engine, event
 from sqlmodel import create_engine
 
 from jdo.config import get_settings
+
+
+def _enable_wal_mode(dbapi_connection, _connection_record) -> None:  # noqa: ANN001
+    """Enable WAL mode for better concurrent access."""
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.close()
+
 
 # Singleton engine instance
 _engine_instance: Engine | None = None
@@ -25,6 +33,8 @@ def get_engine() -> Engine:
             database_url,
             connect_args={"check_same_thread": False},
         )
+        # Enable WAL mode for better concurrent access
+        event.listen(_engine_instance, "connect", _enable_wal_mode)
     return _engine_instance
 
 

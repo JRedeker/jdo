@@ -1,7 +1,7 @@
 # jdo-app Specification
 
 ## Purpose
-TBD - created by archiving change implement-jdo-app. Update Purpose after archive.
+Define the main JDO application shell including startup initialization, screen navigation, draft restoration, vision review notifications, global key bindings, and header/footer widgets.
 ## Requirements
 ### Requirement: Application Startup
 

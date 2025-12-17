@@ -69,7 +69,7 @@ class TestJDOSettings:
 
         # Create a .env file in tmp_path
         env_file = tmp_path / ".env"
-        env_file.write_text("JDO_AI_PROVIDER=google\nJDO_AI_MODEL=gemini-pro\n")
+        env_file.write_text("JDO_AI_PROVIDER=openai\nJDO_AI_MODEL=gpt-4o\n")
 
         # Change to tmp_path so settings picks up the .env file
         monkeypatch.chdir(tmp_path)
@@ -77,8 +77,8 @@ class TestJDOSettings:
         with patch("jdo.config.settings.get_database_path", return_value=tmp_path / "test.db"):
             settings = JDOSettings(_env_file=env_file)
 
-        assert settings.ai_provider == "google"
-        assert settings.ai_model == "gemini-pro"
+        assert settings.ai_provider == "openai"
+        assert settings.ai_model == "gpt-4o"
 
     def test_env_vars_override_env_file(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -88,7 +88,7 @@ class TestJDOSettings:
 
         # Create a .env file
         env_file = tmp_path / ".env"
-        env_file.write_text("JDO_AI_PROVIDER=google\n")
+        env_file.write_text("JDO_AI_PROVIDER=openai\n")
 
         # But set env var to different value
         monkeypatch.setenv("JDO_AI_PROVIDER", "anthropic")

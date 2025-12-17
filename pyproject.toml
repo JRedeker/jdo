@@ -186,10 +186,12 @@ matches = "src/jdo/ai/extraction.py"
 bad-argument-type = false
 
 [[tool.pyrefly.sub-config]]
-# SQLAlchemy .in_() method on status enum - pyrefly doesn't understand SQLModel column descriptors
+# SQLAlchemy column comparisons (<=), .in_(), func.count() - pyrefly doesn't understand SQLModel column descriptors
 matches = "src/jdo/db/session.py"
 [tool.pyrefly.sub-config.errors]
 missing-attribute = false
+unsupported-operation = false
+bad-argument-type = false
 
 # ------------------------------------------------------------------------------
 # Pytest

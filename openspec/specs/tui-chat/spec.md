@@ -47,6 +47,67 @@ The system SHALL support vision review workflow.
 - **WHEN** user indicates the vision has evolved during review
 - **THEN** AI helps create a new vision and offers to mark the old one as "evolved"
 
+### Requirement: Command - Review Goal
+
+The system SHALL support the `/goal review` command for periodic goal reflection.
+
+#### Scenario: List goals due for review
+- **WHEN** user types `/goal review`
+- **THEN** the data panel shows active goals where next_review_date <= today
+
+#### Scenario: Review specific goal
+- **WHEN** user types `/goal review <id>` or selects a goal from the review list
+- **THEN** the data panel shows a goal review interface with motivation, commitment progress, and reflection prompts
+
+#### Scenario: Goal review interface
+- **WHEN** viewing a goal in review mode
+- **THEN** the panel shows:
+  - Goal title and problem/solution vision
+  - "Why This Matters" section with motivation (if set)
+  - Commitment progress: "✓ X completed, ● Y in progress, ○ Z pending"
+  - Reflection prompts: "Are you still moving toward this vision?", "What commitments should you make next?"
+  - Action options: [c]ontinue, [h]old, [a]chieve, [b]andon, [e]dit
+
+#### Scenario: Complete goal review - continue
+- **WHEN** user presses 'c' to continue during review
+- **THEN** last_reviewed_at is set to now, next_review_date is calculated from review_interval_days (if set), and status remains active
+
+#### Scenario: Complete goal review - hold
+- **WHEN** user presses 'h' to hold during review
+- **THEN** status changes to on_hold, last_reviewed_at is set, and AI confirms: "Goal paused. You can reactivate it anytime with /goal activate <id>"
+
+#### Scenario: Complete goal review - achieve
+- **WHEN** user presses 'a' to mark achieved during review
+- **THEN** AI prompts: "Marking a goal as achieved is significant. Are you sure this vision has been realized?" and requires confirmation
+
+#### Scenario: Complete goal review - abandon
+- **WHEN** user presses 'b' to abandon during review
+- **THEN** AI prompts for reason and confirms: "Goals evolve. Abandoning isn't failure—it's honest reprioritization."
+
+#### Scenario: No goals due for review
+- **WHEN** user types `/goal review` and no goals are due
+- **THEN** AI responds: "No goals due for review. Your next review is for '[goal title]' on [date]." or "No goals have review dates set."
+
+### Requirement: Command - Create Goal (Extended)
+
+The system SHALL prompt for motivation and review interval during goal creation.
+
+#### Scenario: Motivation prompt during creation
+- **WHEN** AI creates a goal draft from conversation
+- **THEN** AI asks: "Why does this goal matter to you?" and includes response in motivation field
+
+#### Scenario: Motivation is optional
+- **WHEN** user skips or provides empty motivation
+- **THEN** goal is created with motivation=None (allowed)
+
+#### Scenario: Review interval suggestion
+- **WHEN** goal creation is near completion
+- **THEN** AI suggests: "How often would you like to review this goal? Weekly, Monthly, or Quarterly?" with default of Monthly (30 days)
+
+#### Scenario: Review interval display
+- **WHEN** showing interval options
+- **THEN** options display as "Weekly (7 days)", "Monthly (30 days)", "Quarterly (90 days)", or "No recurring review"
+
 ### Requirement: Command - Create Milestone
 
 The system SHALL support the `/milestone` command to create and manage milestones.

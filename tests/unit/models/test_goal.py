@@ -367,3 +367,51 @@ class TestGoalVisionLink:
                 assert titles == {"Goal 1 for Vision 1", "Goal 2 for Vision 1"}
 
         reset_engine()
+
+
+class TestIntervalLabel:
+    """Tests for review interval label display."""
+
+    def test_interval_7_displays_weekly(self) -> None:
+        """Interval 7 displays as 'Weekly'."""
+        goal = Goal(
+            title="Test",
+            problem_statement="Problem",
+            solution_vision="Vision",
+            review_interval_days=7,
+        )
+
+        assert goal.interval_label == "Weekly"
+
+    def test_interval_30_displays_monthly(self) -> None:
+        """Interval 30 displays as 'Monthly'."""
+        goal = Goal(
+            title="Test",
+            problem_statement="Problem",
+            solution_vision="Vision",
+            review_interval_days=30,
+        )
+
+        assert goal.interval_label == "Monthly"
+
+    def test_interval_90_displays_quarterly(self) -> None:
+        """Interval 90 displays as 'Quarterly'."""
+        goal = Goal(
+            title="Test",
+            problem_statement="Problem",
+            solution_vision="Vision",
+            review_interval_days=90,
+        )
+
+        assert goal.interval_label == "Quarterly"
+
+    def test_interval_none_displays_none(self) -> None:
+        """No interval displays as None."""
+        goal = Goal(
+            title="Test",
+            problem_statement="Problem",
+            solution_vision="Vision",
+            review_interval_days=None,
+        )
+
+        assert goal.interval_label is None

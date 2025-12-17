@@ -3,11 +3,14 @@
 from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime
+from uuid import UUID
 
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 
 from jdo.db.engine import get_engine
-from jdo.models import Draft, Milestone, Vision
+from jdo.models import Commitment, Draft, Goal, Milestone, Vision
+from jdo.models.commitment import CommitmentStatus
+from jdo.models.goal import GoalProgress, GoalStatus
 from jdo.models.milestone import MilestoneStatus
 from jdo.models.vision import VisionStatus
 
@@ -113,3 +116,64 @@ def delete_draft(session: Session, draft: Draft) -> None:
     """
     session.delete(draft)
     session.commit()
+
+
+def get_goals_due_for_review(session: Session) -> list[Goal]:
+    """Get all active goals that are due for review.
+
+    A goal is due for review when:
+    - status is ACTIVE
+    - next_review_date <= today
+
+    Args:
+        session: Database session.
+
+    Returns:
+        List of goals due for review.
+    """
+    today = datetime.now(UTC).date()
+    statement = select(Goal).where(
+        Goal.status == GoalStatus.ACTIVE,
+        Goal.next_review_date <= today,
+    )
+    return list(session.exec(statement).all())
+
+
+def get_commitment_progress(session: Session, goal_id: UUID) -> GoalProgress:
+    """Get commitment progress summary for a goal.
+
+    Counts commitments by status for the given goal.
+
+    Args:
+        session: Database session.
+        goal_id: The goal ID to get progress for.
+
+    Returns:
+        GoalProgress with counts by status.
+    """
+    # Query commitment counts by status for this goal
+    statement = (
+        select(Commitment.status, func.count(Commitment.id))
+        .where(Commitment.goal_id == goal_id)
+        .group_by(Commitment.status)
+    )
+    results = session.exec(statement).all()
+
+    # Convert query results to dict, using defaults for missing statuses
+    result_counts = dict(results)
+    counts = {
+        CommitmentStatus.COMPLETED: result_counts.get(CommitmentStatus.COMPLETED, 0),
+        CommitmentStatus.IN_PROGRESS: result_counts.get(CommitmentStatus.IN_PROGRESS, 0),
+        CommitmentStatus.PENDING: result_counts.get(CommitmentStatus.PENDING, 0),
+        CommitmentStatus.ABANDONED: result_counts.get(CommitmentStatus.ABANDONED, 0),
+    }
+
+    total = sum(counts.values())
+
+    return GoalProgress(
+        total=total,
+        completed=counts[CommitmentStatus.COMPLETED],
+        in_progress=counts[CommitmentStatus.IN_PROGRESS],
+        pending=counts[CommitmentStatus.PENDING],
+        abandoned=counts[CommitmentStatus.ABANDONED],
+    )
