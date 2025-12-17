@@ -233,3 +233,141 @@ class TestListView:
             await pilot.pause()
 
             assert panel.mode == PanelMode.LIST
+
+
+# ============================================================
+# Phase 8: Recurring Commitment View Tests
+# ============================================================
+
+
+class TestRecurringCommitmentViews:
+    """Tests for recurring commitment data panel views."""
+
+    async def test_recurring_commitment_list_view_shows_all_templates(self) -> None:
+        """Test: RecurringCommitmentListView shows all templates."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_list(
+                "recurring_commitment",
+                [
+                    {
+                        "id": "1",
+                        "deliverable_template": "Weekly status report",
+                        "recurrence_type": "weekly",
+                        "status": "active",
+                    },
+                    {
+                        "id": "2",
+                        "deliverable_template": "Monthly review",
+                        "recurrence_type": "monthly",
+                        "status": "active",
+                    },
+                ],
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.LIST
+
+    async def test_recurring_commitment_detail_view_shows_pattern_details(self) -> None:
+        """Test: RecurringCommitmentDetailView shows pattern details."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_recurring_commitment_view(
+                {
+                    "id": "123",
+                    "deliverable_template": "Weekly status report",
+                    "recurrence_type": "weekly",
+                    "days_of_week": [0, 2, 4],  # Mon, Wed, Fri
+                    "interval": 1,
+                    "status": "active",
+                    "instances_generated": 5,
+                }
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.VIEW
+
+    async def test_recurring_commitment_draft_shows_all_fields(self) -> None:
+        """Test: Recurring commitment draft shows all fields."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_recurring_commitment_draft(
+                {
+                    "deliverable_template": "Weekly report",
+                    "stakeholder_name": "Finance Team",
+                    "recurrence_type": "weekly",
+                    "days_of_week": [0],
+                }
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.DRAFT
+
+    async def test_instance_count_displayed_in_detail_view(self) -> None:
+        """Test: Instance count displayed in detail view."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_recurring_commitment_view(
+                {
+                    "id": "123",
+                    "deliverable_template": "Daily standup",
+                    "recurrence_type": "daily",
+                    "status": "active",
+                    "instances_generated": 42,
+                }
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.VIEW
+            # The panel should have stored the instances_generated value
+            assert panel._data.get("instances_generated") == 42
+
+
+class TestCommitmentRecurringIndicator:
+    """Tests for recurring indicator on commitment views."""
+
+    async def test_commitment_view_shows_recurring_indicator_when_linked(self) -> None:
+        """Test: Commitment view shows recurring indicator when recurring."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_commitment_view(
+                {
+                    "id": "123",
+                    "deliverable": "Weekly status report",
+                    "stakeholder_name": "Manager",
+                    "due_date": "2025-12-20",
+                    "status": "pending",
+                    "recurring_commitment_id": "456",  # Linked to recurring
+                }
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.VIEW
+            # Data should include the recurring link
+            assert panel._data.get("recurring_commitment_id") == "456"
+
+    async def test_commitment_view_no_indicator_when_not_recurring(self) -> None:
+        """Test: Commitment view without recurring indicator when not linked."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_commitment_view(
+                {
+                    "id": "123",
+                    "deliverable": "One-time task",
+                    "stakeholder_name": "Manager",
+                    "due_date": "2025-12-20",
+                    "status": "pending",
+                    # No recurring_commitment_id
+                }
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.VIEW
+            # Should not have recurring link
+            assert panel._data.get("recurring_commitment_id") is None

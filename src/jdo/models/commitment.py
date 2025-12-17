@@ -1,10 +1,13 @@
 """Commitment SQLModel entity."""
 
-from datetime import UTC, date, datetime, time
+from datetime import date, datetime, time
 from enum import Enum
 from uuid import UUID, uuid4
 
+from sqlalchemy import Column, ForeignKey, Uuid
 from sqlmodel import Field, SQLModel
+
+from jdo.models.base import utc_now
 
 
 class CommitmentStatus(str, Enum):
@@ -14,11 +17,6 @@ class CommitmentStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     ABANDONED = "abandoned"
-
-
-def utc_now() -> datetime:
-    """Get current UTC datetime."""
-    return datetime.now(UTC)
 
 
 def default_due_time() -> time:
@@ -40,6 +38,14 @@ class Commitment(SQLModel, table=True):
     stakeholder_id: UUID = Field(foreign_key="stakeholders.id")
     goal_id: UUID | None = Field(default=None, foreign_key="goals.id")
     milestone_id: UUID | None = Field(default=None, foreign_key="milestones.id")
+    recurring_commitment_id: UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            Uuid(as_uuid=True),
+            ForeignKey("recurring_commitments.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+    )
     due_date: date
     due_time: time = Field(default_factory=default_due_time)
     timezone: str = Field(default="America/New_York")
@@ -48,6 +54,15 @@ class Commitment(SQLModel, table=True):
     notes: str | None = Field(default=None)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+    @property
+    def is_recurring(self) -> bool:
+        """Check if this commitment was spawned from a recurring commitment.
+
+        Returns:
+            True if linked to a RecurringCommitment, False otherwise.
+        """
+        return self.recurring_commitment_id is not None
 
     def is_orphan(self) -> bool:
         """Check if this commitment is an orphan.

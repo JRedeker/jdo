@@ -5,43 +5,14 @@ Define the Commitment domain model representing promises made to stakeholders wi
 ## Requirements
 ### Requirement: Commitment Model
 
-The system SHALL provide a `Commitment` SQLModel with the following validated fields:
-- `id` (UUID): Unique identifier, auto-generated
-- `deliverable` (str): What is being delivered, required, non-empty
-- `stakeholder_id` (UUID): Reference to Stakeholder, required
-- `goal_id` (UUID | None): Optional reference to parent Goal
-- `due_date` (date): The date the commitment is due, required
-- `due_time` (time | None): Optional specific time of day when due; defaults to 09:00 if not specified
-- `timezone` (str): Timezone for due_time interpretation, defaults to "America/New_York"
-- `status` (CommitmentStatus enum): One of `pending`, `in_progress`, `completed`, `abandoned`; defaults to `pending`. Note: Commitments cannot be "skipped" - they are either completed (met) or abandoned (missed/cancelled).
-- `completed_at` (datetime | None): Timestamp when marked complete
-- `notes` (str | None): Optional additional context
-- `created_at` (datetime): Auto-set on creation, timezone-aware (EST default)
-- `updated_at` (datetime): Auto-updated on modification, timezone-aware (EST default)
+The system SHALL extend the Commitment model with the following field:
 
-#### Scenario: Create commitment with required fields
-- **WHEN** user creates a Commitment with deliverable="Send report", stakeholder_id, and due_date
-- **THEN** a valid Commitment is created with status="pending" and auto-generated timestamps
+**Field Addition**:
+- `recurring_commitment_id` (UUID | None): Optional reference to parent RecurringCommitment template
 
-#### Scenario: Create commitment with specific due time
-- **WHEN** user creates a Commitment with due_date and due_time="15:00" and timezone="America/New_York"
-- **THEN** the Commitment records both date and time for precise deadline tracking
-
-#### Scenario: Create commitment without specific time
-- **WHEN** user creates a Commitment with due_date but no due_time
-- **THEN** the due_time defaults to 09:00 (start of business) in the user's timezone
-
-#### Scenario: Reject commitment without deliverable
-- **WHEN** user creates a Commitment with an empty deliverable
-- **THEN** SQLModel validation raises an error
-
-#### Scenario: Reject commitment without stakeholder
-- **WHEN** user creates a Commitment without a stakeholder_id
-- **THEN** SQLModel validation raises an error
-
-#### Scenario: Reject commitment without due date
-- **WHEN** user creates a Commitment without a due_date
-- **THEN** SQLModel validation raises an error
+#### Scenario: Create commitment from recurring template
+- **WHEN** system generates a Commitment from a RecurringCommitment
+- **THEN** the Commitment has recurring_commitment_id set to the template's id
 
 ### Requirement: Commitment-Goal Association
 
@@ -230,4 +201,20 @@ The system SHALL guide users to link commitments appropriately.
 #### Scenario: Suggest creating milestone
 - **WHEN** user creates multiple commitments for a goal without milestones
 - **THEN** AI suggests: "You have several commitments for this goal. Would you like to organize them into milestones?"
+
+### Requirement: Recurring Instance Linking
+
+The system SHALL support linking Commitment instances to their RecurringCommitment template.
+
+#### Scenario: Query instances by recurring template
+- **WHEN** user queries commitments with recurring_commitment_id filter
+- **THEN** the system returns all instances generated from that template
+
+#### Scenario: Instance remains after template deletion
+- **WHEN** a RecurringCommitment is deleted
+- **THEN** existing Commitment instances retain their data and recurring_commitment_id is set to NULL (ON DELETE SET NULL)
+
+#### Scenario: Trigger next generation on completion
+- **WHEN** user completes a Commitment that has a recurring_commitment_id
+- **THEN** the system checks whether to generate the next instance from the template
 

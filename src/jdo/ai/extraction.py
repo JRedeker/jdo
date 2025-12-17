@@ -6,7 +6,7 @@ Uses PydanticAI structured output to extract fields from natural language.
 from datetime import date, time
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from pydantic_ai import Agent
 from pydantic_ai.models import Model
 
@@ -93,6 +93,28 @@ Suggest which milestone this commitment might contribute to, based on
 the commitment's deliverable and due date.
 """
 
+RECURRING_COMMITMENT_EXTRACTION_PROMPT = """\
+Extract recurring commitment details from the conversation. Look for:
+- What the user commits to doing regularly (deliverable_template)
+- Who they're committing to (stakeholder_name)
+- The recurrence pattern (recurrence_type: daily, weekly, monthly, or yearly)
+- For weekly: which days of the week (days_of_week as 0=Monday to 6=Sunday)
+- For monthly: either the day of month (1-31) or "Nth weekday" pattern
+- Time of day if mentioned (due_time)
+
+Common patterns to recognize:
+- "every day", "daily" → daily
+- "every Monday", "weekly on Monday" → weekly, days_of_week=[0]
+- "every Mon, Wed, Fri" → weekly, days_of_week=[0, 2, 4]
+- "every other week" → weekly with interval=2
+- "on the 15th of each month" → monthly, day_of_month=15
+- "first Monday of each month" → monthly, week_of_month=1, days_of_week=[0]
+- "last Friday of each month" → monthly, week_of_month=5, days_of_week=[4]
+- "annually on March 15" → yearly, month_of_year=3, day_of_month=15
+
+Be specific about the recurrence pattern.
+"""
+
 
 class ExtractedCommitment(BaseModel):
     """Extracted commitment fields from conversation."""
@@ -134,6 +156,108 @@ class ExtractedMilestone(BaseModel):
     title: str = Field(description="A clear title for the milestone")
     description: str | None = Field(default=None, description="What this milestone represents")
     target_date: date = Field(description="When this should be achieved (YYYY-MM-DD)")
+
+
+# Validation constants for extracted recurrence values
+MIN_DAY_OF_WEEK = 0
+MAX_DAY_OF_WEEK = 6
+MIN_DAY_OF_MONTH = 1
+MAX_DAY_OF_MONTH = 31
+MIN_MONTH_OF_YEAR = 1
+MAX_MONTH_OF_YEAR = 12
+VALID_WEEK_OF_MONTH = {1, 2, 3, 4, 5, -1}
+
+
+class ExtractedRecurringCommitment(BaseModel):
+    """Extracted recurring commitment fields from conversation."""
+
+    deliverable_template: str = Field(description="What will be delivered each time")
+    stakeholder_name: str = Field(description="Who this is for (person, team, or organization)")
+    recurrence_type: str = Field(
+        description="Type of recurrence: 'daily', 'weekly', 'monthly', or 'yearly'"
+    )
+    interval: int = Field(
+        default=1,
+        description="Interval between occurrences (e.g., 2 for 'every other week')",
+    )
+    days_of_week: list[int] | None = Field(
+        default=None,
+        description="For weekly: days of week as integers (0=Monday to 6=Sunday)",
+    )
+    day_of_month: int | None = Field(
+        default=None,
+        description="For monthly: specific day of month (1-31)",
+    )
+    week_of_month: int | None = Field(
+        default=None,
+        description="For monthly: which week (1-4, or 5 for 'last')",
+    )
+    month_of_year: int | None = Field(
+        default=None,
+        description="For yearly: month (1-12)",
+    )
+    due_time: time | None = Field(
+        default=None,
+        description="Time of day if specified (HH:MM)",
+    )
+
+    @model_validator(mode="after")
+    def validate_extracted_values(self) -> "ExtractedRecurringCommitment":
+        """Validate extracted recurrence values are in valid ranges."""
+        self._validate_recurrence_type()
+        self._validate_days_of_week()
+        self._validate_day_of_month()
+        self._validate_week_of_month()
+        self._validate_month_of_year()
+        self._validate_interval()
+        return self
+
+    def _validate_recurrence_type(self) -> None:
+        """Validate and normalize recurrence_type."""
+        valid_types = {"daily", "weekly", "monthly", "yearly"}
+        if self.recurrence_type.lower() not in valid_types:
+            msg = f"recurrence_type must be one of: {', '.join(valid_types)}"
+            raise ValueError(msg)
+        self.recurrence_type = self.recurrence_type.lower()
+
+    def _validate_days_of_week(self) -> None:
+        """Validate days_of_week values are in range 0-6."""
+        if self.days_of_week is None:
+            return
+        for day in self.days_of_week:
+            if not (MIN_DAY_OF_WEEK <= day <= MAX_DAY_OF_WEEK):
+                msg = "days_of_week values must be 0-6 (Monday=0 to Sunday=6)"
+                raise ValueError(msg)
+
+    def _validate_day_of_month(self) -> None:
+        """Validate day_of_month is in range 1-31."""
+        if self.day_of_month is None:
+            return
+        if not (MIN_DAY_OF_MONTH <= self.day_of_month <= MAX_DAY_OF_MONTH):
+            msg = "day_of_month must be 1-31"
+            raise ValueError(msg)
+
+    def _validate_week_of_month(self) -> None:
+        """Validate week_of_month is 1-5 or -1."""
+        if self.week_of_month is None:
+            return
+        if self.week_of_month not in VALID_WEEK_OF_MONTH:
+            msg = "week_of_month must be 1-5 or -1 (for last week)"
+            raise ValueError(msg)
+
+    def _validate_month_of_year(self) -> None:
+        """Validate month_of_year is in range 1-12."""
+        if self.month_of_year is None:
+            return
+        if not (MIN_MONTH_OF_YEAR <= self.month_of_year <= MAX_MONTH_OF_YEAR):
+            msg = "month_of_year must be 1-12"
+            raise ValueError(msg)
+
+    def _validate_interval(self) -> None:
+        """Validate interval is positive."""
+        if self.interval < 1:
+            msg = "interval must be at least 1"
+            raise ValueError(msg)
 
 
 def create_extraction_agent(
@@ -271,6 +395,28 @@ async def extract_milestone(
         ExtractedMilestone with populated fields.
     """
     agent = create_extraction_agent(model, ExtractedMilestone, MILESTONE_EXTRACTION_PROMPT)
+    conversation = _format_conversation_for_extraction(messages)
+
+    result = await agent.run(conversation)
+    return result.output  # type: ignore[return-value]
+
+
+async def extract_recurring_commitment(
+    messages: list[dict[str, str]],
+    model: Model | str = "test",
+) -> ExtractedRecurringCommitment:
+    """Extract recurring commitment fields from conversation.
+
+    Args:
+        messages: Conversation history.
+        model: Model to use for extraction.
+
+    Returns:
+        ExtractedRecurringCommitment with populated fields.
+    """
+    agent = create_extraction_agent(
+        model, ExtractedRecurringCommitment, RECURRING_COMMITMENT_EXTRACTION_PROMPT
+    )
     conversation = _format_conversation_for_extraction(messages)
 
     result = await agent.run(conversation)

@@ -16,6 +16,7 @@ class CommandType(str, Enum):
     TASK = "task"
     VISION = "vision"
     MILESTONE = "milestone"
+    RECURRING = "recurring"
     SHOW = "show"
     VIEW = "view"
     EDIT = "edit"
@@ -59,6 +60,7 @@ _COMMAND_MAP: dict[str, CommandType] = {
     "task": CommandType.TASK,
     "vision": CommandType.VISION,
     "milestone": CommandType.MILESTONE,
+    "recurring": CommandType.RECURRING,
     "show": CommandType.SHOW,
     "view": CommandType.VIEW,
     "edit": CommandType.EDIT,

@@ -678,6 +678,31 @@ features:
         - "Slack/Discord integration"
         - "Commitment reminder schedule ahead of due time"
 
+  recurring_commitment_snapshots:
+    title: "Recurring Commitment Visual Snapshots"
+    priority: low
+    complexity: low
+    status: proposed
+    category: testing
+    
+    description: |
+      Visual regression snapshots for recurring commitment UI components.
+      Part of the add-recurring-commitments feature (Phase 9 - skipped during initial impl).
+    
+    proposed_changes:
+      snapshots_to_add:
+        - name: "recurring_commitment_list"
+          description: "List view showing recurring commitment templates"
+        - name: "recurring_commitment_detail"
+          description: "Detail view showing pattern details, next due, instance count"
+        - name: "commitment_with_recurring_indicator"
+          description: "Commitment view showing recurring indicator when linked"
+    
+    acceptance_criteria:
+      - "Snapshot tests exist for recurring commitment list view"
+      - "Snapshot tests exist for recurring commitment detail view"
+      - "Snapshot tests verify recurring indicator appears on linked commitments"
+
   commitment_reminders:
     title: "Commitment Reminders & Escalation"
     priority: medium

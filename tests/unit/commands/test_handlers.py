@@ -784,6 +784,192 @@ class TestCompleteHandler:
 # ============================================================
 
 
+# ============================================================
+# Phase 7: /recurring Command Tests
+# ============================================================
+
+
+class TestRecurringHandler:
+    """Tests for the /recurring command handler."""
+
+    def test_recurring_lists_all_recurring_commitments(self) -> None:
+        """Test: /recurring lists all recurring commitments."""
+        from jdo.commands.handlers import RecurringHandler
+
+        handler = RecurringHandler()
+        cmd = ParsedCommand(CommandType.RECURRING, [], "/recurring")
+
+        context = {
+            "recurring_commitments": [
+                {
+                    "id": uuid4(),
+                    "deliverable_template": "Weekly status report",
+                    "recurrence_type": "weekly",
+                    "status": "active",
+                },
+                {
+                    "id": uuid4(),
+                    "deliverable_template": "Monthly review",
+                    "recurrence_type": "monthly",
+                    "status": "active",
+                },
+            ]
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert result.panel_update is not None
+        assert result.panel_update["mode"] == "list"
+        assert result.panel_update["entity_type"] == "recurring_commitment"
+        assert len(result.panel_update["items"]) == 2
+
+    def test_recurring_shows_pattern_summary(self) -> None:
+        """Test: /recurring shows pattern summary (e.g., 'Weekly on Mon, Wed')."""
+        from jdo.commands.handlers import RecurringHandler
+
+        handler = RecurringHandler()
+        cmd = ParsedCommand(CommandType.RECURRING, [], "/recurring")
+
+        context = {
+            "recurring_commitments": [
+                {
+                    "id": uuid4(),
+                    "deliverable_template": "Weekly status report",
+                    "recurrence_type": "weekly",
+                    "days_of_week": [0, 2, 4],  # Mon, Wed, Fri
+                    "status": "active",
+                },
+            ]
+        }
+
+        result = handler.execute(cmd, context)
+
+        # Panel should contain the recurring commitment data
+        assert result.panel_update is not None
+        assert len(result.panel_update["items"]) == 1
+        item = result.panel_update["items"][0]
+        assert item["days_of_week"] == [0, 2, 4]
+
+    def test_recurring_shows_active_paused_status(self) -> None:
+        """Test: /recurring shows active/paused status."""
+        from jdo.commands.handlers import RecurringHandler
+
+        handler = RecurringHandler()
+        cmd = ParsedCommand(CommandType.RECURRING, [], "/recurring")
+
+        context = {
+            "recurring_commitments": [
+                {
+                    "id": uuid4(),
+                    "deliverable_template": "Active task",
+                    "recurrence_type": "daily",
+                    "status": "active",
+                },
+                {
+                    "id": uuid4(),
+                    "deliverable_template": "Paused task",
+                    "recurrence_type": "daily",
+                    "status": "paused",
+                },
+            ]
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert result.panel_update is not None
+        items = result.panel_update["items"]
+        statuses = [item["status"] for item in items]
+        assert "active" in statuses
+        assert "paused" in statuses
+
+    def test_recurring_new_starts_creation_flow(self) -> None:
+        """Test: /recurring new starts creation flow."""
+        from jdo.commands.handlers import RecurringHandler
+
+        handler = RecurringHandler()
+        cmd = ParsedCommand(CommandType.RECURRING, ["new"], "/recurring new")
+
+        context = {"conversation": []}
+
+        result = handler.execute(cmd, context)
+
+        assert result.panel_update is not None
+        assert result.panel_update["mode"] == "draft"
+        assert result.panel_update["entity_type"] == "recurring_commitment"
+        assert "recurring" in result.message.lower() or "regularly" in result.message.lower()
+
+    def test_recurring_pause_prompts_for_confirmation(self) -> None:
+        """Test: /recurring pause <id> sets status to paused."""
+        from jdo.commands.handlers import RecurringHandler
+
+        handler = RecurringHandler()
+        recurring_id = str(uuid4())
+        cmd = ParsedCommand(
+            CommandType.RECURRING, ["pause", recurring_id], f"/recurring pause {recurring_id}"
+        )
+
+        context = {}
+
+        result = handler.execute(cmd, context)
+
+        assert result.needs_confirmation is True
+        assert "pause" in result.message.lower()
+
+    def test_recurring_resume_prompts_for_confirmation(self) -> None:
+        """Test: /recurring resume <id> sets status to active."""
+        from jdo.commands.handlers import RecurringHandler
+
+        handler = RecurringHandler()
+        recurring_id = str(uuid4())
+        cmd = ParsedCommand(
+            CommandType.RECURRING, ["resume", recurring_id], f"/recurring resume {recurring_id}"
+        )
+
+        context = {}
+
+        result = handler.execute(cmd, context)
+
+        assert result.needs_confirmation is True
+        assert "resume" in result.message.lower()
+
+    def test_recurring_delete_prompts_for_confirmation(self) -> None:
+        """Test: /recurring delete <id> prompts for confirmation."""
+        from jdo.commands.handlers import RecurringHandler
+
+        handler = RecurringHandler()
+        recurring_id = str(uuid4())
+        cmd = ParsedCommand(
+            CommandType.RECURRING, ["delete", recurring_id], f"/recurring delete {recurring_id}"
+        )
+
+        context = {}
+
+        result = handler.execute(cmd, context)
+
+        assert result.needs_confirmation is True
+        assert "delete" in result.message.lower()
+        # Should mention instances will remain
+        assert "instance" in result.message.lower() or "remain" in result.message.lower()
+
+    def test_show_recurring_displays_recurring_list(self) -> None:
+        """Test: /show recurring displays recurring commitment list."""
+        from jdo.commands.handlers import ShowHandler
+
+        handler = ShowHandler()
+        cmd = ParsedCommand(CommandType.SHOW, ["recurring"], "/show recurring")
+
+        context = {
+            "recurring": [
+                {"id": uuid4(), "deliverable_template": "Weekly report"},
+            ]
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert result.panel_update is not None
+        assert result.panel_update["entity_type"] == "recurring_commitment"
+
+
 class TestHandlerRegistry:
     """Tests for the command handler registry."""
 

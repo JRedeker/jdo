@@ -13,6 +13,23 @@ from textual.containers import VerticalScroll
 from textual.reactive import reactive
 from textual.widgets import Static
 
+from jdo.recurrence.formatter import DAY_NAMES, MONTH_NAMES
+
+# Validation constants for day of week
+MIN_DAY_OF_WEEK = 0
+MAX_DAY_OF_WEEK = 6
+
+# Validation constants for month
+MIN_MONTH = 1
+MAX_MONTH = 12
+
+# Week of month values representing "last week"
+LAST_WEEK_VALUES = {5, -1}
+
+# Ordinal suffix constants
+ORDINAL_TEEN_MIN = 11
+ORDINAL_TEEN_MAX = 13
+
 # Empty state messages for each entity type
 _EMPTY_STATE_MESSAGES: dict[str, str] = {
     "commitment": (
@@ -44,6 +61,12 @@ _EMPTY_STATE_MESSAGES: dict[str, str] = {
         "Create your first milestone by typing:\n"
         "  /milestone <a measurable checkpoint>\n\n"
         "Example: /milestone launch beta version by Q2"
+    ),
+    "recurring_commitment": (
+        "No recurring commitments yet.\n\n"
+        "Create your first recurring commitment by typing:\n"
+        "  /recurring new\n\n"
+        "Example: Weekly status report every Monday"
     ),
 }
 
@@ -236,6 +259,11 @@ class DataPanel(VerticalScroll):
 
     def _render_view(self) -> None:
         """Render view mode content."""
+        # Use specialized rendering for recurring_commitment
+        if self._entity_type == "recurring_commitment":
+            self._render_recurring_commitment_view()
+            return
+
         text = Text()
         entity_name = self._entity_type.upper()
         text.append(f"{entity_name}\n", style="bold")
@@ -248,8 +276,137 @@ class DataPanel(VerticalScroll):
 
         self._content.update(text)
 
+    def _render_recurring_commitment_view(self) -> None:
+        """Render specialized view for recurring commitments."""
+        text = Text()
+        text.append("RECURRING COMMITMENT\n", style="bold")
+        text.append("-" * 30 + "\n\n")
+
+        # Deliverable template
+        if "deliverable_template" in self._data:
+            text.append("Deliverable:\n", style="dim")
+            text.append(f"  {self._data['deliverable_template']}\n\n")
+
+        # Try to format pattern summary if we have the model
+        pattern = self._format_recurrence_pattern()
+        if pattern:
+            text.append("Schedule:\n", style="dim")
+            text.append(f"  {pattern}\n\n")
+
+        # Status
+        if "status" in self._data:
+            text.append("Status:\n", style="dim")
+            status = self._data["status"]
+            if hasattr(status, "value"):
+                status = status.value
+            text.append(f"  {status}\n\n")
+
+        # Instance count
+        if "instances_generated" in self._data:
+            text.append("Instances Generated:\n", style="dim")
+            text.append(f"  {self._data['instances_generated']}\n\n")
+
+        self._content.update(text)
+
+    def _format_recurrence_pattern(self) -> str:
+        """Format recurrence pattern from data dict.
+
+        Returns:
+            Human-readable pattern string, or empty string if not enough data.
+        """
+        recurrence_type = self._data.get("recurrence_type")
+        if not recurrence_type:
+            return ""
+
+        # Convert enum to string if needed
+        if hasattr(recurrence_type, "value"):
+            recurrence_type = recurrence_type.value
+
+        formatters = {
+            "daily": self._format_daily_pattern,
+            "weekly": self._format_weekly_pattern,
+            "monthly": self._format_monthly_pattern,
+            "yearly": self._format_yearly_pattern,
+        }
+        formatter = formatters.get(recurrence_type)
+        return formatter() if formatter else ""
+
+    def _format_daily_pattern(self) -> str:
+        """Format daily recurrence pattern."""
+        interval = self._data.get("interval", 1)
+        return "Daily" if interval == 1 else f"Every {interval} days"
+
+    def _format_weekly_pattern(self) -> str:
+        """Format weekly recurrence pattern."""
+        interval = self._data.get("interval", 1)
+        days = self._data.get("days_of_week", [])
+        days_str = self._format_days_of_week(days)
+        if interval == 1:
+            return f"Weekly on {days_str}"
+        return f"Every {interval} weeks on {days_str}"
+
+    def _format_monthly_pattern(self) -> str:
+        """Format monthly recurrence pattern."""
+        interval = self._data.get("interval", 1)
+        day_part = self._get_monthly_day_part()
+        if interval == 1:
+            return f"Monthly on {day_part}"
+        return f"Every {interval} months on {day_part}"
+
+    def _get_monthly_day_part(self) -> str:
+        """Get the day specification for monthly pattern."""
+        day_of_month = self._data.get("day_of_month")
+        if day_of_month:
+            return f"the {self._ordinal(day_of_month)}"
+
+        week_of_month = self._data.get("week_of_month")
+        days = self._data.get("days_of_week", [])
+        if week_of_month is not None and days:
+            day_name = DAY_NAMES[days[0]] if days else ""
+            if week_of_month in LAST_WEEK_VALUES:
+                return f"the last {day_name}"
+            return f"the {self._ordinal(week_of_month)} {day_name}"
+        return ""
+
+    def _format_yearly_pattern(self) -> str:
+        """Format yearly recurrence pattern."""
+        interval = self._data.get("interval", 1)
+        month = self._data.get("month_of_year", 1)
+        month_name = MONTH_NAMES[month] if MIN_MONTH <= month <= MAX_MONTH else ""
+        if interval == 1:
+            return f"Yearly in {month_name}"
+        return f"Every {interval} years in {month_name}"
+
+    def _format_days_of_week(self, days: list[int]) -> str:
+        """Format days of week list as readable string.
+
+        Args:
+            days: List of day indices (0=Monday to 6=Sunday).
+
+        Returns:
+            Formatted string like "Mon, Wed, Fri".
+        """
+        if not days:
+            return ""
+        sorted_days = sorted(days)
+        return ", ".join(
+            DAY_NAMES[d] for d in sorted_days if MIN_DAY_OF_WEEK <= d <= MAX_DAY_OF_WEEK
+        )
+
+    def _ordinal(self, n: int) -> str:
+        """Get ordinal string for a number (1st, 2nd, 3rd, etc.)."""
+        if ORDINAL_TEEN_MIN <= n % 100 <= ORDINAL_TEEN_MAX:
+            return f"{n}th"
+        suffixes = {1: "st", 2: "nd", 3: "rd"}
+        return f"{n}{suffixes.get(n % 10, 'th')}"
+
     def _render_draft(self) -> None:
         """Render draft mode content."""
+        # Use specialized rendering for recurring_commitment
+        if self._entity_type == "recurring_commitment":
+            self._render_recurring_commitment_draft()
+            return
+
         text = Text()
         entity_name = self._entity_type.upper()
         text.append(f"{entity_name} (draft)\n", style="bold yellow")
@@ -262,6 +419,44 @@ class DataPanel(VerticalScroll):
                 text.append(f"  {value}\n\n")
             else:
                 text.append("  (not set)\n\n", style="dim italic")
+
+        self._content.update(text)
+
+    def _render_recurring_commitment_draft(self) -> None:
+        """Render specialized draft view for recurring commitments."""
+        text = Text()
+        text.append("RECURRING COMMITMENT (draft)\n", style="bold yellow")
+        text.append("-" * 30 + "\n\n")
+
+        # Deliverable template
+        text.append("Deliverable:\n", style="dim")
+        deliverable = self._data.get("deliverable_template", "")
+        if deliverable:
+            text.append(f"  {deliverable}\n\n")
+        else:
+            text.append("  (not set)\n\n", style="dim italic")
+
+        # Stakeholder
+        text.append("Stakeholder:\n", style="dim")
+        stakeholder = self._data.get("stakeholder_name", "")
+        if stakeholder:
+            text.append(f"  {stakeholder}\n\n")
+        else:
+            text.append("  (not set)\n\n", style="dim italic")
+
+        # Schedule pattern
+        pattern = self._format_recurrence_pattern()
+        text.append("Schedule:\n", style="dim")
+        if pattern:
+            text.append(f"  {pattern}\n\n")
+        else:
+            text.append("  (not set)\n\n", style="dim italic")
+
+        # Due time
+        due_time = self._data.get("due_time")
+        if due_time:
+            text.append("Due Time:\n", style="dim")
+            text.append(f"  {due_time}\n\n")
 
         self._content.update(text)
 
@@ -318,6 +513,18 @@ class DataPanel(VerticalScroll):
     def show_milestone_view(self, data: dict[str, Any]) -> None:
         """Show a milestone view in the panel."""
         self._entity_type = "milestone"
+        self._data = data
+        self.mode = PanelMode.VIEW
+
+    def show_recurring_commitment_draft(self, data: dict[str, Any]) -> None:
+        """Show a recurring commitment draft in the panel."""
+        self._entity_type = "recurring_commitment"
+        self._data = data
+        self.mode = PanelMode.DRAFT
+
+    def show_recurring_commitment_view(self, data: dict[str, Any]) -> None:
+        """Show a recurring commitment view in the panel."""
+        self._entity_type = "recurring_commitment"
         self._data = data
         self.mode = PanelMode.VIEW
 

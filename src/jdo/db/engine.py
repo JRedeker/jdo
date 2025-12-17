@@ -6,10 +6,13 @@ from sqlmodel import create_engine
 from jdo.config import get_settings
 
 
-def _enable_wal_mode(dbapi_connection, _connection_record) -> None:  # noqa: ANN001
-    """Enable WAL mode for better concurrent access."""
+def _configure_sqlite(dbapi_connection, _connection_record) -> None:  # noqa: ANN001
+    """Configure SQLite pragmas for WAL mode and foreign key enforcement."""
     cursor = dbapi_connection.cursor()
+    # Enable WAL mode for better concurrent access
     cursor.execute("PRAGMA journal_mode=WAL")
+    # Enable foreign key enforcement (required for ON DELETE actions)
+    cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
 
 
@@ -33,8 +36,8 @@ def get_engine() -> Engine:
             database_url,
             connect_args={"check_same_thread": False},
         )
-        # Enable WAL mode for better concurrent access
-        event.listen(_engine_instance, "connect", _enable_wal_mode)
+        # Configure SQLite pragmas (WAL mode, foreign keys)
+        event.listen(_engine_instance, "connect", _configure_sqlite)
     return _engine_instance
 
 

@@ -2,17 +2,21 @@
 
 from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlmodel import Session, func, select
 
 from jdo.db.engine import get_engine
-from jdo.models import Commitment, Draft, Goal, Milestone, Vision
+from jdo.models import Commitment, Draft, Goal, Milestone, RecurringCommitment, Vision
 from jdo.models.commitment import CommitmentStatus
 from jdo.models.goal import GoalProgress, GoalStatus
 from jdo.models.milestone import MilestoneStatus
+from jdo.models.recurring_commitment import RecurringCommitmentStatus
+from jdo.models.task import Task
 from jdo.models.vision import VisionStatus
+from jdo.recurrence.calculator import get_next_due_date
+from jdo.recurrence.generator import generate_instance, should_generate_instance
 
 
 @contextmanager
@@ -137,6 +141,133 @@ def get_goals_due_for_review(session: Session) -> list[Goal]:
         Goal.next_review_date <= today,
     )
     return list(session.exec(statement).all())
+
+
+def get_active_recurring_commitments(session: Session) -> list[RecurringCommitment]:
+    """Get all active recurring commitments.
+
+    Args:
+        session: Database session.
+
+    Returns:
+        List of active recurring commitments.
+    """
+    statement = select(RecurringCommitment).where(
+        RecurringCommitment.status == RecurringCommitmentStatus.ACTIVE,
+    )
+    return list(session.exec(statement).all())
+
+
+def check_and_generate_recurring_instances(
+    session: Session,
+    current_date: datetime | None = None,
+) -> list[tuple[Commitment, list[Task]]]:
+    """Check all active recurring commitments and generate instances if due.
+
+    This is the main trigger function called when viewing upcoming commitments.
+    It checks all active recurring commitments and generates new instances
+    for those that are due within the generation window.
+
+    Args:
+        session: Database session.
+        current_date: Current date for calculation. If None, uses today.
+
+    Returns:
+        List of (Commitment, list[Task]) tuples for generated instances.
+    """
+    if current_date is None:
+        current_date = datetime.now(UTC)
+
+    today = current_date.date()
+    generated: list[tuple[Commitment, list[Task]]] = []
+
+    # Get all active recurring commitments
+    recurring_list = get_active_recurring_commitments(session)
+
+    for recurring in recurring_list:
+        # Check if we should generate
+        if not should_generate_instance(recurring, today):
+            continue
+
+        # Calculate the next due date
+        reference_date = recurring.last_generated_date or (today - timedelta(days=1))
+        next_due = get_next_due_date(recurring, after_date=reference_date)
+
+        if next_due is None:
+            continue
+
+        # Generate the instance
+        commitment, tasks = generate_instance(recurring, due_date=next_due)
+
+        # Update the recurring commitment tracking
+        recurring.last_generated_date = next_due
+        recurring.instances_generated += 1
+        recurring.updated_at = current_date
+
+        # Save all entities
+        session.add(recurring)
+        session.add(commitment)
+        for task in tasks:
+            session.add(task)
+
+        generated.append((commitment, tasks))
+
+    return generated
+
+
+def generate_next_instance_for_recurring(
+    session: Session,
+    recurring_commitment_id: UUID,
+    current_date: datetime | None = None,
+) -> tuple[Commitment, list[Task]] | None:
+    """Generate the next instance for a specific recurring commitment.
+
+    This is called when a recurring commitment instance is completed
+    to trigger generation of the next instance.
+
+    Args:
+        session: Database session.
+        recurring_commitment_id: The ID of the recurring commitment.
+        current_date: Current date for calculation. If None, uses today.
+
+    Returns:
+        Tuple of (Commitment, list[Task]) if generated, None otherwise.
+    """
+    if current_date is None:
+        current_date = datetime.now(UTC)
+
+    today = current_date.date()
+
+    # Get the recurring commitment
+    recurring = session.get(RecurringCommitment, recurring_commitment_id)
+    if recurring is None:
+        return None
+
+    if recurring.status != RecurringCommitmentStatus.ACTIVE:
+        return None
+
+    # Calculate next due date from the last generated date
+    reference_date = recurring.last_generated_date or today
+    next_due = get_next_due_date(recurring, after_date=reference_date)
+
+    if next_due is None:
+        return None
+
+    # Generate the instance
+    commitment, tasks = generate_instance(recurring, due_date=next_due)
+
+    # Update tracking
+    recurring.last_generated_date = next_due
+    recurring.instances_generated += 1
+    recurring.updated_at = current_date
+
+    # Save
+    session.add(recurring)
+    session.add(commitment)
+    for task in tasks:
+        session.add(task)
+
+    return (commitment, tasks)
 
 
 def get_commitment_progress(session: Session, goal_id: UUID) -> GoalProgress:

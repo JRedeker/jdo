@@ -374,6 +374,56 @@ class TestCommitmentPersistence:
         reset_engine()
 
 
+class TestCommitmentRecurringLink:
+    """Tests for Commitment link to RecurringCommitment."""
+
+    def test_has_recurring_commitment_id_field(self) -> None:
+        """Commitment has optional recurring_commitment_id field."""
+        fields = Commitment.model_fields
+        assert "recurring_commitment_id" in fields
+
+    def test_accepts_optional_recurring_commitment_id(self) -> None:
+        """Commitment accepts optional recurring_commitment_id."""
+        recurring_id = uuid4()
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=uuid4(),
+            due_date=date(2025, 12, 31),
+            recurring_commitment_id=recurring_id,
+        )
+
+        assert commitment.recurring_commitment_id == recurring_id
+
+    def test_recurring_commitment_id_defaults_to_none(self) -> None:
+        """recurring_commitment_id defaults to None."""
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=uuid4(),
+            due_date=date(2025, 12, 31),
+        )
+
+        assert commitment.recurring_commitment_id is None
+
+    def test_is_recurring_property(self) -> None:
+        """Commitment.is_recurring returns True when linked to recurring."""
+        # Not recurring
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=uuid4(),
+            due_date=date(2025, 12, 31),
+        )
+        assert not commitment.is_recurring
+
+        # Recurring
+        recurring_commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=uuid4(),
+            due_date=date(2025, 12, 31),
+            recurring_commitment_id=uuid4(),
+        )
+        assert recurring_commitment.is_recurring
+
+
 class TestCommitmentOrphanTracking:
     """Tests for Commitment orphan tracking (no goal AND no milestone)."""
 
