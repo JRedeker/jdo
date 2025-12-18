@@ -152,6 +152,8 @@ The system SHALL add keyboard shortcuts for integrity features.
 - **WHEN** user presses 'i' on home screen
 - **THEN** the integrity dashboard is displayed in the data panel
 
+**Note**: 'i' is currently unused in HomeScreen bindings (uses: n, g, c, v, m, o, h, t, s, q)
+
 #### Scenario: Mark at-risk shortcut
 - **WHEN** user presses 'r' while viewing a commitment
 - **THEN** the at-risk workflow begins (equivalent to `/atrisk`)

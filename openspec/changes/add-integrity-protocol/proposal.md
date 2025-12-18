@@ -75,7 +75,23 @@ Proactive checks on app launch for:
 ## Dependencies
 
 - Requires core domain models (Commitment, Task, Stakeholder) - already implemented
+- **CRITICAL**: Requires `wire_ai_to_chat` - AI agent must be connected to chat flow for prompts
+- **CRITICAL**: Requires `persist_handler_results` - Command handlers must save to database
 - Should be implemented after `implement-jdo-app` (TUI app shell and commands infrastructure)
+
+## Open Questions
+
+1. **Recovery flow**: When commitment recovers from at_risk → in_progress:
+   - Should the CleanupPlan be deleted or kept with status="cancelled"?
+   - Should the notification task be auto-completed or deleted?
+
+2. **Notification task enforcement**: Clarify the soft enforcement:
+   - Task CAN be marked "skipped" but requires explicit acknowledgment
+   - Skipping impacts integrity score (cleanup_completion_rate decreases)
+
+3. **Existing command integration**: 
+   - `/complete` should calculate `completed_on_time` and update CleanupPlan if exists
+   - `/abandon` should trigger soft enforcement check for at-risk commitments
 
 ## References
 

@@ -5,6 +5,22 @@ This task list follows Test-Driven Development: write failing tests first, then 
 **Dependencies**: 
 - Requires core domain models (Commitment, Task, Stakeholder) - already implemented
 - Requires `implement-jdo-app` (TUI app shell and command infrastructure)
+- **BLOCKING**: Requires `wire_ai_to_chat` - AI prompts won't work without this
+- **BLOCKING**: Requires `persist_handler_results` - Commands won't save without this
+
+## Phase 0: Prerequisites Check
+
+### 0.1 Verify AI Integration
+- [ ] Verify AI agent is wired to ChatScreen (wire_ai_to_chat completed)
+- [ ] Verify AI responses stream to chat display
+- [ ] Test: User message triggers AI response
+
+### 0.2 Verify Persistence
+- [ ] Verify /commit command persists Commitment to database
+- [ ] Verify /goal command persists Goal to database
+- [ ] Test: Created entities appear in /show output
+
+**If Phase 0 tests fail, complete wire_ai_to_chat and persist_handler_results first.**
 
 ## Phase 1: Commitment Model Extensions
 

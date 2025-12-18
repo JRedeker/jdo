@@ -14,7 +14,7 @@ Fields:
 - `impact_description` (str | None): Description of what harm missing this commitment causes
 - `mitigation_actions` (list[str]): Actions the user will take to mitigate impact (stored as JSON)
 - `notification_task_id` (UUID | None): Reference to the auto-created notification Task
-- `status` (CleanupPlanStatus enum): One of `planned`, `in_progress`, `completed`, `skipped`; defaults to `planned`
+- `status` (CleanupPlanStatus enum): One of `planned`, `in_progress`, `completed`, `skipped`, `cancelled`; defaults to `planned`
 - `completed_at` (datetime | None): Timestamp when CleanupPlan was completed
 - `skipped_reason` (str | None): User's acknowledgment when skipping cleanup
 - `created_at` (datetime): Auto-set on creation
@@ -79,6 +79,10 @@ The system SHALL track CleanupPlan progress through the recovery workflow.
 #### Scenario: Transition to skipped
 - **WHEN** user abandons commitment without completing notification task and confirms override
 - **THEN** CleanupPlan status changes to "skipped" with skipped_reason recorded
+
+#### Scenario: Transition to cancelled on recovery
+- **WHEN** the associated Commitment recovers from "at_risk" to "in_progress"
+- **THEN** CleanupPlan status changes to "cancelled" (commitment no longer needs cleanup)
 
 ### Requirement: Integrity Metrics Calculation
 

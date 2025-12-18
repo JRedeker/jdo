@@ -294,9 +294,63 @@ class IntegrityMetrics:
 └─────────────────────────────────────────────────────────┘
 ```
 
+## Database Migration
+
+When adding `at_risk` status and new fields, existing data must be handled:
+
+### Migration Script
+```python
+# migrations/versions/xxx_add_integrity_fields.py
+
+def upgrade():
+    # Add at_risk to CommitmentStatus enum
+    op.execute("ALTER TYPE commitmentstatus ADD VALUE 'at_risk' AFTER 'in_progress'")
+    
+    # Add new columns with defaults
+    op.add_column('commitments', sa.Column('marked_at_risk_at', sa.DateTime(), nullable=True))
+    op.add_column('commitments', sa.Column('completed_on_time', sa.Boolean(), nullable=True))
+    
+    # Backfill completed_on_time for existing completed commitments
+    op.execute("""
+        UPDATE commitments 
+        SET completed_on_time = (completed_at <= (due_date + due_time))
+        WHERE status = 'completed' AND completed_at IS NOT NULL
+    """)
+    
+    # Add notification task flag
+    op.add_column('tasks', sa.Column('is_notification_task', sa.Boolean(), default=False))
+    
+    # Create cleanup_plans table
+    op.create_table('cleanup_plans', ...)
+```
+
+### Rollback Strategy
+- `at_risk` commitments would need to be manually transitioned to `in_progress` or `abandoned`
+- `cleanup_plans` table can be dropped
+- New columns can be dropped
+
+## Recovery Flow (Clarification)
+
+When a commitment recovers from `at_risk` → `in_progress`:
+
+1. **CleanupPlan status** → `cancelled` (new status, preserves history)
+2. **Notification task** → User prompted: "You marked this at-risk earlier. Do you still need to notify [stakeholder], or has the situation resolved?"
+   - If resolved: Task marked `skipped` with reason "Situation resolved"
+   - If still need to notify: Task remains active
+
+**CleanupPlanStatus Update**:
+```python
+class CleanupPlanStatus(str, Enum):
+    planned = "planned"
+    in_progress = "in_progress"
+    completed = "completed"
+    skipped = "skipped"      # User overrode
+    cancelled = "cancelled"  # NEW: Commitment recovered
+```
+
 ## Cross-References
 
 - **add-core-domain-models/specs/commitment**: Base Commitment model
 - **add-core-domain-models/specs/task**: Base Task model  
 - **add-conversational-tui/specs/tui-chat**: TUI command infrastructure
-- **FRC.yaml lines 28-212**: Feature specifications
+- **ROADMAP.yaml**: Feature specifications (previously FRC.yaml)
