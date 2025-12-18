@@ -44,38 +44,6 @@ features:
 # =============================================================================
 # Features with specs already created/proposed, or actively in progress.
 
-  implement_inbox_triage:
-    title: "Implement Inbox Triage"
-    priority: high
-    complexity: medium
-    status: in_progress
-    category: feature_completion
-    phase: now
-    change_spec: "add-inbox-triage"
-    
-    description: |
-      Quick capture from CLI (jdo capture "idea") with AI-powered triage workflow.
-      Classify captured items as Commitment, Task, Goal, Vision, or Milestone.
-    
-    completed:
-      - "CLI capture command (jdo capture 'text')"
-      - "UNKNOWN entity type for triage items"
-      - "Triage query helpers (get_triage_items, get_triage_count)"
-      - "TriageHandler with AI classification"
-      - "Home screen triage indicator with [t] shortcut"
-      - "AI triage module with confidence scoring"
-      - "Unit tests for all triage components"
-    
-    remaining:
-      - "Wire triage mode in ChatScreen"
-      - "Persist converted items to database"
-      - "Integration test: capture → triage → entity creation"
-    
-    acceptance_criteria:
-      - "/triage shows list of captured items"
-      - "Each item can be converted or dismissed"
-      - "Converted items persist to database"
-
   honor_your_word_protocol:
     title: "Honor-Your-Word Protocol"
     priority: critical
@@ -765,6 +733,32 @@ features:
       settings:
         - "Prompts can be enabled/disabled per type"
         - "Frequency adjustable"
+
+  add_dev_infrastructure:
+    title: "Developer Infrastructure"
+    priority: low
+    complexity: medium
+    status: proposed
+    category: infrastructure
+    phase: later
+    change_spec: "add-dev-infrastructure"
+    
+    description: |
+      Production-quality developer infrastructure including structured logging,
+      custom exception hierarchy, pre-commit hooks, and database migrations.
+    
+    proposed_changes:
+      - "Structured logging with Loguru (file rotation, JSON output)"
+      - "Custom exception hierarchy by domain (AI, database, TUI, config)"
+      - "Pre-commit hooks for ruff, pyrefly, commit messages"
+      - "Alembic integration for database migrations"
+      - "Optional: Sentry for error tracking and observability"
+    
+    acceptance_criteria:
+      - "Structured logs queryable in production"
+      - "Clear exception types with recovery hints"
+      - "Pre-commit prevents lint/type failures"
+      - "Schema changes versioned via migrations"
 
 # =============================================================================
 # NOTES

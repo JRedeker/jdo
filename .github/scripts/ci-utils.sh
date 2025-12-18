@@ -124,6 +124,98 @@ ci_review() {
 }
 
 # =============================================================================
+# ROADMAP CONSISTENCY CHECK
+# =============================================================================
+
+ci_roadmap() {
+  _header "📋 ROADMAP CHECK" "" "Validates ROADMAP.yaml against archived specs"
+  
+  local errors=0
+  local warnings=0
+  
+  # Check 1: All archived specs should be in CHANGELOG.md
+  _section "$_CYAN" "Checking archived specs in CHANGELOG..."
+  
+  local archive_dir="openspec/changes/archive"
+  if [ -d "$archive_dir" ]; then
+    for spec_dir in "$archive_dir"/*/; do
+      if [ -d "$spec_dir" ]; then
+        local spec_name
+        spec_name=$(basename "$spec_dir" | sed 's/^[0-9-]*//')
+        
+        # Extract just the spec name without date prefix
+        local clean_name
+        clean_name=$(echo "$spec_name" | sed 's/^-//')
+        
+        if ! grep -q "$clean_name" CHANGELOG.md 2>/dev/null; then
+          echo "  ⚠️  Archived spec not in CHANGELOG: $clean_name"
+          ((warnings++))
+        else
+          echo "  ✓ $clean_name"
+        fi
+      fi
+    done
+  fi
+  
+  # Check 2: Completed specs should not be in ROADMAP.yaml "now" or "next" phases
+  _section "$_CYAN" "Checking ROADMAP for stale entries..."
+  
+  if [ -f "ROADMAP.yaml" ]; then
+    for spec_dir in "$archive_dir"/*/; do
+      if [ -d "$spec_dir" ]; then
+        local spec_name
+        spec_name=$(basename "$spec_dir" | sed 's/^[0-9-]*//' | sed 's/^-//')
+        
+        # Check if spec is referenced in ROADMAP with status != completed
+        if grep -q "change_spec:.*$spec_name" ROADMAP.yaml 2>/dev/null; then
+          # Check if it's marked as completed
+          if ! grep -B5 "change_spec:.*$spec_name" ROADMAP.yaml | grep -q "status: completed"; then
+            echo "  ⚠️  Archived spec still active in ROADMAP: $spec_name"
+            ((warnings++))
+          fi
+        fi
+      fi
+    done
+  fi
+  
+  # Check 3: Active specs in openspec/changes/ should be in ROADMAP.yaml
+  _section "$_CYAN" "Checking active specs are tracked..."
+  
+  local changes_dir="openspec/changes"
+  if [ -d "$changes_dir" ]; then
+    for spec_dir in "$changes_dir"/*/; do
+      if [ -d "$spec_dir" ] && [[ "$spec_dir" != *"/archive/"* ]]; then
+        local spec_name
+        spec_name=$(basename "$spec_dir")
+        
+        if [ -f "$spec_dir/proposal.md" ] || [ -f "$spec_dir/design.md" ]; then
+          if ! grep -q "$spec_name" ROADMAP.yaml 2>/dev/null; then
+            echo "  ⚠️  Active spec not in ROADMAP: $spec_name"
+            ((warnings++))
+          else
+            echo "  ✓ $spec_name"
+          fi
+        fi
+      fi
+    done
+  fi
+  
+  # Summary
+  echo ""
+  if [ $errors -gt 0 ]; then
+    _error "❌ ROADMAP CHECK FAILED" "" "$errors error(s), $warnings warning(s)"
+    return 1
+  elif [ $warnings -gt 0 ]; then
+    _warn "⚠️ ROADMAP CHECK: $warnings warning(s)" "" \
+      "Update CHANGELOG.md with archived specs" \
+      "Remove completed specs from ROADMAP.yaml"
+    return 0  # Warnings don't fail CI, but are visible
+  else
+    _success "✅ ROADMAP CONSISTENT"
+  fi
+}
+
+# =============================================================================
 # INSTALL HELPER
 # =============================================================================
 
