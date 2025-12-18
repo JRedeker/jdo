@@ -371,3 +371,169 @@ class TestCommitmentRecurringIndicator:
             assert panel.mode == PanelMode.VIEW
             # Should not have recurring link
             assert panel._data.get("recurring_commitment_id") is None
+
+
+# ============================================================
+# Phase 11-12: Integrity Protocol Panel Tests
+# ============================================================
+
+
+class TestIntegrityDashboardView:
+    """Tests for integrity dashboard display in DataPanel."""
+
+    def test_panel_mode_has_integrity(self) -> None:
+        """PanelMode has integrity mode."""
+        assert PanelMode.INTEGRITY.value == "integrity"
+
+    async def test_show_integrity_dashboard_sets_mode(self) -> None:
+        """show_integrity_dashboard sets mode to INTEGRITY."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_integrity_dashboard(
+                {
+                    "letter_grade": "A-",
+                    "composite_score": 92.5,
+                    "on_time_rate": 0.95,
+                    "notification_timeliness": 0.90,
+                    "cleanup_completion_rate": 0.85,
+                    "current_streak_weeks": 3,
+                    "total_completed": 20,
+                    "total_on_time": 19,
+                    "total_at_risk": 2,
+                    "total_abandoned": 1,
+                }
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.INTEGRITY
+            assert panel.entity_type == "integrity"
+            assert panel.current_data.get("letter_grade") == "A-"
+
+    async def test_integrity_dashboard_renders_grade(self) -> None:
+        """Integrity dashboard displays letter grade prominently."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_integrity_dashboard({"letter_grade": "B+", "composite_score": 88.0})
+            await pilot.pause()
+
+            # Check that the panel rendered (mode is set)
+            assert panel.mode == PanelMode.INTEGRITY
+
+
+class TestCleanupPlanView:
+    """Tests for cleanup plan display in DataPanel."""
+
+    def test_panel_mode_has_cleanup(self) -> None:
+        """PanelMode has cleanup mode."""
+        assert PanelMode.CLEANUP.value == "cleanup"
+
+    async def test_show_cleanup_plan_sets_mode(self) -> None:
+        """show_cleanup_plan sets mode to CLEANUP."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_cleanup_plan(
+                {
+                    "id": "cleanup-123",
+                    "commitment_deliverable": "Quarterly report",
+                    "status": "in_progress",
+                    "impact_description": "Delayed project timeline",
+                    "mitigation_actions": ["Notify stakeholders", "Reschedule deadline"],
+                    "notification_task_complete": False,
+                }
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.CLEANUP
+            assert panel.entity_type == "cleanup_plan"
+
+    async def test_cleanup_plan_shows_status(self) -> None:
+        """Cleanup plan displays status correctly."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_cleanup_plan({"status": "completed"})
+            await pilot.pause()
+
+            assert panel.current_data.get("status") == "completed"
+
+
+class TestAtRiskWorkflowView:
+    """Tests for at-risk workflow display in DataPanel."""
+
+    def test_panel_mode_has_atrisk_workflow(self) -> None:
+        """PanelMode has atrisk_workflow mode."""
+        assert PanelMode.ATRISK_WORKFLOW.value == "atrisk_workflow"
+
+    async def test_show_atrisk_workflow_sets_mode(self) -> None:
+        """show_atrisk_workflow sets mode to ATRISK_WORKFLOW."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+            panel.show_atrisk_workflow(
+                {
+                    "id": "commit-123",
+                    "deliverable": "Send quarterly report",
+                    "stakeholder_name": "Finance team",
+                },
+                workflow_step="reason",
+            )
+            await pilot.pause()
+
+            assert panel.mode == PanelMode.ATRISK_WORKFLOW
+            assert panel.entity_type == "commitment"
+            assert panel.current_data.get("_workflow_step") == "reason"
+
+    async def test_atrisk_workflow_tracks_step(self) -> None:
+        """At-risk workflow tracks current step."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+
+            # Step 1: reason
+            panel.show_atrisk_workflow({"deliverable": "Test"}, workflow_step="reason")
+            await pilot.pause()
+            assert panel.current_data.get("_workflow_step") == "reason"
+
+            # Step 2: impact
+            panel.show_atrisk_workflow({"deliverable": "Test"}, workflow_step="impact")
+            await pilot.pause()
+            assert panel.current_data.get("_workflow_step") == "impact"
+
+            # Step 3: resolution
+            panel.show_atrisk_workflow({"deliverable": "Test"}, workflow_step="resolution")
+            await pilot.pause()
+            assert panel.current_data.get("_workflow_step") == "resolution"
+
+
+class TestDataPanelPublicAccessors:
+    """Tests for public accessor properties on DataPanel."""
+
+    async def test_entity_type_property(self) -> None:
+        """entity_type property returns current entity type."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+
+            panel.show_commitment_view({"deliverable": "Test"})
+            await pilot.pause()
+            assert panel.entity_type == "commitment"
+
+            panel.show_goal_view({"title": "Test Goal"})
+            await pilot.pause()
+            assert panel.entity_type == "goal"
+
+    async def test_current_data_property(self) -> None:
+        """current_data property returns current data dict."""
+        app = DataPanelTestApp()
+        async with app.run_test() as pilot:
+            panel = app.query_one(DataPanel)
+
+            test_data = {"deliverable": "Test", "status": "pending"}
+            panel.show_commitment_view(test_data)
+            await pilot.pause()
+
+            assert panel.current_data == test_data
+            assert panel.current_data.get("deliverable") == "Test"

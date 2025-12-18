@@ -4,6 +4,8 @@ The data panel shows drafts, views, or lists of domain objects
 on the right side of the split-panel chat interface.
 """
 
+from __future__ import annotations
+
 from enum import Enum
 from typing import Any
 
@@ -151,6 +153,9 @@ class PanelMode(str, Enum):
     LIST = "list"
     VIEW = "view"
     DRAFT = "draft"
+    INTEGRITY = "integrity"
+    CLEANUP = "cleanup"
+    ATRISK_WORKFLOW = "atrisk_workflow"
 
 
 class DataPanel(VerticalScroll):
@@ -198,6 +203,23 @@ class DataPanel(VerticalScroll):
     DataPanel .status-completed {
         color: $success;
     }
+
+    DataPanel .status-in_progress {
+        color: $primary;
+    }
+
+    DataPanel .status-at_risk {
+        color: $warning;
+        text-style: bold;
+    }
+
+    DataPanel .status-abandoned {
+        color: $error;
+    }
+
+    DataPanel .notification-task {
+        color: $warning;
+    }
     """
 
     mode: reactive[PanelMode] = reactive(PanelMode.LIST)
@@ -222,6 +244,24 @@ class DataPanel(VerticalScroll):
         self._data: dict[str, Any] = {}
         self._list_items: list[dict[str, Any]] = []
 
+    @property
+    def entity_type(self) -> str:
+        """Get the current entity type being displayed.
+
+        Returns:
+            The entity type string (e.g., 'commitment', 'goal').
+        """
+        return self._entity_type
+
+    @property
+    def current_data(self) -> dict[str, Any]:
+        """Get the current data being displayed.
+
+        Returns:
+            The data dictionary for the current view/draft.
+        """
+        return self._data
+
     def compose(self) -> ComposeResult:
         """Compose the panel content."""
         yield self._content
@@ -238,6 +278,12 @@ class DataPanel(VerticalScroll):
             self._render_view()
         elif self.mode == PanelMode.DRAFT:
             self._render_draft()
+        elif self.mode == PanelMode.INTEGRITY:
+            self._render_integrity()
+        elif self.mode == PanelMode.CLEANUP:
+            self._render_cleanup()
+        elif self.mode == PanelMode.ATRISK_WORKFLOW:
+            self._render_atrisk_workflow()
 
     def _render_list(self) -> None:
         """Render list mode content."""
@@ -250,12 +296,87 @@ class DataPanel(VerticalScroll):
             empty_msg = get_empty_state_message(self._entity_type)
             text.append(empty_msg, style="dim")
         else:
-            for item in self._list_items:
-                # Show a summary line for each item
-                summary = item.get("deliverable") or item.get("title") or str(item.get("id", ""))
-                text.append(f"  - {summary}\n")
+            # Sort items by status priority for commitments/tasks
+            sorted_items = self._sort_items_by_priority(self._list_items)
+            for item in sorted_items:
+                self._render_list_item(text, item)
 
         self._content.update(text)
+
+    def _sort_items_by_priority(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Sort items by status priority (overdue/at-risk first).
+
+        Args:
+            items: List of items to sort.
+
+        Returns:
+            Sorted list with highest priority items first.
+        """
+        # Status priority for sorting (lower number = higher priority)
+        status_priority = {
+            "at_risk": 1,
+            "in_progress": 2,
+            "pending": 3,
+            "completed": 4,
+            "abandoned": 5,
+            "skipped": 5,
+        }
+
+        def get_priority(item: dict[str, Any]) -> int:
+            status = item.get("status", "")
+            if hasattr(status, "value"):
+                status = status.value
+            return status_priority.get(str(status).lower(), 10)
+
+        return sorted(items, key=get_priority)
+
+    def _render_list_item(self, text: Text, item: dict[str, Any]) -> None:
+        """Render a single list item with status indicator.
+
+        Args:
+            text: Rich Text object to append to.
+            item: Item data dictionary.
+        """
+        # Get summary text
+        summary = item.get("deliverable") or item.get("title") or str(item.get("id", ""))
+
+        # Get status for styling
+        status = item.get("status", "")
+        if hasattr(status, "value"):
+            status = status.value
+        status = str(status).lower()
+
+        # Determine icon and style based on status
+        status_icons = {
+            "pending": "○",
+            "in_progress": "◐",
+            "at_risk": "⚠",
+            "completed": "✓",
+            "abandoned": "✗",
+            "skipped": "⊘",
+        }
+
+        status_styles = {
+            "pending": "dim",
+            "in_progress": "blue",
+            "at_risk": "bold yellow",
+            "completed": "green",
+            "abandoned": "red",
+            "skipped": "dim",
+        }
+
+        # Check if this is a notification task
+        is_notification = item.get("is_notification_task", False)
+        if is_notification:
+            icon = "🔔"
+            style = "yellow"
+        else:
+            icon = status_icons.get(status, "○")
+            style = status_styles.get(status, "")
+
+        # Render the item
+        text.append(f"  {icon} ", style=style)
+        text.append(f"{summary}\n", style=style if status == "at_risk" else "")
 
     def _render_view(self) -> None:
         """Render view mode content."""
@@ -533,3 +654,216 @@ class DataPanel(VerticalScroll):
         self._entity_type = entity_type
         self._list_items = items
         self.mode = PanelMode.LIST
+
+    def show_draft(self, entity_type: str, data: dict[str, Any]) -> None:
+        """Show a draft of any entity type in the panel.
+
+        Args:
+            entity_type: Type of entity being drafted.
+            data: Draft data to display.
+        """
+        self._entity_type = entity_type
+        self._data = data
+        self.mode = PanelMode.DRAFT
+
+    def show_view(self, entity_type: str, data: dict[str, Any]) -> None:
+        """Show a view of any entity type in the panel.
+
+        Args:
+            entity_type: Type of entity being viewed.
+            data: Entity data to display.
+        """
+        self._entity_type = entity_type
+        self._data = data
+        self.mode = PanelMode.VIEW
+
+    def show_integrity_dashboard(self, data: dict[str, Any]) -> None:
+        """Show the integrity metrics dashboard.
+
+        Args:
+            data: Integrity metrics data including grade, scores, etc.
+        """
+        self._entity_type = "integrity"
+        self._data = data
+        self.mode = PanelMode.INTEGRITY
+
+    def show_cleanup_plan(self, data: dict[str, Any]) -> None:
+        """Show a cleanup plan view.
+
+        Args:
+            data: CleanupPlan data including impact, actions, status.
+        """
+        self._entity_type = "cleanup_plan"
+        self._data = data
+        self.mode = PanelMode.CLEANUP
+
+    def show_atrisk_workflow(self, data: dict[str, Any], workflow_step: str = "reason") -> None:
+        """Show the at-risk workflow panel.
+
+        Args:
+            data: Current commitment and workflow data.
+            workflow_step: Current step (reason, impact, resolution).
+        """
+        self._entity_type = "commitment"
+        self._data = {**data, "_workflow_step": workflow_step}
+        self.mode = PanelMode.ATRISK_WORKFLOW
+
+    def _render_integrity(self) -> None:
+        """Render integrity dashboard content."""
+        text = Text()
+        text.append("INTEGRITY DASHBOARD\n", style="bold")
+        text.append("=" * 30 + "\n\n")
+
+        # Letter grade (large and prominent)
+        grade = self._data.get("letter_grade", "A+")
+        grade_style = self._get_grade_style(grade)
+        text.append("Overall Grade: ", style="dim")
+        text.append(f"{grade}\n\n", style=f"bold {grade_style}")
+
+        # Composite score
+        score = self._data.get("composite_score", 100.0)
+        text.append(f"Score: {score:.1f}%\n\n", style="dim")
+
+        # Individual metrics
+        text.append("METRICS\n", style="bold")
+        text.append("-" * 20 + "\n")
+
+        on_time = self._data.get("on_time_rate", 1.0) * 100
+        text.append(f"On-time rate:      {on_time:.0f}%\n")
+
+        notification = self._data.get("notification_timeliness", 1.0) * 100
+        text.append(f"Notification:      {notification:.0f}%\n")
+
+        cleanup = self._data.get("cleanup_completion_rate", 1.0) * 100
+        text.append(f"Cleanup rate:      {cleanup:.0f}%\n")
+
+        streak = self._data.get("current_streak_weeks", 0)
+        text.append(f"Current streak:    {streak} week{'s' if streak != 1 else ''}\n\n")
+
+        # Stats
+        text.append("HISTORY\n", style="bold")
+        text.append("-" * 20 + "\n")
+        total = self._data.get("total_completed", 0)
+        on_time_count = self._data.get("total_on_time", 0)
+        at_risk = self._data.get("total_at_risk", 0)
+        abandoned = self._data.get("total_abandoned", 0)
+
+        text.append(f"Completed:         {total}\n")
+        text.append(f"On-time:           {on_time_count}\n")
+        text.append(f"Marked at-risk:    {at_risk}\n")
+        text.append(f"Abandoned:         {abandoned}\n")
+
+        self._content.update(text)
+
+    def _get_grade_style(self, grade: str) -> str:
+        """Get Rich style for a letter grade.
+
+        Args:
+            grade: Letter grade (A+, A, A-, B+, etc.)
+
+        Returns:
+            Rich style string.
+        """
+        if grade.startswith("A"):
+            return "green"
+        if grade.startswith("B"):
+            return "blue"
+        if grade.startswith("C"):
+            return "yellow"
+        return "red"
+
+    def _render_cleanup(self) -> None:
+        """Render cleanup plan content."""
+        text = Text()
+        text.append("CLEANUP PLAN\n", style="bold")
+        text.append("=" * 30 + "\n\n")
+
+        # Status
+        status = self._data.get("status", "planned")
+        status_style = {
+            "planned": "yellow",
+            "in_progress": "blue",
+            "completed": "green",
+            "skipped": "red",
+            "cancelled": "dim",
+        }.get(status, "dim")
+        text.append("Status: ", style="dim")
+        text.append(f"{status.upper()}\n\n", style=f"bold {status_style}")
+
+        # Commitment reference
+        commitment = self._data.get("commitment_deliverable", "")
+        if commitment:
+            text.append("For commitment:\n", style="dim")
+            text.append(f"  {commitment}\n\n")
+
+        # Impact description
+        impact = self._data.get("impact_description")
+        text.append("IMPACT\n", style="bold")
+        text.append("-" * 20 + "\n")
+        if impact:
+            text.append(f"{impact}\n\n")
+        else:
+            text.append("(Not yet described)\n\n", style="dim italic")
+
+        # Mitigation actions
+        actions = self._data.get("mitigation_actions", [])
+        text.append("MITIGATION ACTIONS\n", style="bold")
+        text.append("-" * 20 + "\n")
+        if actions:
+            for i, action in enumerate(actions, 1):
+                text.append(f"  {i}. {action}\n")
+            text.append("\n")
+        else:
+            text.append("(No actions defined yet)\n\n", style="dim italic")
+
+        # Notification task status
+        notification_complete = self._data.get("notification_task_complete", False)
+        text.append("NOTIFICATION\n", style="bold")
+        text.append("-" * 20 + "\n")
+        if notification_complete:
+            text.append("✓ Stakeholder notified\n", style="green")
+        else:
+            text.append("○ Pending notification\n", style="yellow")
+
+        self._content.update(text)
+
+    def _render_atrisk_workflow(self) -> None:
+        """Render at-risk workflow panel."""
+        text = Text()
+        text.append("AT-RISK WORKFLOW\n", style="bold yellow")
+        text.append("=" * 30 + "\n\n")
+
+        # Show commitment being marked at-risk
+        deliverable = self._data.get("deliverable", "")
+        stakeholder = self._data.get("stakeholder_name", "")
+
+        text.append("Commitment:\n", style="dim")
+        text.append(f"  {deliverable}\n\n")
+
+        if stakeholder:
+            text.append("Stakeholder:\n", style="dim")
+            text.append(f"  {stakeholder}\n\n")
+
+        # Show workflow progress
+        step = self._data.get("_workflow_step", "reason")
+        steps = [
+            ("reason", "Why might you miss this?"),
+            ("impact", "What impact will this have?"),
+            ("resolution", "What's your proposed resolution?"),
+            ("confirm", "Review and confirm"),
+        ]
+
+        text.append("WORKFLOW STEPS\n", style="bold")
+        text.append("-" * 20 + "\n")
+        step_order = ["reason", "impact", "resolution", "confirm"]
+        current_idx = step_order.index(step) if step in step_order else 0
+
+        for i, (_step_id, step_desc) in enumerate(steps):
+            if i < current_idx:
+                text.append(f"  ✓ {step_desc}\n", style="green")
+            elif i == current_idx:
+                text.append(f"  → {step_desc}\n", style="bold yellow")
+            else:
+                text.append(f"  ○ {step_desc}\n", style="dim")
+
+        self._content.update(text)
