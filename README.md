@@ -8,9 +8,54 @@ An AI-powered terminal app for people who want to achieve their goals without dr
 
 ## 🤔 Why jdo?
 
+### The Problem with Todo Apps
+
+Your todo list is a graveyard of good intentions. Todoist, TickTick, and their cousins are brilliant at *collecting* tasks—but terrible at helping you *complete* them. The list grows. The guilt grows. You reorganize, re-prioritize, declare "inbox zero"... and three weeks later you're drowning again.
+
+**The uncomfortable truth:** A todo list has no skin in the game. Nobody's waiting. Nothing happens if you don't do it. That's why 41% of todo items are never completed.
+
+### The Problem with Scheduling Apps
+
+Sunsama and Motion took a different approach: time-block everything. If it's not on your calendar, it doesn't exist. The AI schedules your tasks around meetings, and you just... follow the plan.
+
+Except you don't. Because life happens. Meetings run over. Energy crashes. And now you're rescheduling the same task for the fourth time this week, watching the AI shuffle your failures into tomorrow.
+
+**Scheduling apps optimize for *time*. But time isn't the bottleneck—*integrity* is.**
+
+### A Different Philosophy
+
+jdo is built on a simple principle from the [Meta Performance™ Institute](https://metaperformanceinstitute.com/):
+
+> **Commitments are promises, not preferences.**
+
+A commitment isn't a task you *might* do. It's a promise to a specific person (your stakeholder) to deliver something specific by a specific time. When you make fewer commitments and keep them all, something shifts. People trust you. You trust yourself. Work actually gets done.
+
+This is what MPI calls **integrity**—not morality, but *workability*. The engine that makes everything else possible.
+
+**The three rules of integrity:**
+1. 🎯 **Do what you said, by when you said**
+2. 📢 **Notify stakeholders as soon as you know you can't**
+3. 🧹 **Clean up the mess caused by any broken commitment**
+
+jdo doesn't let you dump 47 items into a list and forget about them. Every commitment has a stakeholder, a deliverable, and a due date. You make fewer promises—and you keep them.
+
+### How jdo is Different
+
+| | Todo Apps | Scheduling Apps | jdo |
+|:--|:--|:--|:--|
+| **Mental model** | Infinite list | Calendar blocks | Promises to people |
+| **Accountability** | None | Time pressure | Stakeholder relationships |
+| **When you can't deliver** | Mark incomplete, feel guilty | Reschedule, feel guilty | Notify stakeholder, clean up, maintain trust |
+| **Success metric** | Tasks checked off | Hours scheduled | Commitments kept |
+| **Core belief** | More organization = more done | Better scheduling = more done | Fewer promises kept = more done |
+
+---
+
+## 💬 The Conversational Difference
+
 Most productivity tools ask you to learn their system. jdo asks you one question: *What do you want to accomplish?*
 
-Tell it in plain language. The AI extracts goals, milestones, tasks, and commitments—organizing everything into a hierarchy that makes sense. No forms to fill out. No clicking through menus. Just talk about what matters to you.
+Tell it in plain language. The AI extracts goals, milestones, commitments, and tasks—organizing everything into a hierarchy that makes sense. No forms to fill out. No clicking through menus. Just talk about what matters to you.
 
 ---
 
