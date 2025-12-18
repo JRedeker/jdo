@@ -1,8 +1,12 @@
 """SQLModel entities for JDO."""
 
+from __future__ import annotations
+
+from jdo.models.cleanup_plan import CleanupPlan, CleanupPlanStatus
 from jdo.models.commitment import Commitment, CommitmentStatus
 from jdo.models.draft import Draft, EntityType
 from jdo.models.goal import Goal, GoalStatus
+from jdo.models.integrity_metrics import IntegrityMetrics
 from jdo.models.milestone import Milestone, MilestoneStatus
 from jdo.models.recurring_commitment import (
     EndType,
@@ -17,6 +21,8 @@ from jdo.models.task import SubTask, Task, TaskStatus
 from jdo.models.vision import Vision, VisionStatus
 
 __all__ = [
+    "CleanupPlan",
+    "CleanupPlanStatus",
     "Commitment",
     "CommitmentStatus",
     "Draft",
@@ -24,6 +30,7 @@ __all__ = [
     "EntityType",
     "Goal",
     "GoalStatus",
+    "IntegrityMetrics",
     "Milestone",
     "MilestoneStatus",
     "RecurrenceType",

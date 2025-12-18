@@ -1,5 +1,7 @@
 """Task SQLModel entity."""
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
@@ -54,6 +56,7 @@ class Task(SQLModel, table=True):
     # Store as list of dicts in JSON column
     sub_tasks: list[dict[str, Any]] = Field(default=[], sa_column=Column(JSON))
     order: int
+    is_notification_task: bool = Field(default=False)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 

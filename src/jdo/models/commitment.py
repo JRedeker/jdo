@@ -1,5 +1,7 @@
 """Commitment SQLModel entity."""
 
+from __future__ import annotations
+
 from datetime import date, datetime, time
 from enum import Enum
 from uuid import UUID, uuid4
@@ -15,6 +17,7 @@ class CommitmentStatus(str, Enum):
 
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
+    AT_RISK = "at_risk"
     COMPLETED = "completed"
     ABANDONED = "abandoned"
 
@@ -52,6 +55,8 @@ class Commitment(SQLModel, table=True):
     status: CommitmentStatus = Field(default=CommitmentStatus.PENDING)
     completed_at: datetime | None = Field(default=None)
     notes: str | None = Field(default=None)
+    marked_at_risk_at: datetime | None = Field(default=None)
+    completed_on_time: bool | None = Field(default=None)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 

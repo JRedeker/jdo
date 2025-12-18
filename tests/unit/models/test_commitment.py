@@ -1,6 +1,6 @@
 """Tests for Commitment SQLModel - TDD Red phase."""
 
-from datetime import date, time
+from datetime import UTC, date, time
 from pathlib import Path
 from unittest.mock import patch
 from uuid import UUID, uuid4
@@ -124,6 +124,88 @@ class TestCommitmentStatus:
         assert CommitmentStatus.IN_PROGRESS.value == "in_progress"
         assert CommitmentStatus.COMPLETED.value == "completed"
         assert CommitmentStatus.ABANDONED.value == "abandoned"
+
+    def test_has_at_risk_status(self) -> None:
+        """CommitmentStatus includes at_risk value for integrity protocol."""
+        assert CommitmentStatus.AT_RISK.value == "at_risk"
+
+
+class TestCommitmentAtRiskFields:
+    """Tests for Commitment at-risk and integrity fields."""
+
+    def test_has_marked_at_risk_at_field(self) -> None:
+        """Commitment has marked_at_risk_at datetime field."""
+        fields = Commitment.model_fields
+        assert "marked_at_risk_at" in fields
+
+    def test_marked_at_risk_at_defaults_to_none(self) -> None:
+        """marked_at_risk_at defaults to None."""
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=uuid4(),
+            due_date=date(2025, 12, 31),
+        )
+        assert commitment.marked_at_risk_at is None
+
+    def test_has_completed_on_time_field(self) -> None:
+        """Commitment has completed_on_time boolean field."""
+        fields = Commitment.model_fields
+        assert "completed_on_time" in fields
+
+    def test_completed_on_time_defaults_to_none(self) -> None:
+        """completed_on_time defaults to None (set on completion)."""
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=uuid4(),
+            due_date=date(2025, 12, 31),
+        )
+        assert commitment.completed_on_time is None
+
+    def test_can_set_at_risk_status(self) -> None:
+        """Commitment can be set to at_risk status."""
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=uuid4(),
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.AT_RISK,
+        )
+        assert commitment.status == CommitmentStatus.AT_RISK
+
+    def test_can_set_marked_at_risk_at_timestamp(self) -> None:
+        """Commitment can store marked_at_risk_at timestamp."""
+        from datetime import datetime, timezone
+
+        now = datetime.now(UTC)
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=uuid4(),
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.AT_RISK,
+            marked_at_risk_at=now,
+        )
+        assert commitment.marked_at_risk_at == now
+
+    def test_can_set_completed_on_time_true(self) -> None:
+        """completed_on_time can be set to True."""
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=uuid4(),
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.COMPLETED,
+            completed_on_time=True,
+        )
+        assert commitment.completed_on_time is True
+
+    def test_can_set_completed_on_time_false(self) -> None:
+        """completed_on_time can be set to False."""
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=uuid4(),
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.COMPLETED,
+            completed_on_time=False,
+        )
+        assert commitment.completed_on_time is False
 
 
 class TestCommitmentForeignKeys:

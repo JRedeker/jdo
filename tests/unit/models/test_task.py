@@ -292,3 +292,89 @@ class TestTaskPersistence:
                 assert parsed[1].completed is True
 
         reset_engine()
+
+
+class TestNotificationTask:
+    """Tests for notification task support (integrity protocol)."""
+
+    def test_has_is_notification_task_field(self) -> None:
+        """Task has is_notification_task boolean field."""
+        fields = Task.model_fields
+        assert "is_notification_task" in fields
+
+    def test_is_notification_task_defaults_to_false(self) -> None:
+        """is_notification_task defaults to False."""
+        task = Task(
+            commitment_id=uuid4(),
+            title="Regular task",
+            scope="Do something",
+            order=1,
+        )
+        assert task.is_notification_task is False
+
+    def test_can_set_is_notification_task_true(self) -> None:
+        """is_notification_task can be set to True."""
+        task = Task(
+            commitment_id=uuid4(),
+            title="Notify stakeholder",
+            scope="Send notification about at-risk commitment",
+            order=0,
+            is_notification_task=True,
+        )
+        assert task.is_notification_task is True
+
+    def test_notification_task_persistence(self, tmp_path: Path) -> None:
+        """Notification task flag persists to database."""
+        from sqlmodel import select
+
+        from jdo.db.engine import get_engine, reset_engine
+        from jdo.db.session import get_session
+        from jdo.models.commitment import Commitment
+        from jdo.models.stakeholder import Stakeholder, StakeholderType
+
+        reset_engine()
+        db_path = tmp_path / "test.db"
+
+        with patch("jdo.db.engine.get_settings") as mock_settings:
+            mock_settings.return_value.database_path = db_path
+            engine = get_engine()
+            SQLModel.metadata.create_all(engine)
+
+            # Create stakeholder and commitment
+            stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+            stakeholder_id = stakeholder.id
+
+            with get_session() as session:
+                session.add(stakeholder)
+
+            commitment = Commitment(
+                deliverable="Test",
+                stakeholder_id=stakeholder_id,
+                due_date=date(2025, 12, 31),
+            )
+            commitment_id = commitment.id
+
+            with get_session() as session:
+                session.add(commitment)
+
+            # Create notification task
+            task = Task(
+                commitment_id=commitment_id,
+                title="Notify stakeholder",
+                scope="Notification draft content",
+                order=0,
+                is_notification_task=True,
+            )
+            task_id = task.id
+
+            with get_session() as session:
+                session.add(task)
+
+            # Retrieve and verify
+            with get_session() as session:
+                result = session.exec(select(Task).where(Task.id == task_id)).first()
+
+                assert result is not None
+                assert result.is_notification_task is True
+
+        reset_engine()
