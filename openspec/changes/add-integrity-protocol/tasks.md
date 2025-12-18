@@ -148,14 +148,6 @@ This task list tracks implementation status for the integrity protocol.
 - TUI integration (HomeScreen grade, ChatScreen risk detection, DataPanel modes)
 - Full test coverage
 
-**Deferred to Future Iterations**:
-- Notification timeliness calculation (returns 1.0)
-- Reliability streak calculation (returns 0)
-- Soft enforcement warnings on abandon
-- Visual indicators (warning colors, icons)
-- Snapshot tests
-- Metric trends (improving/stable/declining)
-
 ## Running Tests
 
 ```bash
@@ -171,3 +163,130 @@ uv run pytest tests/tui/test_chat_screen.py tests/tui/test_home_screen.py tests/
 # Run integration tests
 uv run pytest tests/integration/tui/test_flows.py -v
 ```
+
+---
+
+## Deferred Work
+
+The following items are deferred to future iterations. Each is tracked here with rationale and suggested implementation approach.
+
+### D1: Notification Timeliness Calculation
+**Current**: Returns 1.0 (clean slate default)
+**Target**: Calculate average (due_date - marked_at_risk_at) normalized to 0.0-1.0 scale
+
+**Implementation**:
+- [ ] Query commitments where marked_at_risk_at is not null
+- [ ] Calculate days_before_due = (due_date - marked_at_risk_at.date()).days
+- [ ] Normalize: 7+ days = 1.0, 0 days = 0.0, linear interpolation between
+- [ ] Handle edge cases: marked after due_date = 0.0
+- [ ] Update `IntegrityService.calculate_integrity_metrics()`
+
+**Effort**: Small (1-2 hours)
+**Priority**: Medium - Improves accuracy of integrity score
+
+### D2: Reliability Streak Calculation
+**Current**: Returns 0
+**Target**: Count consecutive weeks where all commitments were completed on time
+
+**Implementation**:
+- [ ] Group completed commitments by ISO week
+- [ ] For each week (newest first), check if all were on_time
+- [ ] Count consecutive on-time weeks until a miss
+- [ ] Reset to 0 on: late completion, abandonment, skipped cleanup
+- [ ] Update `IntegrityService.calculate_integrity_metrics()`
+
+**Effort**: Medium (2-4 hours)
+**Priority**: Medium - Gamification element for sustained performance
+
+### D3: Soft Enforcement on Abandon
+**Current**: Direct abandonment allowed without warning
+**Target**: Warn user when abandoning at-risk commitment without completing notification
+
+**Implementation**:
+- [ ] In /abandon handler, check if commitment.status == at_risk
+- [ ] If at_risk, query CleanupPlan and notification task status
+- [ ] If notification incomplete, return HandlerResult with warning message
+- [ ] Add confirmation flow: "This will affect your integrity score. Continue? (y/n)"
+- [ ] On confirm, set CleanupPlan.status = skipped with skipped_reason
+
+**Effort**: Medium (2-3 hours)
+**Priority**: High - Core to Honor-Your-Word philosophy
+
+### D4: Pre-Abandon At-Risk Prompt
+**Current**: Direct abandonment from pending/in_progress allowed
+**Target**: Prompt user to mark at-risk first before abandoning
+
+**Implementation**:
+- [ ] In /abandon handler, check if commitment has stakeholder
+- [ ] If stakeholder exists and status not at_risk, show prompt
+- [ ] Offer options: "Mark at-risk first" or "Abandon directly"
+- [ ] If mark at-risk, redirect to /atrisk flow
+
+**Effort**: Small (1-2 hours)
+**Priority**: Medium - Encourages proper notification workflow
+
+### D5: Visual Indicators for At-Risk Status
+**Current**: No visual distinction in lists
+**Target**: Warning color for at-risk commitments, distinct icon for notification tasks
+
+**Implementation**:
+- [ ] Add CSS class `.commitment-at-risk` with warning color (yellow/orange)
+- [ ] Update commitment list rendering to apply class based on status
+- [ ] Add notification task icon (e.g., 📢 or ⚠️) in task list
+- [ ] Sort commitment lists: overdue > at_risk > pending > in_progress
+
+**Effort**: Small (1-2 hours)
+**Priority**: Low - Polish/UX improvement
+
+### D6: Metric Trends
+**Current**: Not implemented
+**Target**: Show improving/stable/declining indicators for each metric
+
+**Implementation**:
+- [ ] Store previous period metrics (could use session cache or simple comparison)
+- [ ] Calculate delta for each metric vs previous period
+- [ ] Add trend indicator to IntegrityMetrics dataclass
+- [ ] Display ↑/→/↓ in integrity dashboard
+
+**Effort**: Medium (2-3 hours)
+**Priority**: Low - Nice-to-have analytics
+
+### D7: Commitments Affecting Score
+**Current**: Not implemented
+**Target**: List recent commitments that negatively impacted score
+
+**Implementation**:
+- [ ] Query commitments where: completed_on_time=False OR status=abandoned
+- [ ] Filter to recent (last 30 days)
+- [ ] Include in integrity dashboard response
+- [ ] Render as list in DataPanel integrity mode
+
+**Effort**: Small (1-2 hours)
+**Priority**: Low - Helps user understand score
+
+### D8: Snapshot Tests
+**Current**: No snapshot tests for integrity views
+**Target**: Visual regression tests for integrity UI
+
+**Implementation**:
+- [ ] Create snapshot app for integrity dashboard (A+ grade scenario)
+- [ ] Create snapshot app for integrity dashboard (C- grade scenario)
+- [ ] Create snapshot for commitment list with at_risk items
+- [ ] Create snapshot for CleanupPlan view
+- [ ] Run `uv run pytest --snapshot-update` to generate baselines
+
+**Effort**: Small (1-2 hours)
+**Priority**: Low - Testing infrastructure
+
+---
+
+### Deferred Work Priority Order
+
+1. **D3: Soft Enforcement** - High priority, core to integrity philosophy
+2. **D1: Notification Timeliness** - Medium, improves score accuracy
+3. **D2: Reliability Streak** - Medium, gamification
+4. **D4: Pre-Abandon Prompt** - Medium, encourages workflow
+5. **D5: Visual Indicators** - Low, polish
+6. **D6: Metric Trends** - Low, analytics
+7. **D7: Affecting Commitments** - Low, debugging aid
+8. **D8: Snapshot Tests** - Low, infrastructure
