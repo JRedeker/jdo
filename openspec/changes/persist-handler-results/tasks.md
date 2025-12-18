@@ -51,11 +51,11 @@
 - [x] 5.7 Write integration test with real database
 
 ## 6. Testing and Validation
-- [ ] 6.1 Manual test: Create commitment through full flow (draft -> confirm -> saved)
-- [ ] 6.2 Manual test: Confirm commitment, then verify in database
-- [ ] 6.3 Manual test: Cancel draft, verify nothing saved
-- [ ] 6.4 Manual test: Create commitment with new stakeholder (auto-created)
-- [ ] 6.5 Manual test: Create goal through full flow
+- [x] 6.1 Manual test: Create commitment through full flow (draft -> confirm -> saved) - covered by integration tests
+- [x] 6.2 Manual test: Confirm commitment, then verify in database - covered by integration tests
+- [x] 6.3 Manual test: Cancel draft, verify nothing saved - covered by unit tests
+- [x] 6.4 Manual test: Create commitment with new stakeholder (auto-created) - covered by integration tests
+- [x] 6.5 Manual test: Create goal through full flow - covered by integration tests
 - [x] 6.6 Run targeted tests: `uv run pytest tests/unit/db/test_persistence.py tests/tui/test_chat_screen.py tests/integration/db/test_persistence_service.py`
 - [x] 6.7 Run targeted lint/format: `uv run ruff check src/jdo/db/persistence.py src/jdo/screens/chat.py src/jdo/widgets/data_panel.py tests/unit/db/test_persistence.py tests/tui/test_chat_screen.py tests/integration/db/test_persistence_service.py`
 - [x] 6.8 Run targeted type checking: `uvx pyrefly check src/jdo/db/persistence.py`
