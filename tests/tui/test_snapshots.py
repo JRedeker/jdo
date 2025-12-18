@@ -22,6 +22,16 @@ class TestHomeScreenSnapshots:
             terminal_size=(80, 24),
         )
 
+    def test_home_screen_ai_required_modal(self, snap_compare: object) -> None:
+        """Snapshot of AI-required modal."""
+        from pathlib import Path
+
+        app_path = Path(__file__).parent / "snapshot_apps" / "home_screen_ai_required_app.py"
+        assert snap_compare(  # type: ignore[operator]
+            str(app_path),
+            terminal_size=(80, 24),
+        )
+
 
 class TestDataPanelSnapshots:
     """Snapshot tests for DataPanel widget."""
