@@ -7,12 +7,17 @@ This module provides centralized logging configuration with:
 - Standard library logging interception
 """
 
+from __future__ import annotations
+
 import logging
 import sys
-from pathlib import Path
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from loguru import logger
+
+if TYPE_CHECKING:
+    from pathlib import Path
+    from types import FrameType
 
 
 class InterceptHandler(logging.Handler):
@@ -41,10 +46,10 @@ class InterceptHandler(logging.Handler):
         level = self.LEVEL_MAP.get(record.levelno, record.levelname)
 
         # Find caller from where the logged message originated
-        frame = sys._getframe(6)  # noqa: SLF001 - Required for correct frame depth
+        frame: FrameType | None = sys._getframe(6)  # noqa: SLF001 - Required for correct frame depth
         depth = 6
 
-        while frame and frame.f_code.co_filename == logging.__file__:
+        while frame is not None and frame.f_code.co_filename == logging.__file__:
             frame = frame.f_back
             depth += 1
 
@@ -107,7 +112,8 @@ def configure_logging(
             logging.getLogger(logger_name).handlers = [InterceptHandler()]
 
 
-def get_logger(name: str) -> "logger":
+# Note: Return type omitted - Loguru's Logger type causes pyrefly issues
+def get_logger(name: str):  # noqa: ANN201 - Loguru Logger type not expressible
     """Get a logger instance bound to a module name.
 
     Args:

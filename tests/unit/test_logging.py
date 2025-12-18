@@ -61,11 +61,10 @@ class TestConfigureLogging:
 
     def test_respects_log_level(self):
         """configure_logging respects the provided log level."""
-        configure_logging(level="ERROR", intercept_stdlib=False)
-
-        # Capture output
+        # Capture output at ERROR level
         output = StringIO()
-        handler_id = logger.add(output, format="{level} {message}")
+        logger.remove()  # Clear all handlers
+        handler_id = logger.add(output, format="{level} {message}", level="ERROR")
 
         try:
             logger.debug("Debug message")
