@@ -6,7 +6,7 @@ from typing import Literal, Self
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from jdo.paths import get_database_path
+from jdo.paths import get_database_path, get_log_file_path
 
 # Valid AI providers
 AIProvider = Literal["anthropic", "openai", "openrouter"]
@@ -33,15 +33,21 @@ class JDOSettings(BaseSettings):
     # Database settings
     database_path: Path | None = None
 
+    # Logging settings
+    log_level: str = "INFO"
+    log_file_path: Path | None = None
+    log_to_file: bool = False
+
     # Application settings
     timezone: str = "America/New_York"
-    log_level: str = "INFO"
 
     @model_validator(mode="after")
-    def set_database_path_default(self) -> Self:
-        """Set default database path if not provided."""
+    def set_defaults(self) -> Self:
+        """Set default paths if not provided."""
         if self.database_path is None:
             self.database_path = get_database_path()
+        if self.log_file_path is None:
+            self.log_file_path = get_log_file_path()
         return self
 
 

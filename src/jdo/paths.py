@@ -47,3 +47,25 @@ def get_auth_path() -> Path:
         Path to auth.json in the data directory.
     """
     return get_data_dir() / "auth.json"
+
+
+def get_log_dir() -> Path:
+    """Get the log directory for jdo.
+
+    Creates the directory if it doesn't exist.
+
+    Returns:
+        Path to the log directory.
+    """
+    path = get_data_dir() / "logs"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def get_log_file_path() -> Path:
+    """Get the path to the default log file.
+
+    Returns:
+        Path to jdo.log in the log directory.
+    """
+    return get_log_dir() / "jdo.log"

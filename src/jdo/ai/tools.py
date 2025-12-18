@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
+from loguru import logger
 from pydantic_ai import Agent, RunContext
 from sqlmodel import Session, select
 
@@ -31,6 +32,7 @@ def get_current_commitments(session: Session) -> list[dict[str, Any]]:
     Returns:
         List of commitment dicts with id, deliverable, stakeholder_name, due_date, status.
     """
+    logger.debug("Querying current commitments")
     # Query commitments with stakeholder join
     commitments = session.exec(
         select(Commitment, Stakeholder)
@@ -255,5 +257,7 @@ def register_tools(agent: Agent[JDODependencies, str]) -> None:
     Args:
         agent: The PydanticAI agent to register tools with.
     """
+    logger.debug("Registering AI agent tools")
     _register_commitment_tools(agent)
     _register_milestone_vision_tools(agent)
+    logger.debug("AI agent tools registered")

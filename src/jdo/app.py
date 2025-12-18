@@ -7,12 +7,15 @@ and manages the application lifecycle.
 from typing import ClassVar
 from uuid import UUID
 
+from loguru import logger
 from textual.app import App, ComposeResult
 from textual.binding import BindingType
 from textual.widgets import Footer, Header
 
+from jdo.config import get_settings
 from jdo.db import create_db_and_tables, get_session
 from jdo.db.session import get_pending_drafts, get_visions_due_for_review
+from jdo.logging import configure_logging
 from jdo.models.draft import Draft
 from jdo.models.vision import Vision
 from jdo.screens.chat import ChatScreen
@@ -49,6 +52,12 @@ class JdoApp(App[None]):
         self._snoozed_reviews: set[UUID] = set()
         self._visions_due_for_review: list[Vision] = []
 
+        # Configure logging
+        settings = get_settings()
+        log_path = settings.log_file_path if settings.log_to_file else None
+        configure_logging(level=settings.log_level, log_file_path=log_path)
+        logger.info("JDO application initialized")
+
     def compose(self) -> ComposeResult:
         """Compose the application layout.
 
@@ -59,10 +68,12 @@ class JdoApp(App[None]):
 
     async def on_mount(self) -> None:
         """Handle app mount - initialize database and show home screen."""
+        logger.debug("App mounted, initializing database")
         # Initialize database tables
         if not self._db_initialized:
             create_db_and_tables()
             self._db_initialized = True
+            logger.info("Database initialized")
 
         # Check for pending drafts
         pending_draft = self._check_pending_drafts()
@@ -163,10 +174,12 @@ class JdoApp(App[None]):
 
     def on_home_screen_new_chat(self, _message: HomeScreen.NewChat) -> None:
         """Handle new chat request from HomeScreen."""
+        logger.debug("Navigating to ChatScreen")
         self.push_screen(ChatScreen())
 
     def on_home_screen_open_settings(self, _message: HomeScreen.OpenSettings) -> None:
         """Handle settings request from HomeScreen."""
+        logger.debug("Navigating to SettingsScreen")
         self.push_screen(SettingsScreen())
 
     def on_settings_screen_back(self, _message: SettingsScreen.Back) -> None:
@@ -179,6 +192,7 @@ class JdoApp(App[None]):
 
     def on_home_screen_start_triage(self, _message: HomeScreen.StartTriage) -> None:
         """Handle triage request from HomeScreen."""
+        logger.debug("Navigating to ChatScreen in triage mode")
         # Navigate to chat with triage mode
         self.push_screen(ChatScreen(triage_mode=True))
 

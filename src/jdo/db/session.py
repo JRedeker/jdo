@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
+from loguru import logger
 from sqlmodel import Session, func, select
 
 from jdo.db.engine import get_engine
@@ -31,10 +32,13 @@ def get_session() -> Generator[Session, None, None]:
     """
     engine = get_engine()
     session = Session(engine)
+    logger.debug("Database session opened")
     try:
         yield session
         session.commit()
+        logger.debug("Database session committed")
     except Exception:
+        logger.warning("Database session rolled back due to exception")
         session.rollback()
         raise
     finally:
