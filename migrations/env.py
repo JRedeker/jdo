@@ -18,6 +18,7 @@ sys.path.insert(0, str(project_root / "src"))
 # Import all models to ensure they're registered with SQLModel.metadata
 # This is required for autogenerate to detect model changes
 from jdo.models import (  # noqa: E402, F401
+    CleanupPlan,
     Commitment,
     Draft,
     Goal,
