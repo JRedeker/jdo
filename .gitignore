@@ -61,7 +61,6 @@ snapshot_report.html
 .pyright/
 .pyrefly/
 .pyre/
-pyrightconfig.json
 
 # Ruff
 .ruff_cache/

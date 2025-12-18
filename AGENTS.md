@@ -32,6 +32,8 @@ uv run pytest                      # Tests (must pass)
 - All function parameters and returns must have type hints
 - Use `ClassVar` for mutable class attributes
 - Use `Iterator[Widget]` not bare generators for Textual compose methods
+- All source files must start with `from __future__ import annotations` (after docstring)
+- Use `TYPE_CHECKING` blocks only for imports that would cause circular dependencies
 
 ### Exception handling
 - Never use bare `except:` - always catch specific exceptions

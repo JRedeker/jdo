@@ -61,6 +61,10 @@ ignore = [
     # Project preferences (minimal exceptions)
     "TD",      # TODO comments format - we use simple TODOs
     "FIX",     # Fixme comments - allow during development
+    # Type-checking block suggestions - not worth the complexity for this codebase
+    # We use `from __future__ import annotations` which handles forward refs
+    # SQLModel/Pydantic require runtime annotations anyway
+    "TC",      # flake8-type-checking - suggests moving imports to TYPE_CHECKING blocks
 ]
 # Strict: Do NOT add noqa comments without documenting why in pyproject.toml
 # Prefer per-file-ignores over inline noqa comments
@@ -109,6 +113,7 @@ ignore = [
 "src/jdo/widgets/**/*.py" = [
     "A002",    # 'id' parameter - Textual widget convention, cannot change
     "RUF012",  # BINDINGS/DEFAULT_CSS - Textual patterns
+    "FBT001",  # Boolean params in widget methods (set_thinking, etc.) - clear API
 ]
 "src/jdo/screens/**/*.py" = [
     "A002",    # 'id' parameter - Textual widget convention, cannot change
@@ -120,6 +125,12 @@ ignore = [
     "ARG002",  # Unused cmd/context args - handlers implement common interface
     "ANN401",  # Any for goal_id - accepts UUID or other ID types from context
     "RUF012",  # ClassVar for _ENTITY_MAP, _COMMAND_HELP - immutable at runtime
+]
+"src/jdo/ai/agent.py" = [
+    "PLC0415", # Late import of tools to avoid circular dependency
+]
+"src/jdo/ai/context.py" = [
+    "PLC0415", # Late import of PydanticAI messages in conversion function
 ]
 "src/jdo/cli.py" = [
     "PLC0415", # Lazy import of TUI to avoid loading when running CLI subcommands
@@ -149,7 +160,8 @@ docstring-code-format = true
 # NOTE: pyrefly has known false positives with SQLModel/SQLAlchemy - check runtime if unsure
 [tool.pyrefly]
 python-version = "3.11.0"
-project-includes = ["src"]
+project-includes = ["src", "tests"]
+search-path = ["src"]
 
 [tool.pyrefly.errors]
 # All type errors are errors (strict mode)
