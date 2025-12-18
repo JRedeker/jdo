@@ -19,7 +19,7 @@ Tell it in plain language. The AI extracts goals, milestones, tasks, and commitm
 | | |
 |---|---|
 | 💬 **Conversational Interface** | Chat naturally—the AI structures your goals for you |
-| 🏗️ **Flexible Hierarchy** | Visions → Goals → Milestones → Tasks → Commitments |
+| 🏗️ **Flexible Hierarchy** | Visions → Goals → Milestones → Commitments → Tasks |
 | ⌨️ **Keyboard-First Design** | Navigate everything without touching your mouse |
 | 🔄 **Recurring Commitments** | Set it once, generate instances automatically |
 | 💾 **Draft Recovery** | Crash mid-thought? Pick up right where you left off |
@@ -120,9 +120,9 @@ Vision ─────────────── "Become financially indepen
           │
           └── Milestone ─── "Launch info product"
                  │
-                 └── Task ────── "Write course outline"
+                 └── Commitment ─── "Send draft to editor by Friday"
                         │
-                        └── Commitment ─── "Send draft to editor by Friday"
+                        └── Task ────── "Write course outline"
 ```
 
 ### Example Conversation
