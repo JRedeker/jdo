@@ -4,6 +4,8 @@ The HomeScreen provides quick access to views and shortcuts,
 serving as the main entry point for the application.
 """
 
+from __future__ import annotations
+
 from typing import ClassVar
 
 from textual.app import ComposeResult
@@ -16,6 +18,7 @@ from textual.widgets import Static
 
 from jdo.db import get_session
 from jdo.db.session import get_triage_count
+from jdo.integrity.service import IntegrityService
 
 
 class HomeScreen(Screen[None]):
@@ -92,6 +95,34 @@ class HomeScreen(Screen[None]):
     HomeScreen #triage-indicator.hidden {
         display: none;
     }
+
+    HomeScreen #integrity-indicator {
+        text-align: center;
+        text-style: bold;
+        margin-top: 1;
+        margin-bottom: 1;
+    }
+
+    HomeScreen #integrity-indicator.grade-a {
+        color: $success;
+    }
+
+    HomeScreen #integrity-indicator.grade-b {
+        color: $primary;
+    }
+
+    HomeScreen #integrity-indicator.grade-c {
+        color: $warning;
+    }
+
+    HomeScreen #integrity-indicator.grade-d,
+    HomeScreen #integrity-indicator.grade-f {
+        color: $error;
+    }
+
+    HomeScreen #integrity-indicator.hidden {
+        display: none;
+    }
     """
 
     BINDINGS: ClassVar[list[Binding]] = [
@@ -102,12 +133,14 @@ class HomeScreen(Screen[None]):
         Binding("m", "show_milestones", "Milestones"),
         Binding("o", "show_orphans", "Orphans"),
         Binding("h", "show_hierarchy", "Hierarchy"),
+        Binding("i", "show_integrity", "Integrity"),
         Binding("t", "start_triage", "Triage", show=False),
         Binding("s", "settings", "Settings"),
         Binding("q", "quit", "Quit"),
     ]
 
     triage_count: reactive[int] = reactive(0)
+    integrity_grade: reactive[str] = reactive("A+")
 
     def __init__(
         self,
@@ -130,17 +163,20 @@ class HomeScreen(Screen[None]):
         with Container(id="welcome-container"), Vertical(id="welcome-box"):
             yield Static("JDO", classes="title")
             yield Static("Just Do One thing at a time", classes="subtitle")
+            yield Static("", id="integrity-indicator", classes="grade-a")
             yield Static("", id="triage-indicator", classes="hidden")
             yield Static("")
             yield Static("What would you like to do?")
             yield Static("")
             yield Static("[n] New chat    [g] Goals    [c] Commitments", classes="shortcut-row")
             yield Static("[v] Visions     [m] Milestones  [o] Orphans", classes="shortcut-row")
-            yield Static("[h] Hierarchy   [s] Settings    [q] Quit", classes="shortcut-row")
+            yield Static("[h] Hierarchy   [i] Integrity   [s] Settings", classes="shortcut-row")
+            yield Static("[q] Quit", classes="shortcut-row")
 
     def on_mount(self) -> None:
-        """Handle mount event - check for triage items."""
+        """Handle mount event - check for triage items and integrity."""
         self._check_triage_count()
+        self._check_integrity_grade()
 
     def _check_triage_count(self) -> None:
         """Check database for items needing triage and update count.
@@ -166,6 +202,39 @@ class HomeScreen(Screen[None]):
             indicator.remove_class("hidden")
         else:
             indicator.add_class("hidden")
+
+    def _check_integrity_grade(self) -> None:
+        """Check database for integrity metrics and update grade.
+
+        Silently handles database errors (e.g., missing tables during testing).
+        """
+        try:
+            with get_session() as session:
+                service = IntegrityService()
+                metrics = service.calculate_integrity_metrics(session)
+                self.integrity_grade = metrics.letter_grade
+        except Exception:
+            # Database may not be initialized (e.g., in tests)
+            # Default to A+ (clean slate)
+            self.integrity_grade = "A+"
+
+    def watch_integrity_grade(self, grade: str) -> None:
+        """React to integrity_grade changes by updating the indicator.
+
+        Args:
+            grade: The new letter grade.
+        """
+        indicator = self.query_one("#integrity-indicator", Static)
+        indicator.update(f"Integrity: {grade}")
+
+        # Remove all grade classes first
+        for cls in ["grade-a", "grade-b", "grade-c", "grade-d", "grade-f"]:
+            indicator.remove_class(cls)
+
+        # Add appropriate grade class for color
+        grade_letter = grade[0].lower()  # Get first letter (A, B, C, D, F)
+        if grade_letter in ("a", "b", "c", "d", "f"):
+            indicator.add_class(f"grade-{grade_letter}")
 
     def action_new_chat(self) -> None:
         """Start a new chat conversation."""
@@ -205,6 +274,10 @@ class HomeScreen(Screen[None]):
         if self.triage_count > 0:
             self.post_message(self.StartTriage())
 
+    def action_show_integrity(self) -> None:
+        """Show integrity dashboard."""
+        self.post_message(self.ShowIntegrity())
+
     # Custom messages for parent app to handle
     class NewChat(Message):
         """Message to start a new chat."""
@@ -232,3 +305,6 @@ class HomeScreen(Screen[None]):
 
     class StartTriage(Message):
         """Message to start triage workflow."""
+
+    class ShowIntegrity(Message):
+        """Message to show integrity dashboard."""
