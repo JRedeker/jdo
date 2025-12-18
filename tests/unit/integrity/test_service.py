@@ -1,0 +1,614 @@
+"""Tests for IntegrityService - TDD Red phase."""
+
+from __future__ import annotations
+
+from datetime import UTC, date, datetime, timedelta, timezone
+from pathlib import Path
+from unittest.mock import patch
+from uuid import uuid4
+
+import pytest
+from sqlmodel import Session, SQLModel, create_engine, select
+from sqlmodel.pool import StaticPool
+
+from jdo.integrity.service import IntegrityService, RiskSummary
+from jdo.models.cleanup_plan import CleanupPlan, CleanupPlanStatus
+from jdo.models.commitment import Commitment, CommitmentStatus
+from jdo.models.stakeholder import Stakeholder, StakeholderType
+from jdo.models.task import Task, TaskStatus
+
+
+@pytest.fixture(name="session")
+def session_fixture():
+    """Create in-memory SQLite session for testing.
+
+    This follows SQLModel's recommended testing pattern:
+    - Single in-memory database per test
+    - StaticPool to prevent connection issues
+    - Session yielded and kept open during test
+    """
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        yield session
+
+
+class TestMarkCommitmentAtRisk:
+    """Tests for marking a commitment as at-risk."""
+
+    def test_changes_commitment_status_to_at_risk(self, session: Session) -> None:
+        """Marking at-risk changes status from in_progress to at_risk."""
+        # Setup
+        stakeholder = Stakeholder(name="Alice", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Send report",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.IN_PROGRESS,
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+        commitment_id = commitment.id
+
+        # Act
+        service = IntegrityService()
+        service.mark_commitment_at_risk(
+            session=session,
+            commitment_id=commitment_id,
+            reason="Won't finish in time",
+        )
+
+        # Assert - refresh to get updated state
+        session.refresh(commitment)
+        assert commitment.status == CommitmentStatus.AT_RISK
+        assert commitment.marked_at_risk_at is not None
+
+    def test_sets_marked_at_risk_at_timestamp(self, session: Session) -> None:
+        """Marking at-risk sets marked_at_risk_at to current time."""
+        stakeholder = Stakeholder(name="Bob", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Complete task",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.PENDING,
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+        commitment_id = commitment.id
+
+        before = datetime.now(UTC)
+
+        service = IntegrityService()
+        service.mark_commitment_at_risk(
+            session=session,
+            commitment_id=commitment_id,
+            reason="Not starting in time",
+        )
+
+        after = datetime.now(UTC)
+
+        session.refresh(commitment)
+        assert commitment.marked_at_risk_at is not None
+        # Handle timezone comparison
+        marked_time = commitment.marked_at_risk_at
+        if marked_time.tzinfo is None:
+            marked_time = marked_time.replace(tzinfo=UTC)
+        assert before <= marked_time <= after
+
+    def test_creates_cleanup_plan(self, session: Session) -> None:
+        """Marking at-risk creates a CleanupPlan for the commitment."""
+        stakeholder = Stakeholder(name="Carol", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Deliver project",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.IN_PROGRESS,
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+        commitment_id = commitment.id
+
+        service = IntegrityService()
+        service.mark_commitment_at_risk(
+            session=session,
+            commitment_id=commitment_id,
+            reason="Timeline slipped",
+        )
+
+        # Assert CleanupPlan created
+        plan = session.exec(
+            select(CleanupPlan).where(CleanupPlan.commitment_id == commitment_id)
+        ).first()
+        assert plan is not None
+        assert plan.status == CleanupPlanStatus.PLANNED
+
+    def test_creates_notification_task(self, session: Session) -> None:
+        """Marking at-risk creates a notification task at position 0."""
+        stakeholder = Stakeholder(name="Dave", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Send update",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.IN_PROGRESS,
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+        commitment_id = commitment.id
+
+        service = IntegrityService()
+        service.mark_commitment_at_risk(
+            session=session,
+            commitment_id=commitment_id,
+            reason="Blocked by dependency",
+        )
+
+        # Assert notification task created
+        tasks = session.exec(select(Task).where(Task.commitment_id == commitment_id)).all()
+        assert len(tasks) == 1
+        task = tasks[0]
+        assert task.is_notification_task is True
+        assert task.order == 0
+        assert "Dave" in task.title or "Notify" in task.title
+
+    def test_links_cleanup_plan_to_notification_task(self, session: Session) -> None:
+        """CleanupPlan links to the created notification task."""
+        stakeholder = Stakeholder(name="Eve", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Complete review",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.IN_PROGRESS,
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+        commitment_id = commitment.id
+
+        service = IntegrityService()
+        service.mark_commitment_at_risk(
+            session=session,
+            commitment_id=commitment_id,
+            reason="Need more time",
+        )
+
+        plan = session.exec(
+            select(CleanupPlan).where(CleanupPlan.commitment_id == commitment_id)
+        ).first()
+        task = session.exec(
+            select(Task).where(
+                Task.commitment_id == commitment_id,
+                Task.is_notification_task == True,  # noqa: E712
+            )
+        ).first()
+
+        assert plan is not None
+        assert task is not None
+        assert plan.notification_task_id == task.id
+
+    def test_returns_result_with_entities(self, session: Session) -> None:
+        """mark_commitment_at_risk returns the updated commitment, plan, and task."""
+        stakeholder = Stakeholder(name="Frank", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Finish project",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.IN_PROGRESS,
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+        commitment_id = commitment.id
+
+        service = IntegrityService()
+        result = service.mark_commitment_at_risk(
+            session=session,
+            commitment_id=commitment_id,
+            reason="Running behind",
+        )
+
+        assert result.commitment is not None
+        assert result.cleanup_plan is not None
+        assert result.notification_task is not None
+        assert result.commitment.status == CommitmentStatus.AT_RISK
+
+    def test_reuses_existing_cleanup_plan(self, session: Session) -> None:
+        """If commitment already has CleanupPlan, reuse it."""
+        stakeholder = Stakeholder(name="Grace", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Submit report",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.IN_PROGRESS,
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+        commitment_id = commitment.id
+
+        # Create existing plan
+        existing_plan = CleanupPlan(
+            commitment_id=commitment_id,
+            impact_description="Previous impact",
+        )
+        session.add(existing_plan)
+        session.commit()
+
+        service = IntegrityService()
+        service.mark_commitment_at_risk(
+            session=session,
+            commitment_id=commitment_id,
+            reason="Still at risk",
+        )
+
+        # Should only have one plan
+        plans = session.exec(
+            select(CleanupPlan).where(CleanupPlan.commitment_id == commitment_id)
+        ).all()
+        assert len(plans) == 1
+
+
+class TestCalculateIntegrityMetrics:
+    """Tests for calculating integrity metrics."""
+
+    def test_returns_clean_slate_for_no_history(self, session: Session) -> None:
+        """Returns 1.0 for all rates when no commitment history."""
+        service = IntegrityService()
+        metrics = service.calculate_integrity_metrics(session)
+
+        assert metrics.on_time_rate == 1.0
+        assert metrics.notification_timeliness == 1.0
+        assert metrics.cleanup_completion_rate == 1.0
+        assert metrics.current_streak_weeks == 0
+        assert metrics.total_completed == 0
+
+    def test_calculates_on_time_rate(self, session: Session) -> None:
+        """on_time_rate = completed_on_time / total_completed."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        # 3 completed on time, 1 late
+        for i, on_time in enumerate([True, True, True, False]):
+            commitment = Commitment(
+                deliverable=f"Task {i}",
+                stakeholder_id=stakeholder.id,
+                due_date=date(2025, 1, i + 1),
+                status=CommitmentStatus.COMPLETED,
+                completed_on_time=on_time,
+            )
+            session.add(commitment)
+        session.commit()
+
+        service = IntegrityService()
+        metrics = service.calculate_integrity_metrics(session)
+
+        assert metrics.on_time_rate == pytest.approx(0.75)
+        assert metrics.total_completed == 4
+        assert metrics.total_on_time == 3
+
+    def test_calculates_cleanup_completion_rate(self, session: Session) -> None:
+        """cleanup_rate = completed_plans / total_plans."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        # Create 4 commitments with cleanup plans: 3 completed, 1 skipped
+        statuses = [
+            CleanupPlanStatus.COMPLETED,
+            CleanupPlanStatus.COMPLETED,
+            CleanupPlanStatus.COMPLETED,
+            CleanupPlanStatus.SKIPPED,
+        ]
+        for i, plan_status in enumerate(statuses):
+            commitment = Commitment(
+                deliverable=f"Task {i}",
+                stakeholder_id=stakeholder.id,
+                due_date=date(2025, 1, i + 1),
+                status=CommitmentStatus.ABANDONED,
+            )
+            session.add(commitment)
+            session.commit()
+            session.refresh(commitment)
+
+            plan = CleanupPlan(
+                commitment_id=commitment.id,
+                status=plan_status,
+            )
+            session.add(plan)
+        session.commit()
+
+        service = IntegrityService()
+        metrics = service.calculate_integrity_metrics(session)
+
+        assert metrics.cleanup_completion_rate == pytest.approx(0.75)
+
+
+class TestRiskSummary:
+    """Tests for RiskSummary dataclass."""
+
+    def test_total_risks_counts_all_categories(self) -> None:
+        """total_risks returns sum of all risk categories."""
+        # Create mock commitments
+        c1 = Commitment(
+            deliverable="Test 1",
+            stakeholder_id=uuid4(),
+            due_date=datetime.now(UTC).date(),
+            status=CommitmentStatus.PENDING,
+        )
+        c2 = Commitment(
+            deliverable="Test 2",
+            stakeholder_id=uuid4(),
+            due_date=datetime.now(UTC).date(),
+            status=CommitmentStatus.PENDING,
+        )
+        c3 = Commitment(
+            deliverable="Test 3",
+            stakeholder_id=uuid4(),
+            due_date=datetime.now(UTC).date(),
+            status=CommitmentStatus.IN_PROGRESS,
+        )
+
+        summary = RiskSummary(
+            overdue_commitments=[c1],
+            due_soon_commitments=[c2],
+            stalled_commitments=[c3],
+        )
+
+        assert summary.total_risks == 3
+
+    def test_has_risks_true_when_risks_exist(self) -> None:
+        """has_risks returns True when any category has items."""
+        c = Commitment(
+            deliverable="Test",
+            stakeholder_id=uuid4(),
+            due_date=datetime.now(UTC).date(),
+            status=CommitmentStatus.PENDING,
+        )
+        summary = RiskSummary(overdue_commitments=[c])
+
+        assert summary.has_risks is True
+
+    def test_has_risks_false_when_empty(self) -> None:
+        """has_risks returns False when no risks."""
+        summary = RiskSummary()
+
+        assert summary.has_risks is False
+
+    def test_to_message_empty_returns_empty_string(self) -> None:
+        """to_message returns empty string when no risks."""
+        summary = RiskSummary()
+
+        assert summary.to_message() == ""
+
+    def test_to_message_formats_overdue(self) -> None:
+        """to_message includes overdue commitments."""
+        c = Commitment(
+            deliverable="Overdue task",
+            stakeholder_id=uuid4(),
+            due_date=date(2025, 12, 1),
+            status=CommitmentStatus.PENDING,
+        )
+        summary = RiskSummary(overdue_commitments=[c])
+
+        msg = summary.to_message()
+        assert "overdue" in msg.lower()
+        assert "Overdue task" in msg
+
+    def test_to_message_formats_due_soon(self) -> None:
+        """to_message includes due soon commitments."""
+        c = Commitment(
+            deliverable="Urgent task",
+            stakeholder_id=uuid4(),
+            due_date=datetime.now(UTC).date(),
+            status=CommitmentStatus.PENDING,
+        )
+        summary = RiskSummary(due_soon_commitments=[c])
+
+        msg = summary.to_message()
+        assert "24 hours" in msg
+        assert "Urgent task" in msg
+
+
+class TestDetectRisks:
+    """Tests for IntegrityService.detect_risks."""
+
+    def test_detects_overdue_pending_commitments(self, session: Session) -> None:
+        """Detects commitments with due_date < today and status=pending."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        # Overdue pending commitment
+        overdue = Commitment(
+            deliverable="Overdue task",
+            stakeholder_id=stakeholder.id,
+            due_date=datetime.now(UTC).date() - timedelta(days=1),
+            status=CommitmentStatus.PENDING,
+        )
+        session.add(overdue)
+        session.commit()
+
+        service = IntegrityService()
+        summary = service.detect_risks(session)
+
+        assert len(summary.overdue_commitments) == 1
+        assert summary.overdue_commitments[0].deliverable == "Overdue task"
+
+    def test_detects_overdue_in_progress_commitments(self, session: Session) -> None:
+        """Detects commitments with due_date < today and status=in_progress."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        # Overdue in_progress commitment
+        overdue = Commitment(
+            deliverable="Overdue in progress",
+            stakeholder_id=stakeholder.id,
+            due_date=datetime.now(UTC).date() - timedelta(days=2),
+            status=CommitmentStatus.IN_PROGRESS,
+        )
+        session.add(overdue)
+        session.commit()
+
+        service = IntegrityService()
+        summary = service.detect_risks(session)
+
+        assert len(summary.overdue_commitments) == 1
+
+    def test_ignores_overdue_completed_commitments(self, session: Session) -> None:
+        """Does not flag completed commitments as overdue."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        # Overdue but completed - should not be flagged
+        completed = Commitment(
+            deliverable="Done task",
+            stakeholder_id=stakeholder.id,
+            due_date=datetime.now(UTC).date() - timedelta(days=1),
+            status=CommitmentStatus.COMPLETED,
+        )
+        session.add(completed)
+        session.commit()
+
+        service = IntegrityService()
+        summary = service.detect_risks(session)
+
+        assert len(summary.overdue_commitments) == 0
+
+    def test_detects_due_soon_pending_commitments(self, session: Session) -> None:
+        """Detects pending commitments due within 24 hours."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        # Due today (within 24h) - use UTC to match service
+        utc_today = datetime.now(UTC).date()
+        due_soon = Commitment(
+            deliverable="Due today",
+            stakeholder_id=stakeholder.id,
+            due_date=utc_today,
+            status=CommitmentStatus.PENDING,
+        )
+        session.add(due_soon)
+        session.commit()
+
+        service = IntegrityService()
+        summary = service.detect_risks(session)
+
+        assert len(summary.due_soon_commitments) == 1
+        assert summary.due_soon_commitments[0].deliverable == "Due today"
+
+    def test_ignores_due_soon_in_progress_commitments(self, session: Session) -> None:
+        """Does not flag in_progress as due_soon (they're being worked on)."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        # Due today but in progress - use UTC to match service
+        utc_today = datetime.now(UTC).date()
+        in_progress = Commitment(
+            deliverable="Working on it",
+            stakeholder_id=stakeholder.id,
+            due_date=utc_today,
+            status=CommitmentStatus.IN_PROGRESS,
+        )
+        session.add(in_progress)
+        session.commit()
+
+        service = IntegrityService()
+        summary = service.detect_risks(session)
+
+        # Not in due_soon (they're being worked on)
+        assert len(summary.due_soon_commitments) == 0
+
+    def test_detects_stalled_commitments(self, session: Session) -> None:
+        """Detects in_progress commitments due soon with no recent activity."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        # Stalled: due soon, in_progress, but not updated recently
+        old_update = datetime.now(UTC) - timedelta(hours=48)
+        stalled = Commitment(
+            deliverable="Stalled task",
+            stakeholder_id=stakeholder.id,
+            due_date=datetime.now(UTC).date() + timedelta(days=1),  # Due within 48h
+            status=CommitmentStatus.IN_PROGRESS,
+            updated_at=old_update,
+        )
+        session.add(stalled)
+        session.commit()
+
+        service = IntegrityService()
+        summary = service.detect_risks(session)
+
+        assert len(summary.stalled_commitments) == 1
+        assert summary.stalled_commitments[0].deliverable == "Stalled task"
+
+    def test_returns_empty_when_no_risks(self, session: Session) -> None:
+        """Returns empty RiskSummary when all commitments are healthy."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        # Future due date, not overdue
+        healthy = Commitment(
+            deliverable="Future task",
+            stakeholder_id=stakeholder.id,
+            due_date=datetime.now(UTC).date() + timedelta(days=30),
+            status=CommitmentStatus.PENDING,
+        )
+        session.add(healthy)
+        session.commit()
+
+        service = IntegrityService()
+        summary = service.detect_risks(session)
+
+        assert summary.has_risks is False
+        assert summary.total_risks == 0
