@@ -1561,3 +1561,328 @@ class TestHelpHandlerIntegrityCommands:
 
         assert "integrity" in result.message.lower()
         assert "grade" in result.message.lower() or "score" in result.message.lower()
+
+
+# ============================================================
+# Phase 9: /abandon Command Tests (D3 & D4)
+# ============================================================
+
+
+class TestAbandonHandler:
+    """Tests for the /abandon command handler."""
+
+    def test_abandon_without_commitment_prompts_for_selection(self) -> None:
+        """Test: /abandon without commitment context prompts for selection."""
+        from jdo.commands.handlers import AbandonHandler
+
+        handler = AbandonHandler()
+        cmd = ParsedCommand(CommandType.ABANDON, [], "/abandon")
+
+        context = {
+            "available_commitments": [
+                {"id": uuid4(), "deliverable": "Send report", "status": "pending"},
+                {"id": uuid4(), "deliverable": "Review docs", "status": "in_progress"},
+            ]
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "which" in result.message.lower() or "abandon" in result.message.lower()
+        assert result.panel_update is not None
+        assert result.panel_update["mode"] == "list"
+
+    def test_abandon_without_commitments_shows_error(self) -> None:
+        """Test: /abandon without any commitments shows appropriate error."""
+        from jdo.commands.handlers import AbandonHandler
+
+        handler = AbandonHandler()
+        cmd = ParsedCommand(CommandType.ABANDON, [], "/abandon")
+
+        context = {}  # No commitments at all
+
+        result = handler.execute(cmd, context)
+
+        assert "no active commitments" in result.message.lower()
+        assert result.panel_update is None
+
+    def test_abandon_on_completed_commitment_shows_error(self) -> None:
+        """Test: /abandon on completed commitment shows error."""
+        from jdo.commands.handlers import AbandonHandler
+
+        handler = AbandonHandler()
+        cmd = ParsedCommand(CommandType.ABANDON, [], "/abandon")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "Send report",
+                "status": "completed",
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "completed" in result.message.lower()
+        assert "cannot be abandoned" in result.message.lower()
+
+    def test_abandon_on_already_abandoned_commitment_shows_error(self) -> None:
+        """Test: /abandon on already abandoned commitment shows error."""
+        from jdo.commands.handlers import AbandonHandler
+
+        handler = AbandonHandler()
+        cmd = ParsedCommand(CommandType.ABANDON, [], "/abandon")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "Send report",
+                "status": "abandoned",
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "already abandoned" in result.message.lower()
+
+    def test_abandon_on_pending_commitment_without_stakeholder_confirms(self) -> None:
+        """Test: /abandon on pending commitment without stakeholder asks for confirmation."""
+        from jdo.commands.handlers import AbandonHandler
+
+        handler = AbandonHandler()
+        cmd = ParsedCommand(CommandType.ABANDON, [], "/abandon")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "Personal task",
+                "status": "pending",
+                # No stakeholder_name
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "abandon" in result.message.lower()
+        assert "personal task" in result.message.lower()
+        assert result.needs_confirmation is True
+        assert result.panel_update is not None
+        assert result.panel_update["action"] == "abandon"
+
+    def test_abandon_on_pending_commitment_with_stakeholder_prompts_atrisk_first(
+        self,
+    ) -> None:
+        """Test: D4 - /abandon on commitment with stakeholder prompts to mark at-risk first."""
+        from jdo.commands.handlers import AbandonHandler
+
+        handler = AbandonHandler()
+        cmd = ParsedCommand(CommandType.ABANDON, [], "/abandon")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "Send quarterly report",
+                "status": "pending",
+                "stakeholder_name": "Finance Team",
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        # D4: Should prompt to mark at-risk first
+        assert "finance team" in result.message.lower()
+        assert "at-risk" in result.message.lower() or "atrisk" in result.message.lower()
+        assert "recommend" in result.message.lower() or "would you like" in result.message.lower()
+        assert result.panel_update is not None
+        assert result.panel_update["mode"] == "abandon_prompt"
+        assert result.panel_update["prompt_type"] == "atrisk_first"
+
+    def test_abandon_on_in_progress_commitment_with_stakeholder_prompts_atrisk_first(
+        self,
+    ) -> None:
+        """Test: D4 - /abandon on in_progress with stakeholder prompts mark at-risk."""
+        from jdo.commands.handlers import AbandonHandler
+
+        handler = AbandonHandler()
+        cmd = ParsedCommand(CommandType.ABANDON, [], "/abandon")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "Deliver presentation",
+                "status": "in_progress",
+                "stakeholder_name": "Client",
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        # D4: Should prompt to mark at-risk first
+        assert "client" in result.message.lower()
+        assert "at-risk" in result.message.lower() or "atrisk" in result.message.lower()
+
+    def test_abandon_at_risk_with_incomplete_notification_warns_user(self) -> None:
+        """Test: D3 - /abandon on at-risk with incomplete notification warns user."""
+        from jdo.commands.handlers import AbandonHandler
+
+        handler = AbandonHandler()
+        cmd = ParsedCommand(CommandType.ABANDON, [], "/abandon")
+
+        commitment_id = uuid4()
+        context = {
+            "current_commitment": {
+                "id": commitment_id,
+                "deliverable": "Send quarterly report",
+                "status": "at_risk",
+                "stakeholder_name": "Finance Team",
+            },
+            "cleanup_plan": {
+                "id": uuid4(),
+                "status": "planned",
+            },
+            "notification_task": {
+                "id": uuid4(),
+                "status": "pending",  # Not completed
+                "is_notification_task": True,
+            },
+        }
+
+        result = handler.execute(cmd, context)
+
+        # D3: Should warn about incomplete notification
+        assert "haven't notified" in result.message.lower()
+        assert "finance team" in result.message.lower()
+        assert "integrity score" in result.message.lower()
+        assert "skipped" in result.message.lower()
+        assert result.panel_update is not None
+        assert result.panel_update["mode"] == "abandon_warning"
+        assert result.panel_update["warning_type"] == "notification_incomplete"
+        assert result.needs_confirmation is True
+        assert result.draft_data is not None
+        assert result.draft_data["skip_notification"] is True
+
+    def test_abandon_at_risk_with_completed_notification_confirms(self) -> None:
+        """Test: /abandon on at-risk with completed notification asks for simple confirmation."""
+        from jdo.commands.handlers import AbandonHandler
+
+        handler = AbandonHandler()
+        cmd = ParsedCommand(CommandType.ABANDON, [], "/abandon")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "Send quarterly report",
+                "status": "at_risk",
+                "stakeholder_name": "Finance Team",
+            },
+            "cleanup_plan": {
+                "id": uuid4(),
+                "status": "in_progress",
+            },
+            "notification_task": {
+                "id": uuid4(),
+                "status": "completed",  # Completed
+                "is_notification_task": True,
+            },
+        }
+
+        result = handler.execute(cmd, context)
+
+        # Should allow abandonment without warning
+        assert "notified" in result.message.lower()
+        assert "finance team" in result.message.lower()
+        assert result.needs_confirmation is True
+        # No warning about skipping
+        assert "skipped" not in result.message.lower()
+
+    def test_abandon_at_risk_no_notification_task_allows_abandon(self) -> None:
+        """Test: /abandon on at-risk without notification task allows abandonment."""
+        from jdo.commands.handlers import AbandonHandler
+
+        handler = AbandonHandler()
+        cmd = ParsedCommand(CommandType.ABANDON, [], "/abandon")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "Send quarterly report",
+                "status": "at_risk",
+                "stakeholder_name": "Finance Team",
+            },
+            "cleanup_plan": {
+                "id": uuid4(),
+                "status": "planned",
+            },
+            # No notification_task in context
+        }
+
+        result = handler.execute(cmd, context)
+
+        # Should allow abandonment (no notification task to check)
+        assert result.needs_confirmation is True
+
+    def test_abandon_filters_only_active_commitments_in_selection(self) -> None:
+        """Test: /abandon only shows active commitments for selection."""
+        from jdo.commands.handlers import AbandonHandler
+
+        handler = AbandonHandler()
+        cmd = ParsedCommand(CommandType.ABANDON, [], "/abandon")
+
+        context = {
+            "available_commitments": [
+                {"id": uuid4(), "deliverable": "Active one", "status": "pending"},
+                {"id": uuid4(), "deliverable": "Completed one", "status": "completed"},
+                {"id": uuid4(), "deliverable": "At risk one", "status": "at_risk"},
+                {"id": uuid4(), "deliverable": "Abandoned one", "status": "abandoned"},
+            ]
+        }
+
+        result = handler.execute(cmd, context)
+
+        # Panel should only show active commitments (pending, in_progress, at_risk)
+        assert result.panel_update is not None
+        assert len(result.panel_update["items"]) == 2  # pending and at_risk
+
+    def test_abandon_selection_shows_at_risk_indicator(self) -> None:
+        """Test: /abandon selection list shows at-risk indicator."""
+        from jdo.commands.handlers import AbandonHandler
+
+        handler = AbandonHandler()
+        cmd = ParsedCommand(CommandType.ABANDON, [], "/abandon")
+
+        context = {
+            "available_commitments": [
+                {"id": uuid4(), "deliverable": "Normal commitment", "status": "pending"},
+                {"id": uuid4(), "deliverable": "At risk commitment", "status": "at_risk"},
+            ]
+        }
+
+        result = handler.execute(cmd, context)
+
+        # At-risk item should have indicator in message
+        assert "at_risk" in result.message.lower() or "⚠️" in result.message
+
+
+class TestAbandonHandlerRegistration:
+    """Tests for abandon command registration in the handler registry."""
+
+    def test_abandon_handler_is_registered(self) -> None:
+        """Test: AbandonHandler is registered for ABANDON command type."""
+        from jdo.commands.handlers import AbandonHandler, get_handler
+
+        handler = get_handler(CommandType.ABANDON)
+        assert isinstance(handler, AbandonHandler)
+
+
+class TestHelpHandlerAbandonCommand:
+    """Tests for /help with abandon command."""
+
+    def test_help_lists_abandon_command(self) -> None:
+        """Test: /help lists /abandon command."""
+        from jdo.commands.handlers import HelpHandler
+
+        handler = HelpHandler()
+        cmd = ParsedCommand(CommandType.HELP, [], "/help")
+
+        result = handler.execute(cmd, {})
+
+        assert "/abandon" in result.message

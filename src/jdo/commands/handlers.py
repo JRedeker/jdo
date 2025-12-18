@@ -827,6 +827,16 @@ class HelpHandler(CommandHandler):
             "  - Reliability streak bonus (10% of score)\n\n"
             "New users start with an A+ (clean slate)."
         ),
+        "abandon": (
+            "/abandon - Mark commitment as abandoned\n\n"
+            "Abandons a commitment you can no longer complete.\n\n"
+            "Soft enforcement rules:\n"
+            "  - If commitment has a stakeholder, suggests marking at-risk first\n"
+            "  - If commitment is at-risk with incomplete notification, warns about "
+            "integrity impact\n"
+            "  - Allows override after showing warning\n\n"
+            "Abandoning without notifying stakeholders affects your integrity score."
+        ),
     }
 
     def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:
@@ -863,6 +873,7 @@ class HelpHandler(CommandHandler):
             "  /show       - Display entity lists",
             "  /view       - View a specific item",
             "  /complete   - Mark item as completed",
+            "  /abandon    - Mark commitment as abandoned",
             "  /cancel     - Cancel current draft",
             "  /atrisk     - Mark commitment as at-risk",
             "  /cleanup    - View/update cleanup plan",
@@ -1609,6 +1620,221 @@ class IntegrityHandler(CommandHandler):
         )
 
 
+class AbandonHandler(CommandHandler):
+    """Handler for /abandon command - marks commitment as abandoned.
+
+    Implements soft enforcement per Honor-Your-Word protocol:
+    - If commitment is at_risk and notification task not completed, warns user
+    - Offers option to mark at-risk first if stakeholder exists
+    - On confirmed abandon, sets CleanupPlan status to skipped if applicable
+    """
+
+    def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:
+        """Execute /abandon command.
+
+        Args:
+            cmd: The parsed command.
+            context: Context with current commitment data.
+
+        Returns:
+            HandlerResult with appropriate prompt or confirmation.
+        """
+        current_commitment = context.get("current_commitment")
+        available_commitments = context.get("available_commitments", [])
+
+        # Check if we have a commitment in context
+        if not current_commitment:
+            return self._handle_no_commitment(available_commitments)
+
+        # Check if already completed or abandoned
+        validation_result = self._validate_commitment_status(current_commitment)
+        if validation_result:
+            return validation_result
+
+        status = current_commitment.get("status", "")
+        deliverable = current_commitment.get("deliverable", "this commitment")
+        stakeholder = current_commitment.get("stakeholder_name", "")
+
+        # D3: Soft enforcement for at-risk commitments
+        if status == "at_risk":
+            return self._handle_at_risk_abandon(current_commitment, context)
+
+        # D4: Pre-abandon prompt for commitments with stakeholders
+        if stakeholder and status in ("pending", "in_progress"):
+            return self._prompt_atrisk_first(current_commitment)
+
+        # Standard abandonment (no stakeholder)
+        return HandlerResult(
+            message=f"Abandon '{deliverable}'?\n\nThis will mark the commitment as abandoned.",
+            panel_update={
+                "mode": "view",
+                "entity_type": "commitment",
+                "data": current_commitment,
+                "action": "abandon",
+            },
+            draft_data=None,
+            needs_confirmation=True,
+        )
+
+    def _handle_no_commitment(self, available_commitments: list[dict[str, Any]]) -> HandlerResult:
+        """Handle case when no commitment is in context."""
+        if available_commitments:
+            return self._prompt_for_commitment_selection(available_commitments)
+        return HandlerResult(
+            message="No active commitments to abandon. Create a commitment first with /commit.",
+            panel_update=None,
+            draft_data=None,
+            needs_confirmation=False,
+        )
+
+    def _validate_commitment_status(self, commitment: dict[str, Any]) -> HandlerResult | None:
+        """Validate commitment can be abandoned. Returns error result or None if valid."""
+        status = commitment.get("status", "")
+        if status == "completed":
+            return HandlerResult(
+                message="This commitment is already completed. "
+                "Completed commitments cannot be abandoned.",
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+        if status == "abandoned":
+            return HandlerResult(
+                message="This commitment is already abandoned.",
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+        return None
+
+    def _handle_at_risk_abandon(
+        self, commitment: dict[str, Any], context: dict[str, Any]
+    ) -> HandlerResult:
+        """Handle abandonment of at-risk commitment with soft enforcement.
+
+        Checks if notification task is completed. If not, warns the user
+        that abandoning without notification will affect their integrity score.
+        """
+        deliverable = commitment.get("deliverable", "this commitment")
+        stakeholder = commitment.get("stakeholder_name", "the stakeholder")
+        cleanup_plan = context.get("cleanup_plan")
+        notification_task = context.get("notification_task")
+
+        # Check if notification task exists and is incomplete
+        notification_incomplete = False
+        if notification_task:
+            task_status = notification_task.get("status", "")
+            notification_incomplete = task_status not in ("completed", "done")
+
+        if notification_incomplete:
+            # D3: Warn user about incomplete notification
+            return HandlerResult(
+                message=f"⚠️ You haven't notified {stakeholder} yet.\n\n"
+                f"Abandoning '{deliverable}' without notification will:\n"
+                "• Set your cleanup plan status to 'skipped'\n"
+                "• Negatively affect your integrity score\n\n"
+                "Options:\n"
+                "• Type 'yes' to abandon anyway\n"
+                "• Type 'notify' to complete notification first\n"
+                "• Type 'cancel' to go back",
+                panel_update={
+                    "mode": "abandon_warning",
+                    "entity_type": "commitment",
+                    "data": commitment,
+                    "cleanup_plan": cleanup_plan,
+                    "notification_task": notification_task,
+                    "warning_type": "notification_incomplete",
+                },
+                draft_data={
+                    "commitment_id": commitment.get("id"),
+                    "skip_notification": True,
+                    "skipped_reason": "User abandoned without completing notification",
+                },
+                needs_confirmation=True,
+            )
+
+        # Notification completed, standard at-risk abandonment
+        return HandlerResult(
+            message=f"Abandon '{deliverable}'?\n\n"
+            f"You've notified {stakeholder}. The commitment will be marked as abandoned "
+            "and the cleanup plan completed.",
+            panel_update={
+                "mode": "view",
+                "entity_type": "commitment",
+                "data": commitment,
+                "action": "abandon",
+                "cleanup_plan": cleanup_plan,
+            },
+            draft_data=None,
+            needs_confirmation=True,
+        )
+
+    def _prompt_atrisk_first(self, commitment: dict[str, Any]) -> HandlerResult:
+        """D4: Prompt user to mark at-risk first before abandoning.
+
+        When a commitment has a stakeholder but isn't at-risk yet,
+        encourage the user to go through proper notification workflow.
+        """
+        deliverable = commitment.get("deliverable", "this commitment")
+        stakeholder = commitment.get("stakeholder_name", "the stakeholder")
+
+        return HandlerResult(
+            message=f"'{deliverable}' has a stakeholder ({stakeholder}).\n\n"
+            "Would you like to:\n"
+            "• Mark at-risk first to notify them? (recommended)\n"
+            "• Abandon directly without notification?\n\n"
+            "Type 'atrisk' to mark at-risk first, or 'abandon' to abandon directly.",
+            panel_update={
+                "mode": "abandon_prompt",
+                "entity_type": "commitment",
+                "data": commitment,
+                "prompt_type": "atrisk_first",
+            },
+            draft_data={
+                "commitment_id": commitment.get("id"),
+                "stakeholder_name": stakeholder,
+            },
+            needs_confirmation=False,
+        )
+
+    def _prompt_for_commitment_selection(self, commitments: list[dict[str, Any]]) -> HandlerResult:
+        """Prompt user to select which commitment to abandon."""
+        # Filter to only active commitments
+        active = [
+            c for c in commitments if c.get("status") in ("pending", "in_progress", "at_risk")
+        ]
+
+        if not active:
+            return HandlerResult(
+                message="No active commitments to abandon. "
+                "All your commitments are either completed or already abandoned.",
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        lines = ["Which commitment do you want to abandon?", ""]
+        for i, c in enumerate(active, 1):
+            deliverable = c.get("deliverable", "Untitled")[:50]
+            status = c.get("status", "unknown")
+            status_indicator = " ⚠️" if status == "at_risk" else ""
+            lines.append(f"  {i}. {deliverable} [{status}]{status_indicator}")
+        lines.append("")
+        lines.append("Enter a number to select, or describe the commitment.")
+
+        return HandlerResult(
+            message="\n".join(lines),
+            panel_update={
+                "mode": "list",
+                "entity_type": "commitment",
+                "items": active,
+                "action": "select_for_abandon",
+            },
+            draft_data=None,
+            needs_confirmation=False,
+        )
+
+
 class TriageHandler(CommandHandler):
     """Handler for /triage command - processes captured items.
 
@@ -1796,6 +2022,7 @@ _HANDLERS: dict[CommandType, type[CommandHandler]] = {
     CommandType.ATRISK: AtRiskHandler,
     CommandType.CLEANUP: CleanupHandler,
     CommandType.INTEGRITY: IntegrityHandler,
+    CommandType.ABANDON: AbandonHandler,
 }
 
 # Cache handler instances

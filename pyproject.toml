@@ -138,6 +138,11 @@ ignore = [
 "src/jdo/observability.py" = [
     "PLC0415", # Lazy import of JDOError to avoid circular import
 ]
+"src/jdo/integrity/service.py" = [
+    "PLR2004", # Magic value 7 days for timeliness is self-documenting in context
+    "C901",    # _calculate_streak_weeks complexity justified for clarity of logic
+    "PLR0912", # _calculate_streak_weeks branches needed for complete streak tracking
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["jdo"]

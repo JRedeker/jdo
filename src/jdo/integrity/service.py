@@ -289,12 +289,12 @@ Mark this task complete after you've sent the notification."""
         if total_plans > 0:
             cleanup_completion_rate = completed_plans / total_plans
 
-        # Notification timeliness (simplified - would need more data in production)
-        # For now, return 1.0 (clean slate) as we don't have historical data
-        notification_timeliness = 1.0
+        # Notification timeliness: how early users notify when at-risk
+        # 7+ days before due = 1.0, 0 days = 0.0, linear interpolation
+        notification_timeliness = self._calculate_notification_timeliness(session)
 
-        # Streak calculation (simplified - would track weekly in production)
-        current_streak_weeks = 0
+        # Streak calculation: consecutive weeks with all on-time completions
+        current_streak_weeks = self._calculate_streak_weeks(session)
 
         return IntegrityMetrics(
             on_time_rate=on_time_rate,
@@ -380,3 +380,124 @@ Mark this task complete after you've sent the notification."""
             due_soon_commitments=due_soon,
             stalled_commitments=stalled,
         )
+
+    def _calculate_notification_timeliness(self, session: Session) -> float:
+        """Calculate average notification timeliness score.
+
+        Measures how early users mark commitments as at-risk before the due date.
+        7+ days before due = 1.0, 0 days (on due date) = 0.0, linear interpolation.
+
+        Args:
+            session: Database session
+
+        Returns:
+            Timeliness score from 0.0 to 1.0, defaults to 1.0 if no at-risk history
+        """
+        # Get all commitments that were marked at-risk
+        at_risk_commitments = session.exec(
+            select(Commitment).where(Commitment.marked_at_risk_at.is_not(None))  # type: ignore[union-attr]
+        ).all()
+
+        if not at_risk_commitments:
+            return 1.0  # Clean slate
+
+        total_score = 0.0
+        for commitment in at_risk_commitments:
+            if commitment.marked_at_risk_at is None or commitment.due_date is None:
+                continue
+
+            # Calculate days before due when marked at-risk
+            marked_date = commitment.marked_at_risk_at.date()
+            days_before_due = (commitment.due_date - marked_date).days
+
+            # Normalize: 7+ days = 1.0, 0 days = 0.0, negative = 0.0
+            if days_before_due >= 7:
+                score = 1.0
+            elif days_before_due <= 0:
+                score = 0.0
+            else:
+                score = days_before_due / 7.0
+
+            total_score += score
+
+        return total_score / len(at_risk_commitments) if at_risk_commitments else 1.0
+
+    def _calculate_streak_weeks(self, session: Session) -> int:
+        """Calculate consecutive weeks with all on-time completions.
+
+        Counts consecutive weeks (starting from current) where all completed
+        commitments were on time. Streak resets on late completion or abandonment.
+
+        Args:
+            session: Database session
+
+        Returns:
+            Number of consecutive on-time weeks, 0 if no history or recent miss
+        """
+        # Get all completed commitments, ordered by completion date descending
+        completed = session.exec(
+            select(Commitment)
+            .where(
+                Commitment.status == CommitmentStatus.COMPLETED,
+                Commitment.completed_at.is_not(None),  # type: ignore[union-attr]
+            )
+            .order_by(Commitment.completed_at.desc())  # type: ignore[union-attr]
+        ).all()
+
+        if not completed:
+            return 0  # No history
+
+        # Group by ISO week
+        weeks_data: dict[tuple[int, int], list[bool]] = {}  # (year, week) -> [on_time...]
+        for c in completed:
+            if c.completed_at is None:
+                continue
+            iso_cal = c.completed_at.isocalendar()
+            week_key = (iso_cal.year, iso_cal.week)
+            if week_key not in weeks_data:
+                weeks_data[week_key] = []
+            weeks_data[week_key].append(c.completed_on_time is True)
+
+        # Sort weeks newest first
+        sorted_weeks = sorted(weeks_data.keys(), reverse=True)
+
+        # Count consecutive perfect weeks
+        streak = 0
+        for week_key in sorted_weeks:
+            on_time_flags = weeks_data[week_key]
+            if all(on_time_flags):
+                streak += 1
+            else:
+                break  # Streak broken
+
+        # Also check for abandonments that would reset streak
+        # Get most recent abandonment
+        recent_abandon = session.exec(
+            select(Commitment)
+            .where(Commitment.status == CommitmentStatus.ABANDONED)
+            .order_by(Commitment.updated_at.desc())  # type: ignore[arg-type]
+            .limit(1)
+        ).first()
+
+        if recent_abandon and streak > 0:
+            # If there's an abandonment within the streak period, reduce streak
+            abandon_iso = recent_abandon.updated_at.isocalendar()
+            abandon_week = (abandon_iso.year, abandon_iso.week)
+
+            # Check if abandonment is within our streak period
+            streak_start_idx = min(streak, len(sorted_weeks))
+            if streak_start_idx > 0:
+                oldest_streak_week = sorted_weeks[streak_start_idx - 1]
+                if abandon_week >= oldest_streak_week:
+                    # Abandonment within streak period - count weeks after abandonment
+                    new_streak = 0
+                    for week_key in sorted_weeks:
+                        if week_key <= abandon_week:
+                            break
+                        if all(weeks_data[week_key]):
+                            new_streak += 1
+                        else:
+                            break
+                    streak = new_streak
+
+        return streak

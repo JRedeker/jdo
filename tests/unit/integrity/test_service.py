@@ -612,3 +612,261 @@ class TestDetectRisks:
 
         assert summary.has_risks is False
         assert summary.total_risks == 0
+
+
+class TestNotificationTimeliness:
+    """Tests for notification timeliness calculation."""
+
+    def test_returns_1_when_no_at_risk_history(self, session: Session) -> None:
+        """Returns 1.0 (clean slate) when no commitments have been at-risk."""
+        service = IntegrityService()
+        timeliness = service._calculate_notification_timeliness(session)
+        assert timeliness == 1.0
+
+    def test_returns_1_when_marked_7_days_before_due(self, session: Session) -> None:
+        """Returns 1.0 when marked at-risk 7+ days before due date."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        due = date(2025, 1, 15)
+        marked = datetime(2025, 1, 7, 10, 0, tzinfo=UTC)  # 8 days before
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=stakeholder.id,
+            due_date=due,
+            status=CommitmentStatus.AT_RISK,
+            marked_at_risk_at=marked,
+        )
+        session.add(commitment)
+        session.commit()
+
+        service = IntegrityService()
+        timeliness = service._calculate_notification_timeliness(session)
+        assert timeliness == 1.0
+
+    def test_returns_0_when_marked_on_due_date(self, session: Session) -> None:
+        """Returns 0.0 when marked at-risk on due date (no warning time)."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        due = date(2025, 1, 15)
+        marked = datetime(2025, 1, 15, 10, 0, tzinfo=UTC)  # Same day
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=stakeholder.id,
+            due_date=due,
+            status=CommitmentStatus.AT_RISK,
+            marked_at_risk_at=marked,
+        )
+        session.add(commitment)
+        session.commit()
+
+        service = IntegrityService()
+        timeliness = service._calculate_notification_timeliness(session)
+        assert timeliness == 0.0
+
+    def test_returns_0_when_marked_after_due_date(self, session: Session) -> None:
+        """Returns 0.0 when marked at-risk after due date (overdue)."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        due = date(2025, 1, 15)
+        marked = datetime(2025, 1, 20, 10, 0, tzinfo=UTC)  # 5 days after
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=stakeholder.id,
+            due_date=due,
+            status=CommitmentStatus.AT_RISK,
+            marked_at_risk_at=marked,
+        )
+        session.add(commitment)
+        session.commit()
+
+        service = IntegrityService()
+        timeliness = service._calculate_notification_timeliness(session)
+        assert timeliness == 0.0
+
+    def test_returns_interpolated_value(self, session: Session) -> None:
+        """Returns interpolated value for 0-7 days before due."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        due = date(2025, 1, 15)
+        marked = datetime(2025, 1, 12, 10, 0, tzinfo=UTC)  # 3 days before
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=stakeholder.id,
+            due_date=due,
+            status=CommitmentStatus.AT_RISK,
+            marked_at_risk_at=marked,
+        )
+        session.add(commitment)
+        session.commit()
+
+        service = IntegrityService()
+        timeliness = service._calculate_notification_timeliness(session)
+        assert timeliness == pytest.approx(3 / 7)  # 3 days / 7 days
+
+    def test_averages_multiple_commitments(self, session: Session) -> None:
+        """Returns average timeliness across multiple at-risk commitments."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        # First: 7 days before (score 1.0)
+        c1 = Commitment(
+            deliverable="Test 1",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 1, 15),
+            status=CommitmentStatus.AT_RISK,
+            marked_at_risk_at=datetime(2025, 1, 8, 10, 0, tzinfo=UTC),
+        )
+        # Second: 0 days before (score 0.0)
+        c2 = Commitment(
+            deliverable="Test 2",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 1, 20),
+            status=CommitmentStatus.AT_RISK,
+            marked_at_risk_at=datetime(2025, 1, 20, 10, 0, tzinfo=UTC),
+        )
+        session.add_all([c1, c2])
+        session.commit()
+
+        service = IntegrityService()
+        timeliness = service._calculate_notification_timeliness(session)
+        assert timeliness == pytest.approx(0.5)  # (1.0 + 0.0) / 2
+
+
+class TestReliabilityStreak:
+    """Tests for reliability streak calculation."""
+
+    def test_returns_0_when_no_completions(self, session: Session) -> None:
+        """Returns 0 when no commitments have been completed."""
+        service = IntegrityService()
+        streak = service._calculate_streak_weeks(session)
+        assert streak == 0
+
+    def test_returns_1_for_single_on_time_week(self, session: Session) -> None:
+        """Returns 1 when one week has all on-time completions."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        # Complete one commitment this week, on time
+        now = datetime.now(UTC)
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=stakeholder.id,
+            due_date=now.date(),
+            status=CommitmentStatus.COMPLETED,
+            completed_at=now,
+            completed_on_time=True,
+        )
+        session.add(commitment)
+        session.commit()
+
+        service = IntegrityService()
+        streak = service._calculate_streak_weeks(session)
+        assert streak == 1
+
+    def test_returns_0_when_late_completion_in_week(self, session: Session) -> None:
+        """Returns 0 when the only week has a late completion."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        now = datetime.now(UTC)
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=stakeholder.id,
+            due_date=now.date(),
+            status=CommitmentStatus.COMPLETED,
+            completed_at=now,
+            completed_on_time=False,  # Late
+        )
+        session.add(commitment)
+        session.commit()
+
+        service = IntegrityService()
+        streak = service._calculate_streak_weeks(session)
+        assert streak == 0
+
+    def test_counts_consecutive_weeks(self, session: Session) -> None:
+        """Counts consecutive weeks with all on-time completions."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        # Create completions in 3 consecutive weeks, all on time
+        now = datetime.now(UTC)
+        for weeks_ago in range(3):
+            completed_at = now - timedelta(weeks=weeks_ago)
+            commitment = Commitment(
+                deliverable=f"Task week {weeks_ago}",
+                stakeholder_id=stakeholder.id,
+                due_date=completed_at.date(),
+                status=CommitmentStatus.COMPLETED,
+                completed_at=completed_at,
+                completed_on_time=True,
+            )
+            session.add(commitment)
+        session.commit()
+
+        service = IntegrityService()
+        streak = service._calculate_streak_weeks(session)
+        assert streak == 3
+
+    def test_streak_breaks_on_late_completion(self, session: Session) -> None:
+        """Streak breaks when there's a late completion."""
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        now = datetime.now(UTC)
+
+        # This week: on time
+        c1 = Commitment(
+            deliverable="Recent",
+            stakeholder_id=stakeholder.id,
+            due_date=now.date(),
+            status=CommitmentStatus.COMPLETED,
+            completed_at=now,
+            completed_on_time=True,
+        )
+        # Last week: late (breaks streak)
+        c2 = Commitment(
+            deliverable="Late",
+            stakeholder_id=stakeholder.id,
+            due_date=(now - timedelta(weeks=1)).date(),
+            status=CommitmentStatus.COMPLETED,
+            completed_at=now - timedelta(weeks=1),
+            completed_on_time=False,
+        )
+        # Two weeks ago: on time (doesn't count, streak broken)
+        c3 = Commitment(
+            deliverable="Old",
+            stakeholder_id=stakeholder.id,
+            due_date=(now - timedelta(weeks=2)).date(),
+            status=CommitmentStatus.COMPLETED,
+            completed_at=now - timedelta(weeks=2),
+            completed_on_time=True,
+        )
+        session.add_all([c1, c2, c3])
+        session.commit()
+
+        service = IntegrityService()
+        streak = service._calculate_streak_weeks(session)
+        assert streak == 1  # Only this week counts

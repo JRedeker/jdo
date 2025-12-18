@@ -32,6 +32,7 @@ class CommandType(str, Enum):
     ATRISK = "atrisk"  # Mark commitment as at-risk
     CLEANUP = "cleanup"  # View/update cleanup plan
     INTEGRITY = "integrity"  # Show integrity dashboard
+    ABANDON = "abandon"  # Mark commitment as abandoned
     MESSAGE = "message"  # Not a command, just a regular message
 
 
@@ -81,6 +82,7 @@ _COMMAND_MAP: dict[str, CommandType] = {
     "atrisk": CommandType.ATRISK,
     "cleanup": CommandType.CLEANUP,
     "integrity": CommandType.INTEGRITY,
+    "abandon": CommandType.ABANDON,
 }
 
 

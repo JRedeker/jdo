@@ -52,12 +52,12 @@ This task list tracks implementation status for the integrity protocol.
 - [x] Notification task scope contains stakeholder info
 - [x] CleanupPlan links to notification task
 
-### 4.3-4.4 Soft Enforcement (Deferred)
-- [ ] Abandon without notification shows warning
-- [ ] User can override warning with acknowledgment
-- [ ] Override sets CleanupPlan status to "skipped"
-
-**Note**: Soft enforcement deferred to future iteration. Current implementation allows direct abandonment.
+### 4.3-4.4 Soft Enforcement
+- [x] Abandon without notification shows warning
+- [x] User can override warning with acknowledgment
+- [x] Override sets CleanupPlan status to "skipped"
+- [x] /abandon command handler implemented
+- [x] Tests for soft enforcement added
 
 ## Phase 5: Integrity Metrics
 
@@ -65,21 +65,21 @@ This task list tracks implementation status for the integrity protocol.
 - [x] on_time_rate = completed_on_time / total_completed
 - [x] Returns 1.0 when no completions (clean slate)
 
-### 5.3-5.4 Notification Timeliness (Simplified)
+### 5.3-5.4 Notification Timeliness
 - [x] Returns 1.0 (clean slate default)
-- [ ] Actual calculation from marked_at_risk_at vs due_date (deferred)
-
-**Note**: Full timeliness calculation deferred. Returns 1.0 for now.
+- [x] Actual calculation from marked_at_risk_at vs due_date implemented
+- [x] 7+ days before = 1.0, 0 days = 0.0, linear interpolation
+- [x] Tests added for timeliness calculation
 
 ### 5.5-5.6 Cleanup Completion Rate
 - [x] cleanup_rate = completed / total cleanup plans
 - [x] Returns 1.0 when no cleanup plans exist
 
-### 5.7-5.8 Reliability Streak (Simplified)
+### 5.7-5.8 Reliability Streak
 - [x] Returns 0 (no streak tracking yet)
-- [ ] Count consecutive weeks with all on-time (deferred)
-
-**Note**: Full streak calculation deferred. Returns 0 for now.
+- [x] Count consecutive weeks with all on-time implemented
+- [x] Streak breaks on late completion or abandonment
+- [x] Tests added for streak calculation
 
 ### 5.9-5.12 Composite Score and Letter Grade
 - [x] composite_score with weights: on_time=0.4, timeliness=0.25, cleanup=0.25, streak=0.1
@@ -170,60 +170,52 @@ uv run pytest tests/integration/tui/test_flows.py -v
 
 The following items are deferred to future iterations. Each is tracked here with rationale and suggested implementation approach.
 
-### D1: Notification Timeliness Calculation
-**Current**: Returns 1.0 (clean slate default)
-**Target**: Calculate average (due_date - marked_at_risk_at) normalized to 0.0-1.0 scale
+### D1: Notification Timeliness Calculation ✅ COMPLETED
+**Status**: Implemented in `IntegrityService._calculate_notification_timeliness()`
 
 **Implementation**:
-- [ ] Query commitments where marked_at_risk_at is not null
-- [ ] Calculate days_before_due = (due_date - marked_at_risk_at.date()).days
-- [ ] Normalize: 7+ days = 1.0, 0 days = 0.0, linear interpolation between
-- [ ] Handle edge cases: marked after due_date = 0.0
-- [ ] Update `IntegrityService.calculate_integrity_metrics()`
+- [x] Query commitments where marked_at_risk_at is not null
+- [x] Calculate days_before_due = (due_date - marked_at_risk_at.date()).days
+- [x] Normalize: 7+ days = 1.0, 0 days = 0.0, linear interpolation between
+- [x] Handle edge cases: marked after due_date = 0.0
+- [x] Update `IntegrityService.calculate_integrity_metrics()`
+- [x] Added 6 unit tests in `tests/unit/integrity/test_service.py`
 
-**Effort**: Small (1-2 hours)
-**Priority**: Medium - Improves accuracy of integrity score
-
-### D2: Reliability Streak Calculation
-**Current**: Returns 0
-**Target**: Count consecutive weeks where all commitments were completed on time
+### D2: Reliability Streak Calculation ✅ COMPLETED
+**Status**: Implemented in `IntegrityService._calculate_streak_weeks()`
 
 **Implementation**:
-- [ ] Group completed commitments by ISO week
-- [ ] For each week (newest first), check if all were on_time
-- [ ] Count consecutive on-time weeks until a miss
-- [ ] Reset to 0 on: late completion, abandonment, skipped cleanup
-- [ ] Update `IntegrityService.calculate_integrity_metrics()`
+- [x] Group completed commitments by ISO week
+- [x] For each week (newest first), check if all were on_time
+- [x] Count consecutive on-time weeks until a miss
+- [x] Reset to 0 on: late completion, abandonment, skipped cleanup
+- [x] Update `IntegrityService.calculate_integrity_metrics()`
+- [x] Added 5 unit tests in `tests/unit/integrity/test_service.py`
 
-**Effort**: Medium (2-4 hours)
-**Priority**: Medium - Gamification element for sustained performance
-
-### D3: Soft Enforcement on Abandon
-**Current**: Direct abandonment allowed without warning
-**Target**: Warn user when abandoning at-risk commitment without completing notification
+### D3: Soft Enforcement on Abandon ✅ COMPLETED
+**Status**: Implemented in `AbandonHandler`
 
 **Implementation**:
-- [ ] In /abandon handler, check if commitment.status == at_risk
-- [ ] If at_risk, query CleanupPlan and notification task status
-- [ ] If notification incomplete, return HandlerResult with warning message
-- [ ] Add confirmation flow: "This will affect your integrity score. Continue? (y/n)"
-- [ ] On confirm, set CleanupPlan.status = skipped with skipped_reason
+- [x] Created `AbandonHandler` class in `src/jdo/commands/handlers.py`
+- [x] In /abandon handler, check if commitment.status == at_risk
+- [x] If at_risk, query CleanupPlan and notification task status
+- [x] If notification incomplete, return HandlerResult with warning message
+- [x] Add confirmation flow with options (yes/notify/cancel)
+- [x] On confirm, sets CleanupPlan.status = skipped with skipped_reason
+- [x] Registered handler in _HANDLERS dict
+- [x] Added ABANDON command type to parser
+- [x] Added 12 unit tests in `tests/unit/commands/test_handlers.py`
+- [x] Updated /help to include /abandon command
 
-**Effort**: Medium (2-3 hours)
-**Priority**: High - Core to Honor-Your-Word philosophy
-
-### D4: Pre-Abandon At-Risk Prompt
-**Current**: Direct abandonment from pending/in_progress allowed
-**Target**: Prompt user to mark at-risk first before abandoning
+### D4: Pre-Abandon At-Risk Prompt ✅ COMPLETED
+**Status**: Implemented in `AbandonHandler._prompt_atrisk_first()`
 
 **Implementation**:
-- [ ] In /abandon handler, check if commitment has stakeholder
-- [ ] If stakeholder exists and status not at_risk, show prompt
-- [ ] Offer options: "Mark at-risk first" or "Abandon directly"
-- [ ] If mark at-risk, redirect to /atrisk flow
-
-**Effort**: Small (1-2 hours)
-**Priority**: Medium - Encourages proper notification workflow
+- [x] In /abandon handler, check if commitment has stakeholder
+- [x] If stakeholder exists and status not at_risk, show prompt
+- [x] Offer options: "Mark at-risk first" or "Abandon directly"
+- [x] If mark at-risk, user can type 'atrisk' to redirect to /atrisk flow
+- [x] Tests added to verify prompt behavior
 
 ### D5: Visual Indicators for At-Risk Status
 **Current**: No visual distinction in lists
@@ -299,12 +291,15 @@ The following items are deferred to future iterations. Each is tracked here with
 
 ### Deferred Work Priority Order
 
-1. **D3: Soft Enforcement** - High priority, core to integrity philosophy
-2. **D8: Recovery Flow** - Medium, completes at-risk lifecycle
-3. **D1: Notification Timeliness** - Medium, improves score accuracy
-4. **D2: Reliability Streak** - Medium, gamification
-5. **D4: Pre-Abandon Prompt** - Medium, encourages workflow
-6. **D5: Visual Indicators** - Low, polish
-7. **D6: Metric Trends** - Low, analytics
-8. **D7: Affecting Commitments** - Low, debugging aid
-9. **D9: Snapshot Tests** - Low, infrastructure
+**Completed**:
+1. ✅ **D1: Notification Timeliness** - Implemented
+2. ✅ **D2: Reliability Streak** - Implemented
+3. ✅ **D3: Soft Enforcement** - Implemented
+4. ✅ **D4: Pre-Abandon Prompt** - Implemented
+
+**Remaining**:
+1. **D8: Recovery Flow** - Medium, completes at-risk lifecycle
+2. **D5: Visual Indicators** - Low, polish
+3. **D6: Metric Trends** - Low, analytics
+4. **D7: Affecting Commitments** - Low, debugging aid
+5. **D9: Snapshot Tests** - Low, infrastructure
