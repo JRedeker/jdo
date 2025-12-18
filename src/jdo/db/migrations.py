@@ -4,6 +4,8 @@ This module provides database table creation and migration management
 using Alembic for versioned schema changes.
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 
 from alembic import command

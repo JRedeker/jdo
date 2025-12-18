@@ -18,6 +18,8 @@ Hierarchy:
     └── TUIError             # Textual, widget issues
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 # Maximum length for raw response in context (truncate to avoid huge logs)

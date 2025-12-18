@@ -1,5 +1,7 @@
 """Authentication module for AI provider credentials."""
 
+from __future__ import annotations
+
 from jdo.auth.api import (
     clear_credentials,
     get_auth_headers,

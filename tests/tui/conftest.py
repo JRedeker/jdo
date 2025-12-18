@@ -68,6 +68,8 @@ def app(tmp_path: Path, monkeypatch) -> Generator[JdoApp, None, None]:
     monkeypatch.setenv("JDO_AI_MODEL", "claude-sonnet-4-20250514")
     monkeypatch.setenv("JDO_TIMEZONE", "UTC")
     monkeypatch.setenv("JDO_LOG_LEVEL", "DEBUG")
+    # Set a test API key to bypass AI-required screen
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-for-testing")
 
     reset_settings()
 

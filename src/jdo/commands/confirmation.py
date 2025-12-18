@@ -5,6 +5,8 @@ supporting variations like "yes", "yeah", "yep", "sure", "ok" for confirmation
 and "no", "nope", "cancel", "stop" for cancellation.
 """
 
+from __future__ import annotations
+
 from enum import Enum
 
 from rapidfuzz import fuzz

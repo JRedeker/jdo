@@ -1,5 +1,7 @@
 """TUI screens for authentication flows."""
 
+from __future__ import annotations
+
 import webbrowser
 
 from textual.app import ComposeResult

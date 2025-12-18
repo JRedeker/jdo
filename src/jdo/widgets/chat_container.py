@@ -3,6 +3,8 @@
 A VerticalScroll container that holds ChatMessage widgets and auto-scrolls to bottom.
 """
 
+from __future__ import annotations
+
 from textual.containers import VerticalScroll
 
 from jdo.widgets.chat_message import ChatMessage, MessageRole

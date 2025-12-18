@@ -403,7 +403,8 @@ class TestAgentToolIntegration:
         from jdo.ai.tools import register_tools
 
         test_model = TestModel()
-        agent = create_agent_with_model(test_model)
+        # Create agent without auto-registering tools, then register manually
+        agent = create_agent_with_model(test_model, with_tools=False)
 
         register_tools(agent)
 
@@ -431,9 +432,9 @@ class TestAgentToolIntegration:
             engine = get_engine()
             SQLModel.metadata.create_all(engine)
 
-            # Create agent with tools but tell TestModel not to call any
+            # Create agent without auto-registering tools, then register manually
             test_model = TestModel(call_tools=[])  # Don't call any tools
-            agent = create_agent_with_model(test_model)
+            agent = create_agent_with_model(test_model, with_tools=False)
             register_tools(agent)
 
             with get_session() as session:

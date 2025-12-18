@@ -1,5 +1,7 @@
 """Database module for JDO."""
 
+from __future__ import annotations
+
 from jdo.db.engine import get_engine, reset_engine
 from jdo.db.migrations import create_db_and_tables
 from jdo.db.session import (

@@ -3,6 +3,8 @@
 Displays messages with role labels (USER, ASSISTANT, SYSTEM) and timestamps.
 """
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
 from enum import Enum
 
@@ -53,6 +55,10 @@ class ChatMessage(Static):
     ChatMessage.-system {
         background: $error 20%;
         border: solid $error;
+    }
+
+    ChatMessage.-thinking {
+        color: $text-muted;
     }
     """
 
@@ -117,6 +123,28 @@ class ChatMessage(Static):
         """
         self.content = content
         self.refresh()
+
+    def set_thinking(self, is_thinking: bool) -> None:
+        """Set the thinking indicator state.
+
+        Args:
+            is_thinking: Whether the message is in "thinking" state.
+        """
+        self._is_thinking = is_thinking
+        if is_thinking:
+            self.add_class("-thinking")
+        else:
+            self.remove_class("-thinking")
+        self.refresh()
+
+    @property
+    def is_thinking(self) -> bool:
+        """Check if the message is in thinking state.
+
+        Returns:
+            True if thinking, False otherwise.
+        """
+        return getattr(self, "_is_thinking", False)
 
     @property
     def recoverable(self) -> bool:

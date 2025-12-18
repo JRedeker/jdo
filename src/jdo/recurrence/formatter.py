@@ -1,5 +1,7 @@
 """Pattern summary formatter for recurring commitments."""
 
+from __future__ import annotations
+
 from jdo.models.recurring_commitment import RecurrenceType, RecurringCommitment
 
 # Day names for display

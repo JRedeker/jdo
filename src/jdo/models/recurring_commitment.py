@@ -1,5 +1,7 @@
 """RecurringCommitment SQLModel entity."""
 
+from __future__ import annotations
+
 from datetime import date, datetime, time
 from enum import Enum
 from typing import Any
@@ -124,7 +126,7 @@ class RecurringCommitment(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
     @model_validator(mode="after")
-    def validate_recurrence_pattern(self) -> "RecurringCommitment":
+    def validate_recurrence_pattern(self) -> RecurringCommitment:
         """Validate recurrence pattern based on recurrence_type."""
         if self.recurrence_type == RecurrenceType.WEEKLY:
             self._validate_weekly_pattern()

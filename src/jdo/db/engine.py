@@ -1,12 +1,26 @@
 """Database engine configuration."""
 
+from __future__ import annotations
+
+from typing import Protocol
+
 from sqlalchemy import Engine, event
 from sqlmodel import create_engine
 
 from jdo.config import get_settings
 
 
-def _configure_sqlite(dbapi_connection, _connection_record) -> None:  # noqa: ANN001
+class _DBAPICursor(Protocol):
+    def execute(self, statement: str) -> object: ...
+
+    def close(self) -> object: ...
+
+
+class _DBAPIConnection(Protocol):
+    def cursor(self) -> _DBAPICursor: ...
+
+
+def _configure_sqlite(dbapi_connection: _DBAPIConnection, _connection_record: object) -> None:
     """Configure SQLite pragmas for WAL mode and foreign key enforcement."""
     cursor = dbapi_connection.cursor()
     # Enable WAL mode for better concurrent access

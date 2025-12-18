@@ -111,6 +111,37 @@ class TestStreamingSupport:
         assert len(chunks) == 4
         assert "".join(chunks) == "Hello world!"
 
+    async def test_stream_response_passes_message_history(self) -> None:
+        """stream_response converts and passes message history to agent."""
+        from pydantic_ai.messages import ModelRequest, ModelResponse
+
+        from jdo.ai.context import stream_response
+
+        mock_result = MagicMock()
+        mock_result.stream_text = MagicMock(return_value=async_iter(["Response"]))
+
+        mock_agent = MagicMock()
+        mock_agent.run_stream = MagicMock(return_value=async_context_manager(mock_result))
+
+        history = [
+            {"role": "user", "content": "Previous question"},
+            {"role": "assistant", "content": "Previous answer"},
+        ]
+
+        # Consume the stream
+        chunks = []
+        async for chunk in stream_response(mock_agent, "New prompt", MagicMock(), history):
+            chunks.append(chunk)
+
+        # Verify run_stream was called with converted history
+        mock_agent.run_stream.assert_called_once()
+        call_kwargs = mock_agent.run_stream.call_args.kwargs
+        assert "message_history" in call_kwargs
+        model_history = call_kwargs["message_history"]
+        assert len(model_history) == 2
+        assert isinstance(model_history[0], ModelRequest)
+        assert isinstance(model_history[1], ModelResponse)
+
     async def test_stream_response_handles_empty_response(self) -> None:
         """stream_response handles empty AI response gracefully."""
         from jdo.ai.context import stream_response
@@ -162,6 +193,78 @@ class TestConversationContext:
         # Should not exceed max (excluding system prompt)
         non_system = [m for m in context if m["role"] != "system"]
         assert len(non_system) <= MAX_CONTEXT_MESSAGES
+
+
+class TestMessageHistoryConversion:
+    """Tests for converting message history to PydanticAI format."""
+
+    def test_convert_user_message(self) -> None:
+        """User message converts to ModelRequest."""
+        from pydantic_ai.messages import ModelRequest, UserPromptPart
+
+        from jdo.ai.context import _convert_to_model_messages
+
+        messages = [{"role": "user", "content": "Hello AI"}]
+        result = _convert_to_model_messages(messages)
+
+        assert len(result) == 1
+        assert isinstance(result[0], ModelRequest)
+        assert len(result[0].parts) == 1
+        assert isinstance(result[0].parts[0], UserPromptPart)
+        assert result[0].parts[0].content == "Hello AI"
+
+    def test_convert_assistant_message(self) -> None:
+        """Assistant message converts to ModelResponse."""
+        from pydantic_ai.messages import ModelResponse, TextPart
+
+        from jdo.ai.context import _convert_to_model_messages
+
+        messages = [{"role": "assistant", "content": "Hi there!"}]
+        result = _convert_to_model_messages(messages)
+
+        assert len(result) == 1
+        assert isinstance(result[0], ModelResponse)
+        assert len(result[0].parts) == 1
+        assert isinstance(result[0].parts[0], TextPart)
+        assert result[0].parts[0].content == "Hi there!"
+
+    def test_convert_conversation_preserves_order(self) -> None:
+        """Conversation history maintains message order."""
+        from pydantic_ai.messages import ModelRequest, ModelResponse
+
+        from jdo.ai.context import _convert_to_model_messages
+
+        messages = [
+            {"role": "user", "content": "First"},
+            {"role": "assistant", "content": "Second"},
+            {"role": "user", "content": "Third"},
+        ]
+        result = _convert_to_model_messages(messages)
+
+        assert len(result) == 3
+        assert isinstance(result[0], ModelRequest)
+        assert isinstance(result[1], ModelResponse)
+        assert isinstance(result[2], ModelRequest)
+
+    def test_system_messages_are_skipped(self) -> None:
+        """System messages are skipped (handled via system_prompt)."""
+        from jdo.ai.context import _convert_to_model_messages
+
+        messages = [
+            {"role": "system", "content": "You are helpful"},
+            {"role": "user", "content": "Hello"},
+        ]
+        result = _convert_to_model_messages(messages)
+
+        # Only the user message should be converted
+        assert len(result) == 1
+
+    def test_empty_history_returns_empty_list(self) -> None:
+        """Empty message list returns empty result."""
+        from jdo.ai.context import _convert_to_model_messages
+
+        result = _convert_to_model_messages([])
+        assert result == []
 
 
 # Helper functions for async testing

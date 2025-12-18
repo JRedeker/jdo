@@ -198,6 +198,63 @@ class TestChatContainer:
             assert messages[0].content == "Test message"
 
 
+class TestChatMessageStreaming:
+    """Tests for ChatMessage streaming updates."""
+
+    async def test_update_content_changes_message(self) -> None:
+        """update_content updates the message content."""
+        app = ChatMessageTestApp()
+        async with app.run_test() as pilot:
+            messages = app.query(ChatMessage)
+            user_msg = messages[0]
+
+            original_content = user_msg.content
+            user_msg.update_content("Updated content")
+            await pilot.pause()
+
+            assert user_msg.content == "Updated content"
+            assert user_msg.content != original_content
+
+    async def test_set_thinking_adds_class(self) -> None:
+        """set_thinking(True) adds the -thinking CSS class."""
+        app = ChatMessageTestApp()
+        async with app.run_test() as pilot:
+            messages = app.query(ChatMessage)
+            msg = messages[0]
+
+            assert not msg.has_class("-thinking")
+            msg.set_thinking(True)
+            await pilot.pause()
+
+            assert msg.has_class("-thinking")
+            assert msg.is_thinking is True
+
+    async def test_set_thinking_false_removes_class(self) -> None:
+        """set_thinking(False) removes the -thinking CSS class."""
+        app = ChatMessageTestApp()
+        async with app.run_test() as pilot:
+            messages = app.query(ChatMessage)
+            msg = messages[0]
+
+            msg.set_thinking(True)
+            await pilot.pause()
+            assert msg.has_class("-thinking")
+
+            msg.set_thinking(False)
+            await pilot.pause()
+
+            assert not msg.has_class("-thinking")
+            assert msg.is_thinking is False
+
+    async def test_is_thinking_default_false(self) -> None:
+        """is_thinking defaults to False."""
+        app = ChatMessageTestApp()
+        async with app.run_test():
+            messages = app.query(ChatMessage)
+            msg = messages[0]
+            assert msg.is_thinking is False
+
+
 class TestMessageRole:
     """Tests for MessageRole enum."""
 

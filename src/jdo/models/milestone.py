@@ -1,5 +1,7 @@
 """Milestone SQLModel entity."""
 
+from __future__ import annotations
+
 from datetime import UTC, date, datetime
 from enum import Enum
 from uuid import UUID, uuid4

@@ -3,6 +3,8 @@
 A multi-line text input that supports Enter for newline and Ctrl+Enter for submit.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import ClassVar
 

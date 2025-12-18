@@ -113,7 +113,7 @@ def configure_logging(
 
 
 # Note: Return type omitted - Loguru's Logger type causes pyrefly issues
-def get_logger(name: str):  # noqa: ANN201 - Loguru Logger type not expressible
+def get_logger(name: str) -> object:
     """Get a logger instance bound to a module name.
 
     Args:

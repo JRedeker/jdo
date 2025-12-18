@@ -1,5 +1,7 @@
 """Public API for authentication operations."""
 
+from __future__ import annotations
+
 import os
 
 from jdo.auth.models import ApiKeyCredentials, OAuthCredentials

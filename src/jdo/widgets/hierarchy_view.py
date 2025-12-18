@@ -3,6 +3,8 @@
 Displays the MPI hierarchy in an expandable tree structure.
 """
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, ClassVar
 
 from textual.binding import Binding, BindingType
@@ -157,6 +159,15 @@ class HierarchyView(Tree[HierarchyItem | None]):
         self._milestone_nodes[milestone.id] = node
         return node
 
+    # Status icons for commitments (shared by add_commitment and add_orphan_commitment)
+    _COMMITMENT_STATUS_ICONS: ClassVar[dict[str, str]] = {
+        "pending": "⏳",
+        "in_progress": "🔄",
+        "at_risk": "⚠️",
+        "completed": "✅",
+        "abandoned": "✗",
+    }
+
     def add_commitment(self, commitment: Commitment) -> TreeNode[HierarchyItem | None]:
         """Add a commitment as a child of its parent milestone.
 
@@ -166,13 +177,7 @@ class HierarchyView(Tree[HierarchyItem | None]):
         Returns:
             The created tree node.
         """
-        status_icons = {
-            "pending": "⏳",
-            "in_progress": "🔄",
-            "completed": "✅",
-            "failed": "❌",
-        }
-        icon = status_icons.get(commitment.status.value, "⏳")
+        icon = self._COMMITMENT_STATUS_ICONS.get(commitment.status.value, "⏳")
         label = f"{icon} {commitment.deliverable}"
 
         if commitment.milestone_id and commitment.milestone_id in self._milestone_nodes:
@@ -191,13 +196,7 @@ class HierarchyView(Tree[HierarchyItem | None]):
         Returns:
             The created tree node.
         """
-        status_icons = {
-            "pending": "⏳",
-            "in_progress": "🔄",
-            "completed": "✅",
-            "failed": "❌",
-        }
-        icon = status_icons.get(commitment.status.value, "⏳")
+        icon = self._COMMITMENT_STATUS_ICONS.get(commitment.status.value, "⏳")
         label = f"{icon} {commitment.deliverable}"
 
         parent = self._get_or_create_orphan_commitments_node()

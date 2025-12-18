@@ -1,5 +1,7 @@
 """TUI widgets for JDO chat interface."""
 
+from __future__ import annotations
+
 from jdo.widgets.chat_container import ChatContainer
 from jdo.widgets.chat_message import (
     ChatMessage,

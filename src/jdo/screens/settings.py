@@ -4,6 +4,8 @@ The SettingsScreen integrates with the jdo.auth module to show
 authentication status and launch auth flows for AI providers.
 """
 
+from __future__ import annotations
+
 from typing import ClassVar
 
 from textual.app import ComposeResult

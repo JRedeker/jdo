@@ -1,5 +1,7 @@
 """PydanticAI agent configuration for commitment management assistance."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from pydantic_ai import Agent
@@ -40,20 +42,31 @@ def get_model_identifier() -> str:
     return f"{settings.ai_provider}:{settings.ai_model}"
 
 
-def create_agent_with_model(model: Model | str) -> Agent[JDODependencies, str]:
+def create_agent_with_model(
+    model: Model | str,
+    *,
+    with_tools: bool = True,
+) -> Agent[JDODependencies, str]:
     """Create a PydanticAI agent with a specific model.
 
     Args:
         model: The model to use (can be a Model instance or string identifier).
+        with_tools: Whether to register query tools (default True).
 
     Returns:
-        A configured Agent instance.
+        A configured Agent instance with tools registered.
     """
-    return Agent(
+    agent = Agent(
         model,
         deps_type=JDODependencies,
         system_prompt=SYSTEM_PROMPT,
     )
+    if with_tools:
+        # Late import to avoid circular dependency
+        from jdo.ai.tools import register_tools
+
+        register_tools(agent)
+    return agent
 
 
 def create_agent() -> Agent[JDODependencies, str]:

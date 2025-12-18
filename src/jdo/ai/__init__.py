@@ -1,5 +1,7 @@
 """AI agent module for JDO."""
 
+from __future__ import annotations
+
 from jdo.ai.agent import (
     SYSTEM_PROMPT,
     JDODependencies,

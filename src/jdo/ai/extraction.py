@@ -3,6 +3,8 @@
 Uses PydanticAI structured output to extract fields from natural language.
 """
 
+from __future__ import annotations
+
 from datetime import date, time
 from typing import Any
 
@@ -202,7 +204,7 @@ class ExtractedRecurringCommitment(BaseModel):
     )
 
     @model_validator(mode="after")
-    def validate_extracted_values(self) -> "ExtractedRecurringCommitment":
+    def validate_extracted_values(self) -> ExtractedRecurringCommitment:
         """Validate extracted recurrence values are in valid ranges."""
         self._validate_recurrence_type()
         self._validate_days_of_week()

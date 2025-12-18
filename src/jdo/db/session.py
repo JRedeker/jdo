@@ -1,5 +1,7 @@
 """Database session management."""
 
+from __future__ import annotations
+
 from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta

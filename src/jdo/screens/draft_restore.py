@@ -4,6 +4,8 @@ A modal dialog that appears on startup when pending drafts exist,
 allowing the user to restore or discard them.
 """
 
+from __future__ import annotations
+
 from typing import ClassVar
 from uuid import UUID
 

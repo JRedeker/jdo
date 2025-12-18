@@ -3,6 +3,8 @@
 Parses expressions like "tomorrow", "next Friday", "December 20", "3pm".
 """
 
+from __future__ import annotations
+
 import re
 from datetime import UTC, date, datetime, time, timedelta
 

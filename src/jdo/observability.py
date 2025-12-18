@@ -7,6 +7,8 @@ This module provides centralized Sentry initialization with:
 - AI call tracing
 """
 
+from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -22,7 +24,7 @@ if TYPE_CHECKING:
 APP_VERSION = "0.1.0"
 
 
-def init_sentry(settings: "JDOSettings") -> bool:
+def init_sentry(settings: JDOSettings) -> bool:
     """Initialize Sentry error tracking and monitoring.
 
     Sentry is only initialized if a DSN is configured. This allows

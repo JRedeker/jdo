@@ -4,9 +4,12 @@ Handles message formatting, system prompts, and streaming support
 for the JDO conversational interface.
 """
 
+from __future__ import annotations
+
 from collections.abc import AsyncIterator
 
 from pydantic_ai import Agent
+from pydantic_ai.messages import ModelRequest, ModelResponse
 
 from jdo.ai.agent import JDODependencies
 
@@ -128,6 +131,33 @@ def build_context(
     return formatted
 
 
+def _convert_to_model_messages(
+    messages: list[dict[str, str]],
+) -> list[ModelRequest | ModelResponse]:
+    """Convert simple message dicts to PydanticAI ModelMessage objects.
+
+    Args:
+        messages: List of dicts with 'role' and 'content' keys.
+
+    Returns:
+        List of ModelRequest (user) or ModelResponse (assistant) objects.
+    """
+    from pydantic_ai.messages import TextPart, UserPromptPart
+
+    result: list[ModelRequest | ModelResponse] = []
+    for msg in messages:
+        role = msg["role"]
+        content = msg["content"]
+
+        if role == "user":
+            result.append(ModelRequest(parts=[UserPromptPart(content=content)]))
+        elif role == "assistant":
+            result.append(ModelResponse(parts=[TextPart(content=content)]))
+        # Skip system messages - they're handled via system_prompt in agent
+
+    return result
+
+
 async def stream_response(
     agent: Agent[JDODependencies, str],
     prompt: str,
@@ -140,14 +170,16 @@ async def stream_response(
         agent: The PydanticAI agent to use.
         prompt: The user's prompt.
         deps: Agent dependencies including database session.
-        message_history: Optional conversation history (for future use).
+        message_history: Optional conversation history for multi-turn context.
 
     Yields:
         Text chunks as they arrive from the AI.
     """
-    # message_history will be used for multi-turn conversations
-    _ = message_history  # Reserved for future use
+    # Convert message history to PydanticAI format if provided
+    model_history = None
+    if message_history:
+        model_history = _convert_to_model_messages(message_history)
 
-    async with agent.run_stream(prompt, deps=deps) as result:
+    async with agent.run_stream(prompt, deps=deps, message_history=model_history) as result:
         async for chunk in result.stream_text():
             yield chunk

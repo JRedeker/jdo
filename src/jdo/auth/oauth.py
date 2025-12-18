@@ -1,5 +1,7 @@
 """OAuth 2.0 PKCE flow implementation for Claude authentication."""
 
+from __future__ import annotations
+
 import base64
 import hashlib
 import secrets

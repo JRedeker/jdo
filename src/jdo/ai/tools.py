@@ -4,6 +4,8 @@ These tools provide the AI agent with database query capabilities
 to help users manage their commitments, goals, milestones, and visions.
 """
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID

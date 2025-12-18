@@ -75,11 +75,35 @@ class TestCreateAgent:
 
         mock_session = MagicMock()
         deps = JDODependencies(session=mock_session)
-        agent = create_agent_with_model(TestModel())
+        # Disable tools to avoid tool calls against mock session
+        agent = create_agent_with_model(TestModel(), with_tools=False)
 
         result = await agent.run("Test prompt", deps=deps)
 
         assert result.output == "success (no tool calls)"
+
+    def test_agent_has_tools_registered_by_default(self) -> None:
+        """create_agent_with_model registers tools by default."""
+        from jdo.ai.agent import create_agent_with_model
+
+        agent = create_agent_with_model(TestModel())
+
+        # Check that tools are registered via the function toolset
+        toolset = agent._function_toolset
+        tool_names = list(toolset.tools)
+        assert "query_current_commitments" in tool_names
+        assert "query_overdue_commitments" in tool_names
+        assert "query_visions_due_for_review" in tool_names
+
+    def test_agent_without_tools_option(self) -> None:
+        """create_agent_with_model can skip tool registration."""
+        from jdo.ai.agent import create_agent_with_model
+
+        agent = create_agent_with_model(TestModel(), with_tools=False)
+
+        # Check that no tools are registered
+        toolset = agent._function_toolset
+        assert len(list(toolset.tools)) == 0
 
 
 class TestJDODependencies:

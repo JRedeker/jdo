@@ -1,5 +1,7 @@
 """Base model configuration for Pydantic models."""
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
 
 from pydantic import BaseModel as PydanticBaseModel

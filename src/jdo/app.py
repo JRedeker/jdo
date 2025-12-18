@@ -4,6 +4,8 @@ The JdoApp is the application shell that integrates all screens
 and manages the application lifecycle.
 """
 
+from __future__ import annotations
+
 from typing import ClassVar
 from uuid import UUID
 
@@ -12,6 +14,7 @@ from textual.app import App, ComposeResult
 from textual.binding import BindingType
 from textual.widgets import Footer, Header
 
+from jdo.auth.api import is_authenticated
 from jdo.config import get_settings
 from jdo.db import create_db_and_tables, get_session
 from jdo.db.session import get_pending_drafts, get_visions_due_for_review
@@ -19,6 +22,7 @@ from jdo.logging import configure_logging
 from jdo.models.draft import Draft
 from jdo.models.vision import Vision
 from jdo.observability import init_sentry
+from jdo.screens.ai_required import AiRequiredScreen
 from jdo.screens.chat import ChatScreen
 from jdo.screens.draft_restore import DraftRestoreScreen
 from jdo.screens.home import HomeScreen
@@ -80,19 +84,54 @@ class JdoApp(App[None]):
             self._db_initialized = True
             logger.info("Database initialized")
 
-        # Check for pending drafts
+        # Always start at home screen
+        await self.push_screen(HomeScreen())
+
+        # If AI is not configured, block usage until configured.
+        await self._ensure_ai_configured()
+
+        # Check for pending drafts after ensuring AI config
         pending_draft = self._check_pending_drafts()
         if pending_draft:
-            # Show draft restore modal
             await self.push_screen(
                 DraftRestoreScreen(pending_draft),
                 self._on_draft_restore_decision,
             )
-        else:
-            # No drafts, go to home screen
-            await self.push_screen(HomeScreen())
-            # Check for vision reviews after showing home
-            self._check_vision_reviews()
+            return
+
+        # No drafts; check for vision reviews
+        self._check_vision_reviews()
+
+    def _has_ai_credentials(self) -> bool:
+        """Check if the configured AI provider has credentials.
+
+        Returns:
+            True if the currently selected provider is authenticated.
+        """
+        settings = get_settings()
+        return is_authenticated(settings.ai_provider)
+
+    async def _ensure_ai_configured(self) -> None:
+        """Ensure the user has configured AI before using the app.
+
+        Blocks app usage until the user configures a provider or quits.
+        """
+        settings = get_settings()
+        if is_authenticated(settings.ai_provider):
+            return
+
+        while True:
+            decision = await self.push_screen_wait(AiRequiredScreen())
+            if decision == "settings":
+                await self.push_screen_wait(SettingsScreen())
+                settings = get_settings()
+                if is_authenticated(settings.ai_provider):
+                    return
+                continue
+
+            # Default to quitting
+            self.exit()
+            return
 
     def _check_pending_drafts(self) -> Draft | None:
         """Check for pending drafts in the database.
@@ -187,9 +226,10 @@ class JdoApp(App[None]):
         logger.debug("Navigating to SettingsScreen")
         self.push_screen(SettingsScreen())
 
-    def on_settings_screen_back(self, _message: SettingsScreen.Back) -> None:
+    async def on_settings_screen_back(self, _message: SettingsScreen.Back) -> None:
         """Handle back request from SettingsScreen."""
         self.pop_screen()
+        await self._ensure_ai_configured()
 
     def on_chat_screen_back(self, _message: ChatScreen.Back) -> None:
         """Handle back request from ChatScreen."""

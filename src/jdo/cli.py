@@ -4,6 +4,8 @@ Provides both interactive TUI (default) and fire-and-forget CLI commands
 like `jdo capture "text"` for quick capture from scripts and shortcuts.
 """
 
+from __future__ import annotations
+
 import click
 
 from jdo.db import create_db_and_tables, get_session

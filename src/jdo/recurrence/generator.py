@@ -1,6 +1,9 @@
 """Instance generation for recurring commitments."""
 
+from __future__ import annotations
+
 from datetime import date, timedelta
+from uuid import UUID
 
 from jdo.models.commitment import Commitment, CommitmentStatus, default_due_time
 from jdo.models.recurring_commitment import RecurringCommitment, TaskTemplate
@@ -39,14 +42,14 @@ def generate_instance(
         status=CommitmentStatus.PENDING,
     )
 
-    # Copy task templates
+    # Copy task templates (commitment.id is generated locally via uuid4)
     tasks = _create_tasks_from_templates(commitment.id, recurring.get_task_templates())
 
     return commitment, tasks
 
 
 def _create_tasks_from_templates(
-    commitment_id,  # noqa: ANN001 - UUID type
+    commitment_id: UUID,
     templates: list[TaskTemplate],
 ) -> list[Task]:
     """Create Task instances from TaskTemplates.

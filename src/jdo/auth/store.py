@@ -1,5 +1,7 @@
 """Credential storage for authentication tokens."""
 
+from __future__ import annotations
+
 import json
 import stat
 import sys
