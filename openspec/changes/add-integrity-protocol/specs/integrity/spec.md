@@ -155,17 +155,4 @@ The system SHALL provide an integrity dashboard showing metrics breakdown.
 - **WHEN** user views integrity dashboard
 - **THEN** the system lists recent commitments that negatively impacted score (late, abandoned without cleanup)
 
-### Requirement: Task Model Extension
 
-The system SHALL extend the Task model to support notification tasks.
-
-**Field Addition**:
-- `is_notification_task` (bool): Flag indicating this is an auto-created notification task; defaults to False
-
-#### Scenario: Identify notification tasks
-- **WHEN** querying tasks for a commitment
-- **THEN** notification tasks can be identified by is_notification_task=True
-
-#### Scenario: Notification task ordering preserved
-- **WHEN** user reorders tasks for a commitment
-- **THEN** notification tasks with is_notification_task=True remain at order=0 (cannot be moved)

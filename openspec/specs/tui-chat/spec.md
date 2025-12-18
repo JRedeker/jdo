@@ -3,6 +3,30 @@
 ## Purpose
 Define the conversational AI interface for JDO, including slash commands for managing visions, milestones, and hierarchy views, along with data panel displays and keyboard navigation extensions.
 ## Requirements
+
+### Requirement: Typed Draft Gate
+
+The system SHALL require a draft to have a true entity type before applying refinements.
+
+#### Scenario: Untyped draft prompts for type
+- **GIVEN** a draft is awaiting confirmation
+- **AND** the draft has no true type assigned
+- **WHEN** the user enters any refinement text
+- **THEN** the system prompts the user to assign a type
+- **AND** the system accepts either a type name (plain text) or `/type <type>`
+
+#### Scenario: Type assignment requires confirmation
+- **GIVEN** the user has proposed a type for an untyped draft
+- **WHEN** the user confirms with `y` or `yes`
+- **THEN** the draft type is set
+- **AND** the user may continue refining the typed draft
+
+#### Scenario: Refine typed commitment draft with rules
+- **GIVEN** a commitment draft is awaiting confirmation
+- **WHEN** the user enters "stakeholder to Alex"
+- **THEN** the draft stakeholder is updated
+- **AND** the updated draft is re-rendered
+
 ### Requirement: Command - Create Vision
 
 The system SHALL support the `/vision` command to create and manage visions.

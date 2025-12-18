@@ -7,6 +7,14 @@ Define the main JDO application shell including startup initialization, screen n
 
 The system SHALL initialize the application with database setup and screen display.
 
+#### Scenario: AI configuration required on startup
+- **GIVEN** the application is launched
+- **AND** no credentials exist for the configured AI provider
+- **WHEN** the Home screen is displayed
+- **THEN** a blocking modal is shown
+- **AND** the modal offers an option to open Settings
+- **AND** the modal offers an option to quit
+
 #### Scenario: Database initialization on startup
 - **GIVEN** the application is launched
 - **WHEN** the app mounts

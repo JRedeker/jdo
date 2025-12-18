@@ -1,32 +1,21 @@
 # Capability: Commitment Management (Integrity Protocol Extension)
 
-This spec extends the base Commitment model from `add-core-domain-models` to add the `at_risk` status and fields supporting the Honor-Your-Word protocol.
+This spec extends the base Commitment model to add the `at_risk` status and fields supporting the Honor-Your-Word protocol.
 
-**Cross-reference**: See `add-core-domain-models/specs/commitment` for the base Commitment model definition.
+**Cross-reference**: See `specs/commitment/spec.md` for the base Commitment model definition.
 
-## MODIFIED Requirements
+## ADDED Requirements
 
-### Requirement: Commitment Model
+### Requirement: At-Risk Status
 
-The system SHALL provide a `Commitment` SQLModel with the following validated fields:
-- `id` (UUID): Unique identifier, auto-generated
-- `deliverable` (str): What is being delivered, required, non-empty
-- `stakeholder_id` (UUID): Reference to Stakeholder, required
-- `goal_id` (UUID | None): Optional reference to parent Goal
-- `due_date` (date): The date the commitment is due, required
-- `due_time` (time | None): Optional specific time of day when due; defaults to 09:00 if not specified
-- `timezone` (str): Timezone for due_time interpretation, defaults to "America/New_York"
-- `status` (CommitmentStatus enum): One of `pending`, `in_progress`, `at_risk`, `completed`, `abandoned`; defaults to `pending`
-- `completed_at` (datetime | None): Timestamp when marked complete
-- `marked_at_risk_at` (datetime | None): Timestamp when marked at-risk (NEW)
-- `completed_on_time` (bool | None): Whether commitment was completed by due date (NEW, set on completion)
-- `notes` (str | None): Optional additional context
-- `created_at` (datetime): Auto-set on creation, timezone-aware (EST default)
-- `updated_at` (datetime): Auto-updated on modification, timezone-aware (EST default)
+The system SHALL support an `at_risk` status for commitments that may not be met and require stakeholder notification.
 
-#### Scenario: Create commitment with required fields
-- **WHEN** user creates a Commitment with deliverable="Send report", stakeholder_id, and due_date
-- **THEN** a valid Commitment is created with status="pending" and auto-generated timestamps
+**Field Additions to Commitment model**:
+- `marked_at_risk_at` (datetime | None): Timestamp when marked at-risk
+- `completed_on_time` (bool | None): Whether commitment was completed by due date (set on completion)
+
+**CommitmentStatus enum addition**:
+- `at_risk`: Commitment is in jeopardy and stakeholder notification is required
 
 #### Scenario: Mark commitment at-risk
 - **WHEN** user changes Commitment status to "at_risk"
@@ -40,9 +29,9 @@ The system SHALL provide a `Commitment` SQLModel with the following validated fi
 - **WHEN** user marks Commitment as "completed" and current datetime is after due_date + due_time
 - **THEN** completed_on_time is set to False
 
-### Requirement: Commitment Status Transitions
+### Requirement: At-Risk Status Transitions
 
-The system SHALL enforce valid status transitions for Commitments, including the new `at_risk` status.
+The system SHALL enforce valid status transitions involving the `at_risk` status.
 
 #### Scenario: Transition to at-risk from in_progress
 - **WHEN** user changes Commitment status from "in_progress" to "at_risk"
