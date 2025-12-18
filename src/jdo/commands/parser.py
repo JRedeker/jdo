@@ -4,6 +4,8 @@ Commands start with '/' and trigger specific actions like creating
 commitments, goals, or tasks.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 
@@ -23,9 +25,13 @@ class CommandType(str, Enum):
     SHOW = "show"
     VIEW = "view"
     EDIT = "edit"
+    TYPE = "type"
     COMPLETE = "complete"
     CANCEL = "cancel"
     HELP = "help"
+    ATRISK = "atrisk"  # Mark commitment as at-risk
+    CLEANUP = "cleanup"  # View/update cleanup plan
+    INTEGRITY = "integrity"  # Show integrity dashboard
     MESSAGE = "message"  # Not a command, just a regular message
 
 
@@ -68,9 +74,13 @@ _COMMAND_MAP: dict[str, CommandType] = {
     "show": CommandType.SHOW,
     "view": CommandType.VIEW,
     "edit": CommandType.EDIT,
+    "type": CommandType.TYPE,
     "complete": CommandType.COMPLETE,
     "cancel": CommandType.CANCEL,
     "help": CommandType.HELP,
+    "atrisk": CommandType.ATRISK,
+    "cleanup": CommandType.CLEANUP,
+    "integrity": CommandType.INTEGRITY,
 }
 
 

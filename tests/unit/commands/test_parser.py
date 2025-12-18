@@ -122,7 +122,53 @@ class TestCommandType:
         assert CommandType.COMPLETE.value == "complete"
         assert CommandType.CANCEL.value == "cancel"
         assert CommandType.HELP.value == "help"
+        assert CommandType.ATRISK.value == "atrisk"
+        assert CommandType.CLEANUP.value == "cleanup"
+        assert CommandType.INTEGRITY.value == "integrity"
         assert CommandType.MESSAGE.value == "message"
+
+
+class TestIntegrityProtocolCommands:
+    """Tests for integrity protocol command parsing."""
+
+    def test_recognize_atrisk_command(self) -> None:
+        """/atrisk is recognized as a command."""
+        result = parse_command("/atrisk")
+
+        assert result.command_type == CommandType.ATRISK
+        assert result.args == []
+
+    def test_recognize_cleanup_command(self) -> None:
+        """/cleanup is recognized as a command."""
+        result = parse_command("/cleanup")
+
+        assert result.command_type == CommandType.CLEANUP
+        assert result.args == []
+
+    def test_recognize_integrity_command(self) -> None:
+        """/integrity is recognized as a command."""
+        result = parse_command("/integrity")
+
+        assert result.command_type == CommandType.INTEGRITY
+        assert result.args == []
+
+    def test_atrisk_preserves_raw_text(self) -> None:
+        """/atrisk preserves raw_text."""
+        result = parse_command("/atrisk")
+
+        assert result.raw_text == "/atrisk"
+
+    def test_cleanup_preserves_raw_text(self) -> None:
+        """/cleanup preserves raw_text."""
+        result = parse_command("/cleanup")
+
+        assert result.raw_text == "/cleanup"
+
+    def test_integrity_preserves_raw_text(self) -> None:
+        """/integrity preserves raw_text."""
+        result = parse_command("/integrity")
+
+        assert result.raw_text == "/integrity"
 
 
 class TestParsedCommand:

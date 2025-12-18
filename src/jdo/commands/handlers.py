@@ -4,11 +4,14 @@ Each handler executes a parsed command and returns a HandlerResult
 with a message for the chat and optional panel updates.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
 from jdo.commands.parser import CommandType, ParsedCommand
+from jdo.models.draft import EntityType
 
 
 @dataclass
@@ -792,6 +795,38 @@ class HelpHandler(CommandHandler):
             "  [s] Skip - come back later\n"
             "  [q] Quit - exit triage"
         ),
+        "atrisk": (
+            "/atrisk - Mark commitment as at-risk\n\n"
+            "Starts the Honor-Your-Word protocol when you might miss a commitment.\n\n"
+            "The workflow:\n"
+            "  1. Explain why the commitment is at risk\n"
+            "  2. Describe the impact on stakeholders\n"
+            "  3. Propose a resolution or new timeline\n"
+            "  4. AI drafts a notification message\n"
+            "  5. A notification task is created at position 0\n\n"
+            "Completing the notification task maintains your integrity score."
+        ),
+        "cleanup": (
+            "/cleanup - View or update cleanup plan\n\n"
+            "Shows the cleanup plan for an at-risk or abandoned commitment.\n\n"
+            "The cleanup plan includes:\n"
+            "  - Impact description\n"
+            "  - Mitigation actions\n"
+            "  - Notification status\n"
+            "  - Plan status\n\n"
+            "Update by describing changes in the chat:\n"
+            '  "Add mitigation: follow up weekly"'
+        ),
+        "integrity": (
+            "/integrity - Show integrity dashboard\n\n"
+            "Displays your integrity metrics:\n"
+            "  - Overall letter grade (A+ to F)\n"
+            "  - On-time delivery rate (40% of score)\n"
+            "  - Notification timeliness (25% of score)\n"
+            "  - Cleanup completion rate (25% of score)\n"
+            "  - Reliability streak bonus (10% of score)\n\n"
+            "New users start with an A+ (clean slate)."
+        ),
     }
 
     def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:
@@ -829,6 +864,9 @@ class HelpHandler(CommandHandler):
             "  /view       - View a specific item",
             "  /complete   - Mark item as completed",
             "  /cancel     - Cancel current draft",
+            "  /atrisk     - Mark commitment as at-risk",
+            "  /cleanup    - View/update cleanup plan",
+            "  /integrity  - Show integrity dashboard",
             "  /help       - Show this help",
             "",
             "Type /help <command> for more details on a specific command.",
@@ -1111,6 +1149,78 @@ class RecurringHandler(CommandHandler):
         )
 
 
+class TypeHandler(CommandHandler):
+    """Handler for /type command - assigns a true entity type.
+
+    This is used as a gate before refinement: a draft must have a true type
+    before it can be edited or confirmed.
+    """
+
+    def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:
+        """Execute /type <entity_type>.
+
+        Args:
+            cmd: Parsed command with args.
+            context: Context with current draft.
+
+        Returns:
+            HandlerResult asking for confirmation.
+        """
+        if not cmd.args:
+            return HandlerResult(
+                message=(
+                    "Usage: /type <commitment|goal|task|vision|milestone>\n"
+                    "Example: /type commitment"
+                ),
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        type_str = cmd.args[0].lower().strip()
+        try:
+            entity_type = EntityType(type_str)
+        except ValueError:
+            return HandlerResult(
+                message=(
+                    f"Unknown type: {type_str}. "
+                    "Use one of: commitment, goal, task, vision, milestone."
+                ),
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        if entity_type == EntityType.UNKNOWN:
+            return HandlerResult(
+                message="Type must be one of commitment, goal, task, vision, or milestone.",
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        current_draft = context.get("current_draft")
+        if not current_draft:
+            return HandlerResult(
+                message="No active draft to type.",
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        # Ask for confirmation before setting type.
+        return HandlerResult(
+            message=f"Set draft type to '{entity_type.value}'? (y/n)",
+            panel_update={
+                "mode": "draft",
+                "entity_type": entity_type.value,
+                "data": current_draft,
+            },
+            draft_data=current_draft,
+            needs_confirmation=True,
+        )
+
+
 class EditHandler(CommandHandler):
     """Handler for /edit command - enables editing via conversation."""
 
@@ -1144,6 +1254,357 @@ class EditHandler(CommandHandler):
                 "data": current_object,
             },
             draft_data=current_object,
+            needs_confirmation=False,
+        )
+
+
+class AtRiskHandler(CommandHandler):
+    """Handler for /atrisk command - marks commitment as at-risk.
+
+    Starts the Honor-Your-Word protocol: notify stakeholders, clean up impact.
+    """
+
+    def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:
+        """Execute /atrisk command.
+
+        Args:
+            cmd: The parsed command.
+            context: Context with current commitment data.
+
+        Returns:
+            HandlerResult for at-risk workflow.
+        """
+        current_commitment = context.get("current_commitment")
+        available_commitments = context.get("available_commitments", [])
+
+        # Check if we have a commitment in context
+        if not current_commitment:
+            if available_commitments:
+                return self._prompt_for_commitment_selection(available_commitments)
+            return HandlerResult(
+                message="No active commitments to mark as at-risk. "
+                "Create a commitment first with /commit.",
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        # Check if already at-risk
+        status = current_commitment.get("status", "")
+        if status == "at_risk":
+            return HandlerResult(
+                message="This commitment is already marked at-risk. "
+                "Would you like to view the cleanup plan? Use /cleanup.",
+                panel_update={
+                    "mode": "view",
+                    "entity_type": "commitment",
+                    "data": current_commitment,
+                },
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        # Check if commitment is completable (not already completed/abandoned)
+        if status in ("completed", "abandoned"):
+            return HandlerResult(
+                message=f"This commitment is already {status}. "
+                "Only pending or in-progress commitments can be marked at-risk.",
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        # Start at-risk workflow - prompt for reason
+        deliverable = current_commitment.get("deliverable", "this commitment")
+        stakeholder = current_commitment.get("stakeholder_name", "the stakeholder")
+
+        return HandlerResult(
+            message=f"You're about to mark '{deliverable}' as at-risk.\n\n"
+            "Why might you miss this commitment? "
+            "(This helps draft the notification to the stakeholder)",
+            panel_update={
+                "mode": "atrisk_workflow",
+                "entity_type": "commitment",
+                "data": current_commitment,
+                "workflow_step": "reason",
+            },
+            draft_data={
+                "commitment_id": current_commitment.get("id"),
+                "stakeholder_name": stakeholder,
+                "reason": None,
+                "impact": None,
+                "proposed_resolution": None,
+            },
+            needs_confirmation=False,
+        )
+
+    def _prompt_for_commitment_selection(self, commitments: list[dict[str, Any]]) -> HandlerResult:
+        """Prompt user to select which commitment is at-risk."""
+        # Filter to only active commitments
+        active = [c for c in commitments if c.get("status") in ("pending", "in_progress")]
+
+        if not active:
+            return HandlerResult(
+                message="No active commitments to mark as at-risk. "
+                "All your commitments are either completed or abandoned.",
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        lines = ["Which commitment is at risk?", ""]
+        for i, c in enumerate(active, 1):
+            deliverable = c.get("deliverable", "Untitled")[:50]
+            due = c.get("due_date", "No date")
+            lines.append(f"  {i}. {deliverable} (due: {due})")
+        lines.append("")
+        lines.append("Enter a number to select, or describe the commitment.")
+
+        return HandlerResult(
+            message="\n".join(lines),
+            panel_update={
+                "mode": "list",
+                "entity_type": "commitment",
+                "items": active,
+            },
+            draft_data=None,
+            needs_confirmation=False,
+        )
+
+
+class CleanupHandler(CommandHandler):
+    """Handler for /cleanup command - view or update cleanup plan."""
+
+    def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:
+        """Execute /cleanup command.
+
+        Args:
+            cmd: The parsed command.
+            context: Context with current commitment and cleanup plan data.
+
+        Returns:
+            HandlerResult with cleanup plan view or prompt.
+        """
+        current_commitment = context.get("current_commitment")
+        cleanup_plan = context.get("cleanup_plan")
+
+        # Check for commitment context
+        if not current_commitment:
+            return HandlerResult(
+                message="Select a commitment first to view its cleanup plan. "
+                "Use /show commitments to see your commitments.",
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        status = current_commitment.get("status", "")
+
+        # Check if commitment has a cleanup plan
+        if not cleanup_plan:
+            if status == "at_risk":
+                # At-risk but no cleanup plan - shouldn't happen but handle gracefully
+                return HandlerResult(
+                    message="This commitment is at-risk but has no cleanup plan. "
+                    "This may indicate a data issue. Please try /atrisk again.",
+                    panel_update=None,
+                    draft_data=None,
+                    needs_confirmation=False,
+                )
+            # Not at-risk, no cleanup plan
+            return HandlerResult(
+                message="This commitment doesn't have a cleanup plan. "
+                "Would you like to mark it as at-risk? Use /atrisk.",
+                panel_update={
+                    "mode": "view",
+                    "entity_type": "commitment",
+                    "data": current_commitment,
+                },
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        # Show cleanup plan
+        return self._show_cleanup_plan(current_commitment, cleanup_plan)
+
+    def _show_cleanup_plan(
+        self, commitment: dict[str, Any], cleanup_plan: dict[str, Any]
+    ) -> HandlerResult:
+        """Display cleanup plan details."""
+        plan_status = cleanup_plan.get("status", "unknown")
+        impact = cleanup_plan.get("impact_description") or "Not specified"
+        actions = cleanup_plan.get("mitigation_actions", [])
+        notification_complete = cleanup_plan.get("notification_task_completed", False)
+
+        lines = [
+            "Cleanup Plan",
+            "=" * 40,
+            "",
+            f"Status: {plan_status}",
+            f"Notification sent: {'Yes' if notification_complete else 'No'}",
+            "",
+            "Impact Description:",
+            f"  {impact}",
+            "",
+            "Mitigation Actions:",
+        ]
+
+        if actions:
+            for i, action in enumerate(actions, 1):
+                lines.append(f"  {i}. {action}")
+        else:
+            lines.append("  (No mitigation actions defined yet)")
+
+        lines.extend(
+            [
+                "",
+                "You can update this plan by describing changes in the chat.",
+                "Example: 'Add mitigation action: follow up weekly until resolved'",
+            ]
+        )
+
+        return HandlerResult(
+            message="\n".join(lines),
+            panel_update={
+                "mode": "cleanup",
+                "entity_type": "cleanup_plan",
+                "data": cleanup_plan,
+                "commitment": commitment,
+            },
+            draft_data=None,
+            needs_confirmation=False,
+        )
+
+
+class IntegrityHandler(CommandHandler):
+    """Handler for /integrity command - shows integrity dashboard."""
+
+    def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:
+        """Execute /integrity command.
+
+        Args:
+            cmd: The parsed command.
+            context: Context with integrity metrics.
+
+        Returns:
+            HandlerResult with integrity dashboard.
+        """
+        metrics = context.get("integrity_metrics")
+
+        # Handle case where no metrics are available
+        if not metrics:
+            # New user with clean slate
+            return self._show_empty_dashboard()
+
+        return self._show_dashboard(metrics)
+
+    def _show_empty_dashboard(self) -> HandlerResult:
+        """Show dashboard for new users with no history."""
+        lines = [
+            "Integrity Dashboard",
+            "=" * 40,
+            "",
+            "  Grade: A+",
+            "",
+            "You're starting with a clean slate!",
+            "",
+            "Keep your commitments to maintain your integrity score.",
+            "If you can't meet a commitment, use /atrisk to notify",
+            "stakeholders and create a cleanup plan.",
+            "",
+            "Your score is based on:",
+            "  - On-time delivery rate (40%)",
+            "  - Notification timeliness (25%)",
+            "  - Cleanup completion rate (25%)",
+            "  - Reliability streak bonus (10%)",
+        ]
+
+        return HandlerResult(
+            message="\n".join(lines),
+            panel_update={
+                "mode": "integrity",
+                "entity_type": "integrity_dashboard",
+                "data": {
+                    "letter_grade": "A+",
+                    "composite_score": 100.0,
+                    "on_time_rate": 1.0,
+                    "notification_timeliness": 1.0,
+                    "cleanup_completion_rate": 1.0,
+                    "current_streak_weeks": 0,
+                    "is_empty": True,
+                },
+            },
+            draft_data=None,
+            needs_confirmation=False,
+        )
+
+    def _show_dashboard(self, metrics: dict[str, Any]) -> HandlerResult:
+        """Show integrity dashboard with metrics."""
+        grade = metrics.get("letter_grade", "?")
+        score = metrics.get("composite_score", 0)
+        on_time = metrics.get("on_time_rate", 0) * 100
+        timeliness = metrics.get("notification_timeliness", 0) * 100
+        cleanup = metrics.get("cleanup_completion_rate", 0) * 100
+        streak = metrics.get("current_streak_weeks", 0)
+
+        # Totals for context
+        total_completed = metrics.get("total_completed", 0)
+        total_on_time = metrics.get("total_on_time", 0)
+        total_at_risk = metrics.get("total_at_risk", 0)
+        total_abandoned = metrics.get("total_abandoned", 0)
+
+        lines = [
+            "Integrity Dashboard",
+            "=" * 40,
+            "",
+            f"  Grade: {grade}  (Score: {score:.1f}%)",
+            "",
+            "Metrics:",
+            f"  On-time delivery:      {on_time:.0f}% ({total_on_time}/{total_completed} on time)",
+            f"  Notification timing:   {timeliness:.0f}%",
+            f"  Cleanup completion:    {cleanup:.0f}%",
+            f"  Reliability streak:    {streak} week(s)",
+            "",
+        ]
+
+        # Add summary stats
+        if total_at_risk > 0 or total_abandoned > 0:
+            lines.append("History:")
+            lines.append(f"  Total completed: {total_completed}")
+            if total_at_risk > 0:
+                lines.append(f"  Marked at-risk: {total_at_risk}")
+            if total_abandoned > 0:
+                lines.append(f"  Abandoned: {total_abandoned}")
+            lines.append("")
+
+        # Grade color hint for TUI
+        grade_colors = {
+            "A+": "green",
+            "A": "green",
+            "A-": "green",
+            "B+": "blue",
+            "B": "blue",
+            "B-": "blue",
+            "C+": "yellow",
+            "C": "yellow",
+            "C-": "yellow",
+            "D+": "red",
+            "D": "red",
+            "D-": "red",
+            "F": "red",
+        }
+
+        return HandlerResult(
+            message="\n".join(lines),
+            panel_update={
+                "mode": "integrity",
+                "entity_type": "integrity_dashboard",
+                "data": {
+                    **metrics,
+                    "grade_color": grade_colors.get(grade, "white"),
+                },
+            },
+            draft_data=None,
             needs_confirmation=False,
         )
 
@@ -1330,7 +1791,11 @@ _HANDLERS: dict[CommandType, type[CommandHandler]] = {
     CommandType.VIEW: ViewHandler,
     CommandType.CANCEL: CancelHandler,
     CommandType.COMPLETE: CompleteHandler,
+    CommandType.TYPE: TypeHandler,
     CommandType.EDIT: EditHandler,
+    CommandType.ATRISK: AtRiskHandler,
+    CommandType.CLEANUP: CleanupHandler,
+    CommandType.INTEGRITY: IntegrityHandler,
 }
 
 # Cache handler instances

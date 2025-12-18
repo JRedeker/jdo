@@ -1007,3 +1007,557 @@ class TestHandlerRegistry:
 
         handler = get_handler(CommandType.MESSAGE)
         assert handler is None
+
+
+# ============================================================
+# Phase 8: Integrity Protocol Command Tests (/atrisk, /cleanup, /integrity)
+# ============================================================
+
+
+class TestAtRiskHandler:
+    """Tests for the /atrisk command handler."""
+
+    def test_atrisk_without_commitment_prompts_for_selection(self) -> None:
+        """Test: /atrisk without commitment context prompts for selection."""
+        from jdo.commands.handlers import AtRiskHandler
+
+        handler = AtRiskHandler()
+        cmd = ParsedCommand(CommandType.ATRISK, [], "/atrisk")
+
+        context = {
+            "available_commitments": [
+                {"id": uuid4(), "deliverable": "Send report", "status": "pending"},
+                {"id": uuid4(), "deliverable": "Review docs", "status": "in_progress"},
+            ]
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "which" in result.message.lower() or "at risk" in result.message.lower()
+        assert result.panel_update is not None
+        assert result.panel_update["mode"] == "list"
+
+    def test_atrisk_without_commitments_shows_error(self) -> None:
+        """Test: /atrisk without any commitments shows appropriate error."""
+        from jdo.commands.handlers import AtRiskHandler
+
+        handler = AtRiskHandler()
+        cmd = ParsedCommand(CommandType.ATRISK, [], "/atrisk")
+
+        context = {}  # No commitments at all
+
+        result = handler.execute(cmd, context)
+
+        assert "no active commitments" in result.message.lower()
+        assert result.panel_update is None
+
+    def test_atrisk_on_already_at_risk_commitment_shows_message(self) -> None:
+        """Test: /atrisk on already at-risk commitment shows appropriate message."""
+        from jdo.commands.handlers import AtRiskHandler
+
+        handler = AtRiskHandler()
+        cmd = ParsedCommand(CommandType.ATRISK, [], "/atrisk")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "Send report",
+                "status": "at_risk",
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "already" in result.message.lower()
+        assert "at-risk" in result.message.lower() or "at_risk" in result.message.lower()
+
+    def test_atrisk_on_completed_commitment_shows_error(self) -> None:
+        """Test: /atrisk on completed commitment shows error."""
+        from jdo.commands.handlers import AtRiskHandler
+
+        handler = AtRiskHandler()
+        cmd = ParsedCommand(CommandType.ATRISK, [], "/atrisk")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "Send report",
+                "status": "completed",
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "completed" in result.message.lower()
+        assert "pending" in result.message.lower() or "in-progress" in result.message.lower()
+
+    def test_atrisk_on_abandoned_commitment_shows_error(self) -> None:
+        """Test: /atrisk on abandoned commitment shows error."""
+        from jdo.commands.handlers import AtRiskHandler
+
+        handler = AtRiskHandler()
+        cmd = ParsedCommand(CommandType.ATRISK, [], "/atrisk")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "Send report",
+                "status": "abandoned",
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "abandoned" in result.message.lower()
+
+    def test_atrisk_starts_workflow_for_pending_commitment(self) -> None:
+        """Test: /atrisk starts workflow for pending commitment."""
+        from jdo.commands.handlers import AtRiskHandler
+
+        handler = AtRiskHandler()
+        cmd = ParsedCommand(CommandType.ATRISK, [], "/atrisk")
+
+        commitment_id = uuid4()
+        context = {
+            "current_commitment": {
+                "id": commitment_id,
+                "deliverable": "Send quarterly report",
+                "status": "pending",
+                "stakeholder_name": "Finance Team",
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        # Should ask why the commitment is at risk
+        assert "why" in result.message.lower() or "reason" in result.message.lower()
+        assert result.panel_update is not None
+        assert result.panel_update["mode"] == "atrisk_workflow"
+        assert result.draft_data is not None
+        assert result.draft_data["commitment_id"] == commitment_id
+
+    def test_atrisk_starts_workflow_for_in_progress_commitment(self) -> None:
+        """Test: /atrisk starts workflow for in-progress commitment."""
+        from jdo.commands.handlers import AtRiskHandler
+
+        handler = AtRiskHandler()
+        cmd = ParsedCommand(CommandType.ATRISK, [], "/atrisk")
+
+        commitment_id = uuid4()
+        context = {
+            "current_commitment": {
+                "id": commitment_id,
+                "deliverable": "Send quarterly report",
+                "status": "in_progress",
+                "stakeholder_name": "Finance Team",
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        # Should ask why the commitment is at risk
+        assert "why" in result.message.lower() or "reason" in result.message.lower()
+        assert result.panel_update is not None
+        assert result.panel_update["workflow_step"] == "reason"
+
+    def test_atrisk_filters_only_active_commitments_in_selection(self) -> None:
+        """Test: /atrisk only shows pending/in_progress commitments for selection."""
+        from jdo.commands.handlers import AtRiskHandler
+
+        handler = AtRiskHandler()
+        cmd = ParsedCommand(CommandType.ATRISK, [], "/atrisk")
+
+        context = {
+            "available_commitments": [
+                {"id": uuid4(), "deliverable": "Active one", "status": "pending"},
+                {"id": uuid4(), "deliverable": "Completed one", "status": "completed"},
+                {"id": uuid4(), "deliverable": "Active two", "status": "in_progress"},
+                {"id": uuid4(), "deliverable": "Abandoned one", "status": "abandoned"},
+            ]
+        }
+
+        result = handler.execute(cmd, context)
+
+        # Panel should only show active commitments
+        assert result.panel_update is not None
+        assert len(result.panel_update["items"]) == 2  # Only pending and in_progress
+
+
+class TestCleanupHandler:
+    """Tests for the /cleanup command handler."""
+
+    def test_cleanup_without_commitment_prompts_for_selection(self) -> None:
+        """Test: /cleanup without commitment context prompts for selection."""
+        from jdo.commands.handlers import CleanupHandler
+
+        handler = CleanupHandler()
+        cmd = ParsedCommand(CommandType.CLEANUP, [], "/cleanup")
+
+        context = {}
+
+        result = handler.execute(cmd, context)
+
+        assert "select" in result.message.lower() or "commitment" in result.message.lower()
+        assert result.panel_update is None
+
+    def test_cleanup_without_cleanup_plan_suggests_atrisk(self) -> None:
+        """Test: /cleanup on commitment without cleanup plan suggests /atrisk."""
+        from jdo.commands.handlers import CleanupHandler
+
+        handler = CleanupHandler()
+        cmd = ParsedCommand(CommandType.CLEANUP, [], "/cleanup")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "Send report",
+                "status": "pending",
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "doesn't have a cleanup plan" in result.message.lower()
+        assert "/atrisk" in result.message
+
+    def test_cleanup_shows_cleanup_plan_details(self) -> None:
+        """Test: /cleanup shows cleanup plan details."""
+        from jdo.commands.handlers import CleanupHandler
+
+        handler = CleanupHandler()
+        cmd = ParsedCommand(CommandType.CLEANUP, [], "/cleanup")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "Send report",
+                "status": "at_risk",
+            },
+            "cleanup_plan": {
+                "id": uuid4(),
+                "status": "planned",
+                "impact_description": "Client may lose trust",
+                "mitigation_actions": ["Email weekly update", "Offer discount"],
+                "notification_task_completed": False,
+            },
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "cleanup plan" in result.message.lower()
+        assert "planned" in result.message.lower()
+        assert "client may lose trust" in result.message.lower()
+        assert result.panel_update is not None
+        assert result.panel_update["mode"] == "cleanup"
+
+    def test_cleanup_shows_notification_status(self) -> None:
+        """Test: /cleanup shows notification completion status."""
+        from jdo.commands.handlers import CleanupHandler
+
+        handler = CleanupHandler()
+        cmd = ParsedCommand(CommandType.CLEANUP, [], "/cleanup")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "Send report",
+                "status": "at_risk",
+            },
+            "cleanup_plan": {
+                "id": uuid4(),
+                "status": "in_progress",
+                "impact_description": "Delay affects project timeline",
+                "mitigation_actions": [],
+                "notification_task_completed": True,
+            },
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "notification sent" in result.message.lower()
+        assert "yes" in result.message.lower()
+
+    def test_cleanup_shows_mitigation_actions(self) -> None:
+        """Test: /cleanup shows mitigation actions list."""
+        from jdo.commands.handlers import CleanupHandler
+
+        handler = CleanupHandler()
+        cmd = ParsedCommand(CommandType.CLEANUP, [], "/cleanup")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "Send report",
+                "status": "at_risk",
+            },
+            "cleanup_plan": {
+                "id": uuid4(),
+                "status": "in_progress",
+                "impact_description": "Delay",
+                "mitigation_actions": ["Action 1", "Action 2", "Action 3"],
+                "notification_task_completed": True,
+            },
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "mitigation" in result.message.lower()
+        assert "1. Action 1" in result.message
+        assert "2. Action 2" in result.message
+        assert "3. Action 3" in result.message
+
+
+class TestIntegrityHandler:
+    """Tests for the /integrity command handler."""
+
+    def test_integrity_shows_empty_dashboard_for_new_user(self) -> None:
+        """Test: /integrity shows A+ for new user with no history."""
+        from jdo.commands.handlers import IntegrityHandler
+
+        handler = IntegrityHandler()
+        cmd = ParsedCommand(CommandType.INTEGRITY, [], "/integrity")
+
+        context = {}  # No metrics available
+
+        result = handler.execute(cmd, context)
+
+        assert "A+" in result.message
+        assert "clean slate" in result.message.lower()
+        assert result.panel_update is not None
+        assert result.panel_update["mode"] == "integrity"
+        assert result.panel_update["data"]["is_empty"] is True
+
+    def test_integrity_shows_dashboard_with_metrics(self) -> None:
+        """Test: /integrity shows dashboard with actual metrics."""
+        from jdo.commands.handlers import IntegrityHandler
+
+        handler = IntegrityHandler()
+        cmd = ParsedCommand(CommandType.INTEGRITY, [], "/integrity")
+
+        context = {
+            "integrity_metrics": {
+                "letter_grade": "B+",
+                "composite_score": 88.5,
+                "on_time_rate": 0.9,
+                "notification_timeliness": 0.85,
+                "cleanup_completion_rate": 0.8,
+                "current_streak_weeks": 3,
+                "total_completed": 20,
+                "total_on_time": 18,
+                "total_at_risk": 2,
+                "total_abandoned": 0,
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "B+" in result.message
+        assert "88.5%" in result.message or "88.5" in result.message
+        assert "90%" in result.message  # on_time_rate * 100
+        assert "3 week" in result.message.lower()
+        assert result.panel_update is not None
+        assert result.panel_update["data"]["grade_color"] == "blue"
+
+    def test_integrity_shows_all_metrics(self) -> None:
+        """Test: /integrity shows all four main metrics."""
+        from jdo.commands.handlers import IntegrityHandler
+
+        handler = IntegrityHandler()
+        cmd = ParsedCommand(CommandType.INTEGRITY, [], "/integrity")
+
+        context = {
+            "integrity_metrics": {
+                "letter_grade": "A-",
+                "composite_score": 91.0,
+                "on_time_rate": 0.95,
+                "notification_timeliness": 0.9,
+                "cleanup_completion_rate": 0.85,
+                "current_streak_weeks": 5,
+                "total_completed": 50,
+                "total_on_time": 47,
+                "total_at_risk": 3,
+                "total_abandoned": 1,
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        # Check all metrics are shown
+        assert "on-time delivery" in result.message.lower()
+        assert "notification" in result.message.lower()
+        assert "cleanup" in result.message.lower()
+        assert "streak" in result.message.lower()
+
+    def test_integrity_shows_grade_with_color(self) -> None:
+        """Test: /integrity shows grade with appropriate color code."""
+        from jdo.commands.handlers import IntegrityHandler
+
+        handler = IntegrityHandler()
+        cmd = ParsedCommand(CommandType.INTEGRITY, [], "/integrity")
+
+        # Test various grades and their colors
+        grade_color_tests = [
+            ("A+", "green"),
+            ("A", "green"),
+            ("A-", "green"),
+            ("B+", "blue"),
+            ("B", "blue"),
+            ("B-", "blue"),
+            ("C+", "yellow"),
+            ("C", "yellow"),
+            ("C-", "yellow"),
+            ("D+", "red"),
+            ("D", "red"),
+            ("D-", "red"),
+            ("F", "red"),
+        ]
+
+        for grade, expected_color in grade_color_tests:
+            context = {
+                "integrity_metrics": {
+                    "letter_grade": grade,
+                    "composite_score": 50.0,
+                    "on_time_rate": 0.5,
+                    "notification_timeliness": 0.5,
+                    "cleanup_completion_rate": 0.5,
+                    "current_streak_weeks": 0,
+                    "total_completed": 10,
+                    "total_on_time": 5,
+                    "total_at_risk": 2,
+                    "total_abandoned": 1,
+                }
+            }
+
+            result = handler.execute(cmd, context)
+
+            assert result.panel_update is not None
+            assert result.panel_update["data"]["grade_color"] == expected_color, (
+                f"Grade {grade} should have color {expected_color}"
+            )
+
+    def test_integrity_shows_history_stats_when_present(self) -> None:
+        """Test: /integrity shows history stats when there are at-risk or abandoned."""
+        from jdo.commands.handlers import IntegrityHandler
+
+        handler = IntegrityHandler()
+        cmd = ParsedCommand(CommandType.INTEGRITY, [], "/integrity")
+
+        context = {
+            "integrity_metrics": {
+                "letter_grade": "B",
+                "composite_score": 85.0,
+                "on_time_rate": 0.8,
+                "notification_timeliness": 0.9,
+                "cleanup_completion_rate": 0.75,
+                "current_streak_weeks": 2,
+                "total_completed": 30,
+                "total_on_time": 24,
+                "total_at_risk": 5,
+                "total_abandoned": 2,
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        # Should show history section
+        assert "history" in result.message.lower()
+        assert "30" in result.message  # total_completed
+        assert "at-risk" in result.message.lower() or "at_risk" in result.message.lower()
+
+
+class TestIntegrityCommandRegistration:
+    """Tests for integrity command registration in the handler registry."""
+
+    def test_atrisk_handler_is_registered(self) -> None:
+        """Test: AtRiskHandler is registered for ATRISK command type."""
+        from jdo.commands.handlers import AtRiskHandler, get_handler
+
+        handler = get_handler(CommandType.ATRISK)
+        assert isinstance(handler, AtRiskHandler)
+
+    def test_cleanup_handler_is_registered(self) -> None:
+        """Test: CleanupHandler is registered for CLEANUP command type."""
+        from jdo.commands.handlers import CleanupHandler, get_handler
+
+        handler = get_handler(CommandType.CLEANUP)
+        assert isinstance(handler, CleanupHandler)
+
+    def test_integrity_handler_is_registered(self) -> None:
+        """Test: IntegrityHandler is registered for INTEGRITY command type."""
+        from jdo.commands.handlers import IntegrityHandler, get_handler
+
+        handler = get_handler(CommandType.INTEGRITY)
+        assert isinstance(handler, IntegrityHandler)
+
+
+class TestHelpHandlerIntegrityCommands:
+    """Tests for /help with integrity commands."""
+
+    def test_help_lists_atrisk_command(self) -> None:
+        """Test: /help lists /atrisk command."""
+        from jdo.commands.handlers import HelpHandler
+
+        handler = HelpHandler()
+        cmd = ParsedCommand(CommandType.HELP, [], "/help")
+
+        result = handler.execute(cmd, {})
+
+        assert "/atrisk" in result.message
+
+    def test_help_lists_cleanup_command(self) -> None:
+        """Test: /help lists /cleanup command."""
+        from jdo.commands.handlers import HelpHandler
+
+        handler = HelpHandler()
+        cmd = ParsedCommand(CommandType.HELP, [], "/help")
+
+        result = handler.execute(cmd, {})
+
+        assert "/cleanup" in result.message
+
+    def test_help_lists_integrity_command(self) -> None:
+        """Test: /help lists /integrity command."""
+        from jdo.commands.handlers import HelpHandler
+
+        handler = HelpHandler()
+        cmd = ParsedCommand(CommandType.HELP, [], "/help")
+
+        result = handler.execute(cmd, {})
+
+        assert "/integrity" in result.message
+
+    def test_help_atrisk_shows_details(self) -> None:
+        """Test: /help atrisk shows command details."""
+        from jdo.commands.handlers import HelpHandler
+
+        handler = HelpHandler()
+        cmd = ParsedCommand(CommandType.HELP, ["atrisk"], "/help atrisk")
+
+        result = handler.execute(cmd, {})
+
+        assert "at-risk" in result.message.lower() or "atrisk" in result.message.lower()
+        assert "honor" in result.message.lower() or "workflow" in result.message.lower()
+
+    def test_help_cleanup_shows_details(self) -> None:
+        """Test: /help cleanup shows command details."""
+        from jdo.commands.handlers import HelpHandler
+
+        handler = HelpHandler()
+        cmd = ParsedCommand(CommandType.HELP, ["cleanup"], "/help cleanup")
+
+        result = handler.execute(cmd, {})
+
+        assert "cleanup" in result.message.lower()
+        assert "impact" in result.message.lower() or "mitigation" in result.message.lower()
+
+    def test_help_integrity_shows_details(self) -> None:
+        """Test: /help integrity shows command details."""
+        from jdo.commands.handlers import HelpHandler
+
+        handler = HelpHandler()
+        cmd = ParsedCommand(CommandType.HELP, ["integrity"], "/help integrity")
+
+        result = handler.execute(cmd, {})
+
+        assert "integrity" in result.message.lower()
+        assert "grade" in result.message.lower() or "score" in result.message.lower()

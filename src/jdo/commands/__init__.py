@@ -1,8 +1,12 @@
 """Command parsing and handling for JDO TUI."""
 
+from __future__ import annotations
+
 from jdo.commands.confirmation import ConfirmationMatcher, ConfirmationResult
 from jdo.commands.handlers import (
+    AtRiskHandler,
     CancelHandler,
+    CleanupHandler,
     CommandHandler,
     CommitHandler,
     CompleteHandler,
@@ -10,6 +14,7 @@ from jdo.commands.handlers import (
     GoalHandler,
     HandlerResult,
     HelpHandler,
+    IntegrityHandler,
     MilestoneHandler,
     ShowHandler,
     TaskHandler,
@@ -25,7 +30,9 @@ from jdo.commands.parser import (
 )
 
 __all__ = [
+    "AtRiskHandler",
     "CancelHandler",
+    "CleanupHandler",
     "CommandHandler",
     "CommandType",
     "CommitHandler",
@@ -36,6 +43,7 @@ __all__ = [
     "GoalHandler",
     "HandlerResult",
     "HelpHandler",
+    "IntegrityHandler",
     "MilestoneHandler",
     "ParseError",
     "ParsedCommand",
