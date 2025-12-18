@@ -83,6 +83,8 @@ ignore = [
     "RUF059",  # Unused unpacked variables
     "RUF012",  # ClassVar not needed in test helper classes
     "PERF401", # Async list comprehensions less readable in tests
+    "TRY003",  # Long exception messages OK in tests for readability
+    "EM101",   # String literals in exceptions OK in tests
 ]
 # Source code - minimal exceptions, document each one
 "src/**/*.py" = [

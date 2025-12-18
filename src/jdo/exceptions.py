@@ -20,6 +20,9 @@ Hierarchy:
 
 from typing import Any
 
+# Maximum length for raw response in context (truncate to avoid huge logs)
+MAX_RAW_RESPONSE_LENGTH = 500
+
 
 class JDOError(Exception):
     """Base exception for all JDO application errors.
@@ -178,7 +181,10 @@ class ExtractionError(AIError):
             ctx["expected_type"] = expected_type
         if raw_response:
             # Truncate long responses
-            ctx["raw_response"] = raw_response[:500] if len(raw_response) > 500 else raw_response
+            if len(raw_response) > MAX_RAW_RESPONSE_LENGTH:
+                ctx["raw_response"] = raw_response[:MAX_RAW_RESPONSE_LENGTH]
+            else:
+                ctx["raw_response"] = raw_response
 
         super().__init__(message, recovery_hint=recovery_hint, context=ctx)
         self.expected_type = expected_type

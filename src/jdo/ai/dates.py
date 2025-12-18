@@ -6,6 +6,8 @@ Parses expressions like "tomorrow", "next Friday", "December 20", "3pm".
 import re
 from datetime import UTC, date, datetime, time, timedelta
 
+from jdo.exceptions import ExtractionError
+
 # Days of week (lowercase for matching)
 DAYS_OF_WEEK = {
     "monday": 0,
@@ -78,7 +80,7 @@ NOON_HOUR = 12
 MIDNIGHT_HOUR = 0
 
 
-class ParseError(Exception):
+class ParseError(ExtractionError):
     """Raised when date/time cannot be parsed."""
 
 

@@ -68,8 +68,9 @@ class TestConfigError:
 
     def test_catchable_as_jdo_error(self):
         """ConfigError can be caught as JDOError."""
+        msg = "Missing env var"
         with pytest.raises(JDOError):
-            raise ConfigError("Missing env var")
+            raise ConfigError(msg)
 
     def test_with_recovery_hint(self):
         """ConfigError supports recovery hints."""
@@ -97,8 +98,9 @@ class TestDatabaseError:
 
     def test_catch_migration_as_database_error(self):
         """MigrationError can be caught as DatabaseError."""
+        msg = "Migration failed"
         with pytest.raises(DatabaseError):
-            raise MigrationError("Migration failed")
+            raise MigrationError(msg)
 
 
 class TestAIError:
@@ -161,13 +163,15 @@ class TestAIError:
 
     def test_catch_provider_as_ai_error(self):
         """ProviderError can be caught as AIError."""
+        msg = "API failed"
         with pytest.raises(AIError):
-            raise ProviderError("API failed")
+            raise ProviderError(msg)
 
     def test_catch_extraction_as_ai_error(self):
         """ExtractionError can be caught as AIError."""
+        msg = "Parse failed"
         with pytest.raises(AIError):
-            raise ExtractionError("Parse failed")
+            raise ExtractionError(msg)
 
 
 class TestAuthError:
@@ -228,6 +232,7 @@ class TestErrorHierarchy:
             TUIError,
         ]
 
+        msg = "test"
         for exc_class in exception_classes:
             with pytest.raises(JDOError):
-                raise exc_class("test")
+                raise exc_class(msg)

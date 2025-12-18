@@ -7,6 +7,8 @@ commitments, goals, or tasks.
 from dataclasses import dataclass
 from enum import Enum
 
+from jdo.exceptions import JDOError
+
 
 class CommandType(str, Enum):
     """Type of command recognized by the parser."""
@@ -27,7 +29,7 @@ class CommandType(str, Enum):
     MESSAGE = "message"  # Not a command, just a regular message
 
 
-class ParseError(Exception):
+class ParseError(JDOError):
     """Error raised when command parsing fails."""
 
 

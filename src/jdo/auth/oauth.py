@@ -9,6 +9,7 @@ from urllib.parse import urlencode
 import httpx
 
 from jdo.auth.models import OAuthCredentials
+from jdo.exceptions import AuthError
 
 # OAuth Configuration (matching OpenCode's implementation)
 CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
@@ -18,7 +19,7 @@ REDIRECT_URI = "https://console.anthropic.com/oauth/code/callback"
 SCOPES = "org:create_api_key user:profile user:inference"
 
 
-class AuthenticationError(Exception):
+class AuthenticationError(AuthError):
     """Raised when authentication fails."""
 
 
