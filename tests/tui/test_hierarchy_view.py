@@ -32,7 +32,7 @@ class TestHierarchyViewWidget:
         """HierarchyView has navigation key bindings."""
         from jdo.widgets.hierarchy_view import HierarchyView
 
-        binding_keys = [b.key for b in HierarchyView.BINDINGS]
+        binding_keys = [binding[0] for binding in HierarchyView.BINDINGS]
 
         # Arrow keys for expand/collapse
         assert "right" in binding_keys or "enter" in binding_keys

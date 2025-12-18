@@ -408,9 +408,9 @@ class TestAgentToolIntegration:
 
         register_tools(agent)
 
-        # Access the _AgentFunctionToolset's tools dict
-        toolset = agent.toolsets[0]
-        tool_names = list(toolset.tools.keys())
+        # Assert tools registered by name (agent internal toolset)
+        toolset = agent._function_toolset
+        tool_names = set(toolset.tools)
 
         assert "query_current_commitments" in tool_names
         assert "query_overdue_commitments" in tool_names

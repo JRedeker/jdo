@@ -13,7 +13,7 @@ import logging
 import sys
 from typing import TYPE_CHECKING, ClassVar
 
-from loguru import logger
+from loguru import Logger, logger
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -112,8 +112,7 @@ def configure_logging(
             logging.getLogger(logger_name).handlers = [InterceptHandler()]
 
 
-# Note: Return type omitted - Loguru's Logger type causes pyrefly issues
-def get_logger(name: str) -> object:
+def get_logger(name: str) -> Logger:
     """Get a logger instance bound to a module name.
 
     Args:

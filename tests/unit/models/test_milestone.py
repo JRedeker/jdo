@@ -333,9 +333,7 @@ class TestMilestonePersistence:
 
             with get_session() as session:
                 result = session.exec(
-                    select(Milestone)
-                    .where(Milestone.goal_id == goal_id)
-                    .order_by(Milestone.target_date)
+                    select(Milestone).where(Milestone.goal_id == goal_id).order_by("target_date")
                 ).all()
 
                 assert len(result) == 3

@@ -105,4 +105,6 @@ class TestGetSession:
             # Session should be closed (not usable)
             # Using broad Exception is intentional - SQLAlchemy can raise various errors
             with pytest.raises(Exception):  # noqa: B017, PT011
-                session.execute("SELECT 1")
+                from sqlalchemy import text
+
+                session.execute(text("SELECT 1"))

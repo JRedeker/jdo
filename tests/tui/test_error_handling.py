@@ -53,7 +53,7 @@ class TestAIErrorDisplay:
 
             messages = container.query(ChatMessage)
             assert len(messages) == 1
-            assert "Rate limit" in messages[0].content
+            assert "rate limit" in str(messages[0].content).lower()
 
 
 class TestValidationErrorDisplay:

@@ -1,9 +1,13 @@
 """Integration tests for database migration operations."""
 
+from __future__ import annotations
+
+from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from sqlalchemy.engine import Engine
 from sqlmodel import Session
 
 from jdo.db.engine import get_engine, reset_engine
@@ -18,7 +22,9 @@ from jdo.db.migrations import (
 
 
 @pytest.fixture
-def db_session_for_migrations(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def db_session_for_migrations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Generator[Session, None, None]:
     """Create a database for migration testing."""
     from jdo.config.settings import reset_settings
 
@@ -41,25 +47,26 @@ def db_session_for_migrations(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 class TestGetAlembicConfig:
     """Tests for get_alembic_config function."""
 
-    def test_returns_config_object(self):
+    def test_returns_config_object(self) -> None:
         """get_alembic_config returns an Alembic Config object."""
         cfg = get_alembic_config()
 
         assert cfg is not None
         assert cfg.get_main_option("script_location") is not None
 
-    def test_config_points_to_migrations_dir(self):
+    def test_config_points_to_migrations_dir(self) -> None:
         """Config points to the migrations directory."""
         cfg = get_alembic_config()
         script_location = cfg.get_main_option("script_location")
 
+        assert script_location is not None
         assert "migrations" in script_location
 
 
 class TestCreateDbAndTables:
     """Tests for create_db_and_tables function."""
 
-    def test_creates_tables(self, db_session_for_migrations):
+    def test_creates_tables(self, db_session_for_migrations: Session) -> None:
         """create_db_and_tables creates all model tables."""
         # Tables should already exist from fixture
         # Verify by querying - this would fail if tables don't exist
@@ -74,14 +81,14 @@ class TestMigrationCommands:
     """Tests for migration command functions."""
 
     @patch("jdo.db.migrations.command")
-    def test_get_migration_status_calls_current(self, mock_command):
+    def test_get_migration_status_calls_current(self, mock_command: MagicMock) -> None:
         """get_migration_status calls alembic current command."""
         get_migration_status()
 
         mock_command.current.assert_called_once()
 
     @patch("jdo.db.migrations.command")
-    def test_upgrade_database_calls_upgrade(self, mock_command):
+    def test_upgrade_database_calls_upgrade(self, mock_command: MagicMock) -> None:
         """upgrade_database calls alembic upgrade command."""
         upgrade_database("head")
 
@@ -90,7 +97,7 @@ class TestMigrationCommands:
         assert call_args[0][1] == "head"  # Second arg is revision
 
     @patch("jdo.db.migrations.command")
-    def test_downgrade_database_calls_downgrade(self, mock_command):
+    def test_downgrade_database_calls_downgrade(self, mock_command: MagicMock) -> None:
         """downgrade_database calls alembic downgrade command."""
         downgrade_database("-1")
 
@@ -99,7 +106,7 @@ class TestMigrationCommands:
         assert call_args[0][1] == "-1"
 
     @patch("jdo.db.migrations.command")
-    def test_create_revision_calls_revision(self, mock_command):
+    def test_create_revision_calls_revision(self, mock_command: MagicMock) -> None:
         """create_revision calls alembic revision command."""
         create_revision("test migration", autogenerate=True)
 
@@ -112,43 +119,53 @@ class TestMigrationCommands:
 class TestMigrationsDirectory:
     """Tests for migrations directory structure."""
 
-    def test_migrations_directory_exists(self):
+    def test_migrations_directory_exists(self) -> None:
         """Migrations directory exists."""
         cfg = get_alembic_config()
-        script_location = Path(cfg.get_main_option("script_location"))
+        script_location_str = cfg.get_main_option("script_location")
+        assert script_location_str is not None
 
+        script_location = Path(script_location_str)
         assert script_location.exists()
         assert script_location.is_dir()
 
-    def test_alembic_ini_exists(self):
+    def test_alembic_ini_exists(self) -> None:
         """alembic.ini configuration file exists."""
         cfg = get_alembic_config()
-        script_location = Path(cfg.get_main_option("script_location"))
-        alembic_ini = script_location / "alembic.ini"
+        script_location_str = cfg.get_main_option("script_location")
+        assert script_location_str is not None
 
+        script_location = Path(script_location_str)
+        alembic_ini = script_location / "alembic.ini"
         assert alembic_ini.exists()
 
-    def test_env_py_exists(self):
+    def test_env_py_exists(self) -> None:
         """env.py environment file exists."""
         cfg = get_alembic_config()
-        script_location = Path(cfg.get_main_option("script_location"))
-        env_py = script_location / "env.py"
+        script_location_str = cfg.get_main_option("script_location")
+        assert script_location_str is not None
 
+        script_location = Path(script_location_str)
+        env_py = script_location / "env.py"
         assert env_py.exists()
 
-    def test_script_template_exists(self):
+    def test_script_template_exists(self) -> None:
         """script.py.mako template file exists."""
         cfg = get_alembic_config()
-        script_location = Path(cfg.get_main_option("script_location"))
-        template = script_location / "script.py.mako"
+        script_location_str = cfg.get_main_option("script_location")
+        assert script_location_str is not None
 
+        script_location = Path(script_location_str)
+        template = script_location / "script.py.mako"
         assert template.exists()
 
-    def test_versions_directory_exists(self):
+    def test_versions_directory_exists(self) -> None:
         """versions directory for migration scripts exists."""
         cfg = get_alembic_config()
-        script_location = Path(cfg.get_main_option("script_location"))
-        versions_dir = script_location / "versions"
+        script_location_str = cfg.get_main_option("script_location")
+        assert script_location_str is not None
 
+        script_location = Path(script_location_str)
+        versions_dir = script_location / "versions"
         assert versions_dir.exists()
         assert versions_dir.is_dir()

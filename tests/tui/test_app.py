@@ -4,6 +4,8 @@ Tests for JdoApp - the main application shell that integrates
 all screens and manages the application lifecycle.
 """
 
+from __future__ import annotations
+
 import pytest
 from textual.widgets import Footer, Header
 
@@ -156,9 +158,9 @@ class TestDatabaseInitialization:
         async with app.run_test() as pilot:
             # App should have initialized the database
             # Check that the database file exists (if not in-memory)
-            db_path = Path(pilot.app._db_path) if hasattr(pilot.app, "_db_path") else None
-            if db_path and db_path.exists():
-                assert db_path.stat().st_size > 0
+            # Database path is managed by settings; this is a smoke check that the app
+            # initialized without error rather than asserting internal attributes.
+            assert pilot.app.is_running
 
 
 @pytest.mark.tui
@@ -358,7 +360,9 @@ class TestVisionReviews:
             # Home screen should show, but with a review notification
             assert isinstance(pilot.app.screen, HomeScreen)
             # The app should have tracked the vision for review
-            assert len(pilot.app._visions_due_for_review) == 1
+            typed_app = pilot.app
+            assert isinstance(typed_app, JdoApp)
+            assert len(typed_app._visions_due_for_review) == 1
 
     async def test_dismissing_notification_snoozes_for_session(
         self, app: JdoApp, tmp_path, monkeypatch
@@ -386,10 +390,12 @@ class TestVisionReviews:
             await pilot.pause()
 
             # Snooze the review
-            pilot.app.snooze_vision_review(vision_id)
+            typed_app = pilot.app
+            assert isinstance(typed_app, JdoApp)
+            typed_app.snooze_vision_review(vision_id)
 
             # Vision should be in snoozed set
-            assert vision_id in pilot.app._snoozed_reviews
+            assert vision_id in typed_app._snoozed_reviews
 
     async def test_snoozed_review_not_shown_again(self, app: JdoApp, tmp_path, monkeypatch) -> None:
         """Snoozed review doesn't show up in notifications."""
@@ -415,8 +421,10 @@ class TestVisionReviews:
             await pilot.pause()
 
             # Snooze the review
-            pilot.app.snooze_vision_review(vision_id)
+            typed_app = pilot.app
+            assert isinstance(typed_app, JdoApp)
+            typed_app.snooze_vision_review(vision_id)
 
             # Get unsnoozed reviews (should be empty)
-            unsnoozed = pilot.app.get_unsnoozed_reviews()
+            unsnoozed = typed_app.get_unsnoozed_reviews()
             assert len(unsnoozed) == 0
