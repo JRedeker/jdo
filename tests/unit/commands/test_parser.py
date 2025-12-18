@@ -46,6 +46,13 @@ class TestParseCommand:
         assert result.command_type == CommandType.MILESTONE
         assert result.args == []
 
+    def test_recognize_triage_command(self) -> None:
+        """/triage is recognized as a command."""
+        result = parse_command("/triage")
+
+        assert result.command_type == CommandType.TRIAGE
+        assert result.args == []
+
     def test_recognize_show_command_with_argument(self) -> None:
         """/show goals parses command with argument."""
         result = parse_command("/show goals")
@@ -108,6 +115,7 @@ class TestCommandType:
         assert CommandType.TASK.value == "task"
         assert CommandType.VISION.value == "vision"
         assert CommandType.MILESTONE.value == "milestone"
+        assert CommandType.TRIAGE.value == "triage"
         assert CommandType.SHOW.value == "show"
         assert CommandType.VIEW.value == "view"
         assert CommandType.EDIT.value == "edit"

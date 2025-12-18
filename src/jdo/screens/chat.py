@@ -84,6 +84,7 @@ class ChatScreen(Screen[None]):
         self,
         *,
         draft_id: UUID | None = None,
+        triage_mode: bool = False,
         name: str | None = None,
         id: str | None = None,
         classes: str | None = None,
@@ -92,6 +93,7 @@ class ChatScreen(Screen[None]):
 
         Args:
             draft_id: Optional draft ID to restore on mount.
+            triage_mode: If True, start in triage mode for captured items.
             name: Widget name.
             id: Widget ID.
             classes: CSS classes.
@@ -99,6 +101,7 @@ class ChatScreen(Screen[None]):
         super().__init__(name=name, id=id, classes=classes)
         self._panel_visible = True
         self._draft_id = draft_id
+        self._triage_mode = triage_mode
 
     def compose(self) -> ComposeResult:
         """Compose the chat screen layout."""

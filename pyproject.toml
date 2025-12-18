@@ -14,10 +14,11 @@ dependencies = [
     "pydantic-ai>=0.1.0",
     "rapidfuzz>=3.0.0",
     "httpx>=0.27.0",
+    "click>=8.1.0",
 ]
 
 [project.scripts]
-jdo = "jdo.app:main"
+jdo = "jdo.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -108,11 +109,15 @@ ignore = [
     "A002",    # 'id' parameter - Textual widget convention, cannot change
     "RUF012",  # BINDINGS/DEFAULT_CSS - Textual patterns
     "FBT001",  # push_screen callbacks require positional bool - Textual API
+    "BLE001",  # Catch Exception for database errors in _check_triage_count
 ]
 "src/jdo/commands/handlers.py" = [
     "ARG002",  # Unused cmd/context args - handlers implement common interface
     "ANN401",  # Any for goal_id - accepts UUID or other ID types from context
     "RUF012",  # ClassVar for _ENTITY_MAP, _COMMAND_HELP - immutable at runtime
+]
+"src/jdo/cli.py" = [
+    "PLC0415", # Lazy import of TUI to avoid loading when running CLI subcommands
 ]
 
 [tool.ruff.lint.isort]

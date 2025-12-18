@@ -43,8 +43,19 @@ from jdo.ai.extraction import (
     extract_vision,
     get_missing_fields,
 )
+from jdo.ai.triage import (
+    CLASSIFIABLE_TYPES,
+    CONFIDENCE_THRESHOLD,
+    ClarifyingQuestion,
+    TriageAnalysis,
+    TriageClassification,
+    classify_triage_item,
+    classify_triage_item_async,
+)
 
 __all__ = [
+    "CLASSIFIABLE_TYPES",
+    "CONFIDENCE_THRESHOLD",
     "DEFAULT_TIME",
     "MAX_CONTEXT_MESSAGES",
     "MILESTONE_EXTRACTION_PROMPT",
@@ -54,6 +65,7 @@ __all__ = [
     "SYSTEM_PROMPT",
     "VISION_EXTRACTION_PROMPT",
     "VISION_LINKAGE_PROMPT",
+    "ClarifyingQuestion",
     "ExtractedCommitment",
     "ExtractedGoal",
     "ExtractedMilestone",
@@ -61,8 +73,12 @@ __all__ = [
     "ExtractedVision",
     "JDODependencies",
     "ParseError",
+    "TriageAnalysis",
+    "TriageClassification",
     "VagueDateError",
     "build_context",
+    "classify_triage_item",
+    "classify_triage_item_async",
     "create_agent",
     "create_agent_with_model",
     "create_extraction_agent",

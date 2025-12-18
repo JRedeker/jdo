@@ -781,6 +781,17 @@ class HelpHandler(CommandHandler):
             "Types: goals, commitments, tasks, visions, milestones, recurring, "
             "stakeholders, orphans"
         ),
+        "triage": (
+            "/triage - Process captured items\n\n"
+            "Starts the triage workflow to classify captured items.\n"
+            'Use `jdo capture "text"` from the command line to capture ideas.\n\n'
+            "During triage:\n"
+            "  [a] Accept - create with suggested type\n"
+            "  [c] Change - choose a different type\n"
+            "  [d] Delete - remove the item\n"
+            "  [s] Skip - come back later\n"
+            "  [q] Quit - exit triage"
+        ),
     }
 
     def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:
@@ -813,6 +824,7 @@ class HelpHandler(CommandHandler):
             "  /vision     - Manage visions",
             "  /milestone  - Manage milestones",
             "  /recurring  - Manage recurring commitments",
+            "  /triage     - Process captured items",
             "  /show       - Display entity lists",
             "  /view       - View a specific item",
             "  /complete   - Mark item as completed",
@@ -1136,6 +1148,174 @@ class EditHandler(CommandHandler):
         )
 
 
+class TriageHandler(CommandHandler):
+    """Handler for /triage command - processes captured items.
+
+    Triage workflow:
+    1. Get next item from triage queue (FIFO order)
+    2. AI analyzes and suggests entity type
+    3. User confirms, changes type, deletes, or skips
+    4. Repeat until queue empty or user exits
+    """
+
+    def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:
+        """Execute /triage command.
+
+        Args:
+            cmd: The parsed command.
+            context: Context with triage items and state.
+
+        Returns:
+            HandlerResult with triage item display and options.
+        """
+        # Get triage items from context (populated by chat screen)
+        triage_items = context.get("triage_items", [])
+        current_index = context.get("triage_index", 0)
+
+        if not triage_items:
+            return HandlerResult(
+                message='No items to triage. Use `jdo capture "text"` to capture ideas.',
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        if current_index >= len(triage_items):
+            return HandlerResult(
+                message="Triage complete! All items have been processed.",
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        # Get current triage item
+        current_item = triage_items[current_index]
+
+        # Get AI analysis from context (populated by chat screen)
+        analysis = context.get("triage_analysis")
+
+        if analysis is None:
+            # First time viewing this item - show it and trigger analysis
+            return self._show_item_for_analysis(current_item, current_index, len(triage_items))
+
+        # Show AI analysis with options
+        return self._show_analysis_with_options(
+            current_item, analysis, current_index, len(triage_items)
+        )
+
+    def _show_item_for_analysis(
+        self, item: dict[str, Any], index: int, total: int
+    ) -> HandlerResult:
+        """Show triage item and indicate analysis is needed.
+
+        Args:
+            item: The triage item data.
+            index: Current item index.
+            total: Total number of items.
+
+        Returns:
+            HandlerResult indicating analysis is needed.
+        """
+        raw_text = item.get("raw_text", "Unknown")
+
+        lines = [
+            f"Triage item {index + 1} of {total}:",
+            "",
+            f'  "{raw_text}"',
+            "",
+            "Analyzing...",
+        ]
+
+        return HandlerResult(
+            message="\n".join(lines),
+            panel_update={
+                "mode": "triage",
+                "item": item,
+                "index": index,
+                "total": total,
+                "needs_analysis": True,
+            },
+            draft_data=None,
+            needs_confirmation=False,
+        )
+
+    def _show_analysis_with_options(
+        self,
+        item: dict[str, Any],
+        analysis: dict[str, Any],
+        index: int,
+        total: int,
+    ) -> HandlerResult:
+        """Show AI analysis and available actions.
+
+        Args:
+            item: The triage item data.
+            analysis: AI analysis results.
+            index: Current item index.
+            total: Total number of items.
+
+        Returns:
+            HandlerResult with analysis and options.
+        """
+        raw_text = item.get("raw_text", "Unknown")
+
+        lines = [
+            f"Triage item {index + 1} of {total}:",
+            "",
+            f'  "{raw_text}"',
+            "",
+        ]
+
+        # Check if we have a confident classification
+        if analysis.get("is_confident"):
+            classification = analysis.get("classification", {})
+            suggested_type = classification.get("suggested_type", "unknown")
+            confidence = classification.get("confidence", 0)
+            reasoning = classification.get("reasoning", "")
+            stakeholder = classification.get("detected_stakeholder")
+            date_info = classification.get("detected_date")
+
+            lines.append(f"Suggested type: {suggested_type} ({confidence:.0%} confident)")
+            lines.append(f"Reasoning: {reasoning}")
+
+            if stakeholder:
+                lines.append(f"Detected stakeholder: {stakeholder}")
+            if date_info:
+                lines.append(f"Detected date: {date_info}")
+
+            lines.append("")
+            lines.append("Options:")
+            lines.append("  [a] Accept - create as " + suggested_type)
+            lines.append("  [c] Change type - choose a different type")
+            lines.append("  [d] Delete - remove this item")
+            lines.append("  [s] Skip - come back later")
+            lines.append("  [q] Quit - exit triage")
+        else:
+            # Low confidence or question
+            question = analysis.get("question", {})
+            question_text = question.get("question", "What type of item is this?")
+
+            lines.append(f"Question: {question_text}")
+            lines.append("")
+            lines.append("Options:")
+            lines.append("  [1] commitment  [2] goal  [3] task")
+            lines.append("  [4] vision      [5] milestone")
+            lines.append("  [d] Delete      [s] Skip  [q] Quit")
+
+        return HandlerResult(
+            message="\n".join(lines),
+            panel_update={
+                "mode": "triage",
+                "item": item,
+                "analysis": analysis,
+                "index": index,
+                "total": total,
+            },
+            draft_data=None,
+            needs_confirmation=False,
+        )
+
+
 # Handler registry
 _HANDLERS: dict[CommandType, type[CommandHandler]] = {
     CommandType.COMMIT: CommitHandler,
@@ -1144,6 +1324,7 @@ _HANDLERS: dict[CommandType, type[CommandHandler]] = {
     CommandType.VISION: VisionHandler,
     CommandType.MILESTONE: MilestoneHandler,
     CommandType.RECURRING: RecurringHandler,
+    CommandType.TRIAGE: TriageHandler,
     CommandType.SHOW: ShowHandler,
     CommandType.HELP: HelpHandler,
     CommandType.VIEW: ViewHandler,

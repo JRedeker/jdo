@@ -177,6 +177,11 @@ class JdoApp(App[None]):
         """Handle back request from ChatScreen."""
         self.pop_screen()
 
+    def on_home_screen_start_triage(self, _message: HomeScreen.StartTriage) -> None:
+        """Handle triage request from HomeScreen."""
+        # Navigate to chat with triage mode
+        self.push_screen(ChatScreen(triage_mode=True))
+
 
 def main() -> None:
     """Run the application."""

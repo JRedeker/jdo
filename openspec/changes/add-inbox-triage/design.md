@@ -41,12 +41,30 @@ Key stakeholders:
 
 ### Decision 2: CLI subcommand vs separate entry point
 
-**Choice**: Add `jdo capture "text"` as a subcommand using Click/Typer.
+**Choice**: Add `jdo capture "text"` as a subcommand using Click with `@click.group(invoke_without_command=True)`.
 
 **Rationale**:
 - Single `jdo` command with subcommands is more discoverable
+- Click's `invoke_without_command=True` allows `jdo` (no args) to launch TUI, while `jdo capture` runs the subcommand
 - Consistent with common CLI patterns (git, docker, etc.)
 - Future subcommands (e.g., `jdo status`) share same entry point
+
+**Implementation pattern** (from Click docs):
+```python
+@click.group(invoke_without_command=True)
+@click.pass_context
+def cli(ctx):
+    if ctx.invoked_subcommand is None:
+        # Launch TUI
+        from jdo.app import main
+        main()
+
+@cli.command()
+@click.argument('text')
+def capture(text):
+    # Create triage item
+    ...
+```
 
 **Alternatives considered**:
 - Separate `jdo-capture` binary: Simpler initially but fragments UX
@@ -94,16 +112,87 @@ Key stakeholders:
 - Skip moves to back: Item could get buried
 - Priority system: Over-engineering for v1
 
-### Decision 6: AI confidence threshold hardcoded
+### Decision 6: AI classification using PydanticAI structured output
 
-**Choice**: Use hardcoded reasonable defaults for classification confidence.
+**Choice**: Use PydanticAI agent with `output_type` for structured classification results.
 
 **Rationale**:
-- Avoid premature optimization
-- Can tune based on real user feedback
-- Expose as setting later if needed
+- PydanticAI's `output_type` parameter enforces structured responses
+- Pydantic models provide type safety and validation
+- Can return either classification result or clarifying question using union types
+- Consistent with existing AI agent patterns in codebase
 
-**Implementation**: If AI confidence < 0.7, ask clarifying question rather than suggesting type.
+**Implementation pattern** (from PydanticAI docs):
+```python
+from pydantic import BaseModel
+from pydantic_ai import Agent
+
+class TriageClassification(BaseModel):
+    suggested_type: str  # commitment, goal, task, vision, milestone
+    confidence: float
+    detected_stakeholder: str | None
+    detected_date: str | None
+    reasoning: str
+
+class ClarifyingQuestion(BaseModel):
+    question: str
+
+agent = Agent(
+    'anthropic:claude-sonnet-4-20250514',
+    output_type=[TriageClassification, ClarifyingQuestion],
+)
+```
+
+**Confidence threshold**: If AI returns `ClarifyingQuestion` or confidence < 0.7, ask user rather than suggesting type.
+
+### Decision 7: Textual reactive pattern for home screen indicator
+
+**Choice**: Use Textual's `reactive` attribute with `watch_` method for triage count.
+
+**Rationale**:
+- Textual's reactive system automatically triggers UI updates when values change
+- `watch_` methods allow responding to changes with custom logic
+- Pattern is well-established in Textual documentation
+
+**Implementation pattern** (from Textual docs):
+```python
+from textual.reactive import reactive
+from textual.screen import Screen
+
+class HomeScreen(Screen):
+    triage_count = reactive(0)
+    
+    def watch_triage_count(self, count: int) -> None:
+        """Called automatically when triage_count changes."""
+        indicator = self.query_one("#triage-indicator", Static)
+        if count > 0:
+            indicator.update(f"{count} items need triage [t]")
+            indicator.display = True
+        else:
+            indicator.display = False
+```
+
+### Decision 8: Chat message handling pattern
+
+**Choice**: Add `on_prompt_input_submitted` handler to ChatScreen following Textual's message naming convention.
+
+**Rationale**:
+- Textual message handlers use pattern `on_<widget_class>_<message_class>`
+- `PromptInput.Submitted` message already exists but is unhandled
+- Handler can dispatch to command parser or AI intent detection
+
+**Implementation pattern**:
+```python
+def on_prompt_input_submitted(self, message: PromptInput.Submitted) -> None:
+    """Handle submitted text from prompt input."""
+    text = message.text
+    if text.startswith('/'):
+        # Route to command handler
+        self._handle_command(text)
+    else:
+        # Route to AI intent detection
+        self._handle_message(text)
+```
 
 ## Risks / Trade-offs
 

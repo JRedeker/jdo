@@ -1,0 +1,799 @@
+# JDO Development Roadmap
+# 
+# This document tracks features and enhancements organized by implementation phase.
+# Prioritized based on: core functionality gaps → MPI differentiators → feature completion → polish
+#
+# Phases:
+#   Now   - Currently implementing or spec already created/proposed
+#   Next  - High priority, not yet started
+#   Later - Future considerations
+#
+# Priority: critical, high, medium, low
+# Complexity: low, medium, high, very_high
+# Status: proposed, approved, in_progress, completed, deferred
+
+metadata:
+  version: "4.0"
+  last_updated: "2025-12-17"
+  philosophy: |
+    JDO is built on Meta Performance™ Institute (MPI) principles:
+    - Commitments are promises, not preferences - make fewer, keep them all
+    - Integrity = deliver, notify, clean up - it's the engine of workability
+    - Vision leads - goals and commitments must trace back to a vivid future picture
+
+# =============================================================================
+# IMPLEMENTATION STATUS (as of 2025-12-17)
+# =============================================================================
+# 
+# COMPLETED (Archived):
+# - refactor-core-libraries: Core infrastructure (paths, settings, database, AI agent)
+# - add-testing-infrastructure: pytest fixtures, coverage config, test markers
+# - add-provider-auth: OAuth PKCE + API key auth for Anthropic/OpenAI/OpenRouter
+# - add-core-domain-models: Stakeholder, Goal, Commitment, Task (54 tests)
+# - add-vision-milestone-hierarchy: Vision, Milestone models with review tracking
+# - add-conversational-tui: ChatScreen, DataPanel, HierarchyView widgets
+# - add-recurring-commitments: RecurringCommitment model, calculator, generator
+#
+# TEST STATUS: 790 passed, 6 snapshots
+# LINT STATUS: All checks passed (ruff, pyrefly)
+
+features:
+
+# =============================================================================
+# NOW - Currently Implementing
+# =============================================================================
+# Features with specs already created/proposed, or actively in progress.
+
+  implement_inbox_triage:
+    title: "Implement Inbox Triage"
+    priority: high
+    complexity: medium
+    status: in_progress
+    category: feature_completion
+    phase: now
+    change_spec: "add-inbox-triage"
+    
+    description: |
+      Quick capture from CLI (jdo capture "idea") with AI-powered triage workflow.
+      Classify captured items as Commitment, Task, Goal, Vision, or Milestone.
+    
+    completed:
+      - "CLI capture command (jdo capture 'text')"
+      - "UNKNOWN entity type for triage items"
+      - "Triage query helpers (get_triage_items, get_triage_count)"
+      - "TriageHandler with AI classification"
+      - "Home screen triage indicator with [t] shortcut"
+      - "AI triage module with confidence scoring"
+      - "Unit tests for all triage components"
+    
+    remaining:
+      - "Wire triage mode in ChatScreen"
+      - "Persist converted items to database"
+      - "Integration test: capture → triage → entity creation"
+    
+    acceptance_criteria:
+      - "/triage shows list of captured items"
+      - "Each item can be converted or dismissed"
+      - "Converted items persist to database"
+
+  honor_your_word_protocol:
+    title: "Honor-Your-Word Protocol"
+    priority: critical
+    complexity: high
+    status: proposed
+    category: integrity
+    phase: now
+    change_spec: "add-integrity-protocol"
+    
+    description: |
+      Implements MPI's three integrity rules - the heart of what makes jdo different:
+      1. Do what you said by when you said
+      2. Notify the right people as soon as you know you won't
+      3. Clean up the mess caused
+      
+      This transforms "abandoned" commitments into structured recovery workflows
+      that maintain integrity even when commitments can't be met.
+    
+    proposed_changes:
+      commitment_status_extension:
+        description: "Add 'at_risk' status between in_progress and abandoned"
+        new_statuses:
+          - name: "at_risk"
+            meaning: "Commitment may not be met; stakeholder notification required"
+            triggers:
+              - "User flags commitment as at-risk"
+              - "AI detects commitment is overdue or likely to miss deadline"
+            required_actions:
+              - "Select stakeholders to notify"
+              - "Provide reason for risk"
+              - "Propose new deadline or indicate cannot complete"
+      
+      cleanup_plan_model:
+        description: "New CleanupPlan entity linked to commitment"
+        fields:
+          - "id (UUID)"
+          - "commitment_id (UUID, required)"
+          - "impact_description (text) - What impact does missing this have?"
+          - "mitigation_actions (list[str]) - What will you do about it?"
+          - "stakeholders_notified (list[UUID])"
+          - "notified_at (datetime)"
+          - "status (enum: planned, in_progress, completed)"
+          - "completed_at (datetime | None)"
+      
+      notification_workflow:
+        steps:
+          - "User marks commitment as at_risk"
+          - "System prompts for stakeholder selection"
+          - "AI helps draft notification (reason, impact, resolution)"
+          - "User confirms notification sent"
+          - "CleanupPlan created and tracked"
+      
+      ai_risk_detection:
+        triggers:
+          - "Commitment is overdue"
+          - "Commitment due within 24 hours with no task progress"
+          - "User hasn't interacted with commitment approaching deadline"
+    
+    commands:
+      - "/atrisk - Mark commitment as at-risk, start notification workflow"
+      - "/cleanup - View or update cleanup plan"
+      - "/notify - Send stakeholder notification"
+    
+    acceptance_criteria:
+      - "Marking at_risk requires stakeholder notification within the session"
+      - "Cannot mark commitment as abandoned without completed CleanupPlan"
+      - "AI proactively warns about commitments at risk of missing deadline"
+
+# =============================================================================
+# NEXT - High Priority, Not Started
+# =============================================================================
+# Critical gaps and differentiating features ready to implement.
+
+  wire_ai_to_chat:
+    title: "Wire AI Agent to Chat Flow"
+    priority: critical
+    complexity: medium
+    status: proposed
+    category: core
+    phase: next
+    
+    description: |
+      The AI agent exists (ai/agent.py), tools are registered (ai/tools.py), 
+      but the chat screen doesn't invoke the AI. When a user sends a message, 
+      nothing happens. This is the core UX - it must work.
+    
+    current_behavior: |
+      ChatScreen/ChatContainer accept user input but don't call the PydanticAI agent.
+      Messages appear in chat but no AI response is generated.
+    
+    proposed_changes:
+      - "Connect ChatContainer message submission to invoke PydanticAI agent"
+      - "Stream AI responses back to chat display"
+      - "Handle tool calls during conversation"
+      - "Maintain conversation context across messages"
+    
+    acceptance_criteria:
+      - "User can type a message and receive AI response"
+      - "AI can invoke registered tools (query commitments, goals, etc.)"
+      - "Conversation history is maintained within session"
+      - "Streaming responses display progressively"
+
+  persist_handler_results:
+    title: "Persist Command Handler Results"
+    priority: critical
+    complexity: medium
+    status: proposed
+    category: core
+    phase: next
+    
+    description: |
+      Command handlers (e.g., CommitHandler.execute()) build draft data but never 
+      save to the database. /commit creates a HandlerResult with draft_data but 
+      nothing calls session.add(). Users can't actually create commitments.
+    
+    current_behavior: |
+      Handlers return HandlerResult with panel_update and draft_data.
+      No persistence layer connects handlers to database operations.
+      Confirmation flow exists but doesn't trigger saves.
+    
+    proposed_changes:
+      - "Add persistence callbacks to confirmation flow"
+      - "When user confirms draft, convert to entity and save"
+      - "Update DataPanel to reflect saved state"
+      - "Handle validation errors gracefully"
+    
+    acceptance_criteria:
+      - "/commit with confirmation creates Commitment in database"
+      - "/goal new with confirmation creates Goal in database"
+      - "All entity-creating commands persist on confirmation"
+      - "Cancelled drafts are discarded without persistence"
+
+  connect_navigation_messages:
+    title: "Connect Navigation Messages"
+    priority: critical
+    complexity: low
+    status: proposed
+    category: core
+    phase: next
+    
+    description: |
+      HomeScreen posts messages like ShowGoals, ShowCommitments, ShowHierarchy,
+      but JdoApp only handles NewChat and OpenSettings. The view buttons don't work.
+    
+    current_behavior: |
+      Keyboard shortcuts on HomeScreen post messages that are never handled.
+      Only 'n' (NewChat) and 's' (OpenSettings) actually work.
+    
+    proposed_changes:
+      - "Add message handlers in JdoApp for ShowGoals, ShowCommitments, etc."
+      - "Push ChatScreen with appropriate DataPanel state"
+      - "Or update DataPanel on HomeScreen directly"
+    
+    acceptance_criteria:
+      - "Pressing 'g' shows goals list"
+      - "Pressing 'c' shows commitments list"
+      - "Pressing 'v' shows visions list"
+      - "Pressing 'h' shows full hierarchy tree"
+      - "Pressing 'o' shows orphan commitments"
+
+  integrity_metrics:
+    title: "Integrity Metrics & Scoring"
+    priority: high
+    complexity: high
+    status: proposed
+    category: integrity
+    phase: next
+    change_spec: "add-integrity-protocol"
+    
+    description: |
+      Track and display reliability metrics based on MPI's integrity framework.
+      Provides visibility into commitment-keeping patterns to reinforce behavior.
+    
+    proposed_changes:
+      metrics_tracked:
+        - "on_time_delivery_rate: completed_on_time / total_completed"
+        - "notification_timeliness: avg lead time when notifying at-risk"
+        - "cleanup_completion_rate: cleanup_completed / cleanup_required"
+        - "reliability_streak: consecutive periods with all commitments met"
+        - "commitment_volume: commitments per week (detect over-committing)"
+        - "stakeholder_impact_score: weighted by importance and miss frequency"
+      
+      integrity_score:
+        formula: "(on_time_rate * 0.4) + (notification_timeliness * 0.25) + (cleanup_rate * 0.25) + (streak_bonus * 0.1)"
+        display: "Letter grade (A+ through D-) on home screen"
+      
+      weekly_integrity_report:
+        shows:
+          - "Commitments made vs completed"
+          - "On-time rate trend"
+          - "Current streak"
+          - "Stakeholders most impacted"
+    
+    commands:
+      - "/integrity - Show integrity dashboard"
+      - "/streak - Show reliability streak history"
+    
+    acceptance_criteria:
+      - "Integrity score visible on home screen"
+      - "Metrics update in real-time"
+      - "AI references integrity patterns in coaching"
+
+  stakeholder_centric_views:
+    title: "Stakeholder-Centric Views"
+    priority: high
+    complexity: medium
+    status: proposed
+    category: integrity
+    phase: next
+    
+    description: |
+      The README emphasizes "promises to people" but the UI doesn't surface 
+      stakeholder relationships prominently. Add views that center on WHO 
+      you've made commitments to, not just WHAT you need to do.
+    
+    proposed_changes:
+      stakeholder_view:
+        description: "Show commitments grouped by stakeholder"
+        features:
+          - "List stakeholders with commitment counts"
+          - "Expand to show commitments per stakeholder"
+          - "Reliability score per stakeholder"
+          - "Visual indicator for stakeholders with at-risk commitments"
+      
+      stakeholder_impact_surface:
+        description: "Highlight which stakeholders are most affected by misses"
+        features:
+          - "Sort by impact (frequency × importance)"
+          - "AI coaching: 'You've missed 3 commitments to [name] this month'"
+    
+    commands:
+      - "/stakeholders - List stakeholders with commitment counts"
+      - "/show stakeholders - Alternative syntax"
+    
+    acceptance_criteria:
+      - "Can view commitments grouped by stakeholder"
+      - "Reliability score shown per stakeholder"
+      - "Most-impacted stakeholders surfaced"
+
+  commitment_guardrails:
+    title: "Make Fewer Promises Guardrails"
+    priority: high
+    complexity: low
+    status: proposed
+    category: integrity
+    phase: next
+    
+    description: |
+      MPI principle: "make fewer, keep them all." Currently nothing prevents 
+      commitment overload. Add guardrails that nudge toward quality over quantity.
+    
+    proposed_changes:
+      overcommitment_warning:
+        description: "Warn when user has too many active commitments"
+        threshold: "Configurable (default: 7 active commitments)"
+        message: "You have 8 active commitments. Are you sure you want to add another?"
+      
+      commitment_velocity:
+        description: "Track commitments made vs completed per week"
+        alert: "You're making commitments faster than completing them"
+      
+      ai_coaching:
+        prompts:
+          - "Before adding: 'What would you need to drop to take this on?'"
+          - "When overloaded: 'Which of these could be renegotiated?'"
+    
+    acceptance_criteria:
+      - "Warning appears when adding commitment above threshold"
+      - "User can override warning but it's logged"
+      - "Velocity metrics visible in integrity dashboard"
+
+  complete_recurring_tui:
+    title: "Complete Recurring Commitments TUI"
+    priority: medium
+    complexity: low
+    status: proposed
+    category: feature_completion
+    phase: next
+    
+    description: |
+      RecurringCommitment model and recurrence logic are complete (790 tests).
+      TUI commands exist but aren't fully wired to persistence.
+    
+    current_behavior: |
+      /recurring handler exists but doesn't persist to database.
+      RecurringHandler._start_creation_flow builds draft but no save.
+    
+    proposed_changes:
+      - "Wire /recurring new to create RecurringCommitment in database"
+      - "Wire /recurring pause, resume, delete to update/remove records"
+      - "Show recurring indicator (↻) in commitment views"
+      - "Display next due date in recurring list"
+    
+    acceptance_criteria:
+      - "/recurring new creates RecurringCommitment"
+      - "/recurring pause sets is_active=false"
+      - "Generated instances show recurring indicator"
+
+  goal_review_tui:
+    title: "Goal Review TUI Commands"
+    priority: medium
+    complexity: low
+    status: proposed
+    category: feature_completion
+    phase: next
+    
+    description: |
+      Goal model has is_due_for_review(), complete_review(), review intervals.
+      But no TUI commands to trigger review flow.
+    
+    current_behavior: |
+      Review fields exist: next_review_date, review_interval_days, last_reviewed_at.
+      get_goals_due_for_review() query exists. No /goal review command.
+    
+    proposed_changes:
+      - "Add /goal review command"
+      - "Show goals due for review"
+      - "Guided review flow with MPI prompts ('Does this still ignite passion?')"
+      - "Update next_review_date on completion"
+    
+    acceptance_criteria:
+      - "/goal review shows goals due for review"
+      - "Completing review updates dates"
+      - "Home screen indicates goals due for review"
+
+# =============================================================================
+# LATER - Future Considerations
+# =============================================================================
+# Medium/low priority features for future development cycles.
+
+  daily_checkin:
+    title: "Daily Check-in / Stand-up View"
+    priority: medium
+    complexity: medium
+    status: proposed
+    category: engagement
+    phase: later
+    
+    description: |
+      Aligns with "Just Do One" philosophy. Structured morning/evening ritual
+      that focuses on today's commitments.
+    
+    proposed_changes:
+      morning_checkin:
+        prompt: "What are your commitments for today?"
+        shows:
+          - "Commitments due today"
+          - "Overdue commitments"
+          - "At-risk commitments"
+        action: "Mark which ones you're committing to complete today"
+      
+      evening_checkin:
+        prompt: "Did you deliver on your commitments?"
+        shows:
+          - "Today's commitments with status"
+          - "Quick complete/at-risk buttons"
+        action: "Update status, trigger cleanup if needed"
+      
+      focus_mode:
+        description: "Show only ONE commitment at a time"
+        principle: "Just Do One thing at a time"
+    
+    commands:
+      - "/today - Show today's commitments"
+      - "/checkin - Start morning or evening check-in"
+    
+    acceptance_criteria:
+      - "Morning check-in shows today's commitments"
+      - "Evening check-in prompts for status updates"
+      - "Focus mode hides everything except current commitment"
+
+  notifications:
+    title: "Notification System"
+    priority: medium
+    complexity: medium
+    status: proposed
+    category: engagement
+    phase: later
+    
+    description: |
+      External reminders reinforce commitment keeping. Start with desktop 
+      notifications, expand to integrations.
+    
+    proposed_changes:
+      desktop_notifications:
+        triggers:
+          - "24 hours before due: Gentle reminder"
+          - "2 hours before due: Urgent if not in_progress"
+          - "Overdue: Escalation prompt"
+      
+      future_integrations:
+        - "Slack/Discord webhooks"
+        - "Daily digest email"
+        - "Calendar sync (iCal export)"
+      
+      settings:
+        - "Customizable reminder timing"
+        - "Per-commitment preferences"
+        - "Quiet hours support"
+    
+    acceptance_criteria:
+      - "Desktop notifications appear for due commitments"
+      - "User can configure notification timing"
+      - "Quiet hours respected"
+
+  weekly_report:
+    title: "Weekly Integrity Report"
+    priority: medium
+    complexity: medium
+    status: proposed
+    category: engagement
+    phase: later
+    
+    description: |
+      Auto-generated weekly report reinforcing MPI principles through visibility.
+    
+    proposed_changes:
+      report_contents:
+        - "Commitments made vs kept this week"
+        - "On-time rate (this week vs average)"
+        - "Current reliability streak"
+        - "Stakeholders most impacted"
+        - "Goals progressed"
+        - "Upcoming week preview"
+      
+      delivery:
+        - "Shown on app launch Monday morning"
+        - "Exportable to markdown"
+        - "Optional email delivery"
+    
+    commands:
+      - "/report - Generate weekly report"
+      - "/report last - Show last week's report"
+    
+    acceptance_criteria:
+      - "Report auto-generates weekly"
+      - "Key metrics clearly displayed"
+      - "Exportable format"
+
+  graceful_degradation:
+    title: "Graceful Degradation Without AI"
+    priority: low
+    complexity: medium
+    status: proposed
+    category: robustness
+    phase: later
+    
+    description: |
+      When AI provider is unavailable (no auth, rate limited, network error),
+      allow slash commands to work while disabling natural language processing.
+    
+    proposed_changes:
+      - "Detect AI availability on startup and during use"
+      - "Fall back to command-only mode"
+      - "Show clear indicator of degraded mode in UI"
+      - "Queue natural language messages for later (optional)"
+    
+    acceptance_criteria:
+      - "App launches even without API key"
+      - "Slash commands work without AI"
+      - "Clear indicator when AI unavailable"
+
+  import_from_todo_apps:
+    title: "Import from Todo Apps"
+    priority: low
+    complexity: medium
+    status: proposed
+    category: adoption
+    phase: later
+    
+    description: |
+      Lower barrier to adoption for people switching from todo apps.
+      Import existing tasks and prompt for stakeholder assignment.
+    
+    proposed_changes:
+      supported_formats:
+        - "Todoist CSV/JSON export"
+        - "Things 3 JSON export"
+        - "Generic CSV (title, due_date, notes)"
+      
+      import_flow:
+        - "Parse import file"
+        - "Show preview of items to import"
+        - "Prompt: 'Who is this commitment to?' for each"
+        - "Create commitments with stakeholder links"
+    
+    commands:
+      - "/import <file> - Import from file"
+    
+    acceptance_criteria:
+      - "Can import from Todoist export"
+      - "Each imported item gets stakeholder"
+      - "Preview before final import"
+
+  textual_web:
+    title: "Browser Access via Textual-Web"
+    priority: low
+    complexity: low
+    status: proposed
+    category: accessibility
+    phase: later
+    
+    description: |
+      Not everyone lives in the terminal. Textual supports web export
+      for browser-based access with minimal additional work.
+    
+    proposed_changes:
+      - "Add textual-web dependency"
+      - "Create web entry point"
+      - "Test responsive behavior"
+      - "Document deployment options"
+    
+    acceptance_criteria:
+      - "App accessible via browser"
+      - "All features work in web mode"
+      - "Reasonable performance"
+
+  vision_alignment_reports:
+    title: "Vision Alignment Reports"
+    priority: low
+    complexity: medium
+    status: proposed
+    category: integrity
+    phase: later
+    
+    description: |
+      Track and report on how well commitments align with vision.
+      Surface "drift" where user is making commitments that don't connect
+      to any vision or goal.
+    
+    proposed_changes:
+      alignment_metrics:
+        - "vision_linked_rate: commitments with vision ancestry / total"
+        - "orphan_commitment_count: commitments with no goal/milestone link"
+        - "goal_coverage: goals with active commitments / total active goals"
+        - "vision_drift_alert: warn when orphan rate exceeds threshold"
+      
+      quarterly_report:
+        shows:
+          - "% commitments linked to vision"
+          - "Goals without recent commitments"
+          - "Orphan commitments list"
+          - "Suggested goal/vision links"
+    
+    commands:
+      - "/alignment - Show vision alignment dashboard"
+    
+    acceptance_criteria:
+      - "Orphan commitments surfaced for attention"
+      - "AI suggests linking orphans to goals"
+
+  ai_intelligent_sorting:
+    title: "AI-Intelligent Commitment Sorting"
+    priority: low
+    complexity: medium
+    status: proposed
+    category: ai_enhancement
+    phase: later
+    
+    description: "Smart sorting that surfaces what matters most"
+    
+    proposed_changes:
+      factors:
+        - "Overdue status"
+        - "Stakeholder importance"
+        - "Goal alignment"
+        - "User patterns"
+        - "Risk level"
+      features:
+        - "Toggle between 'smart' and 'due date' sorting"
+    
+    acceptance_criteria:
+      - "Smart sort available as option"
+      - "Factors are explainable"
+
+  recurring_commitment_snapshots:
+    title: "Recurring Commitment Visual Snapshots"
+    priority: low
+    complexity: low
+    status: proposed
+    category: testing
+    phase: later
+    
+    description: |
+      Visual regression snapshots for recurring commitment UI components.
+      Deferred from add-recurring-commitments Phase 9.
+    
+    proposed_changes:
+      snapshots_to_add:
+        - "recurring_commitment_list: List view showing templates"
+        - "recurring_commitment_detail: Pattern details, next due, count"
+        - "commitment_with_recurring_indicator: Shows ↻ when linked"
+    
+    acceptance_criteria:
+      - "Snapshot tests exist for recurring views"
+      - "Recurring indicator verified in snapshots"
+
+  cloud_sync:
+    title: "Cloud Sync"
+    priority: low
+    complexity: very_high
+    status: proposed
+    category: future
+    phase: later
+    
+    description: "Optional cloud backup and multi-device support"
+    
+    proposed_changes:
+      - "Optional cloud backup/sync"
+      - "Multi-device support"
+      - "Conflict resolution for concurrent edits"
+      - "End-to-end encryption option"
+
+  mobile_interface:
+    title: "Native Mobile Interface"
+    priority: low
+    complexity: very_high
+    status: proposed
+    category: future
+    phase: later
+    
+    description: "Native mobile app for iOS/Android"
+    
+    proposed_changes:
+      - "React Native or Flutter app"
+      - "Sync with desktop database"
+      - "Push notifications"
+      - "Quick capture widget"
+
+  coaching_integration:
+    title: "Coaching Hooks & Vision Calls"
+    priority: low
+    complexity: medium
+    status: proposed
+    category: future
+    phase: later
+    
+    description: |
+      Support for coaching sessions with structured agendas and feedback.
+      Based on MPI Foundations emphasis on vision calls.
+    
+    proposed_changes:
+      vision_call_agenda:
+        includes:
+          - "Recent commitments and status"
+          - "Commitments at risk or missed"
+          - "Cleanup plan status"
+          - "Integrity metrics summary"
+          - "Goals due for review"
+      
+      feedback_capture:
+        fields:
+          - "session_date"
+          - "insights"
+          - "action_items"
+          - "next_session_date"
+    
+    commands:
+      - "/agenda - Generate coaching session agenda"
+      - "/feedback - Log session feedback"
+
+  go_live_prompts:
+    title: "GO LIVE Value Prompts"
+    priority: low
+    complexity: low
+    status: proposed
+    category: future
+    phase: later
+    
+    description: |
+      Lightweight prompts reinforcing MPI's GO LIVE values:
+      Growth, Ownership, Love, Integrity, Vision, Energy
+    
+    proposed_changes:
+      prompt_types:
+        - trigger: "Starting work on commitment"
+          prompt: "Where is your ownership in this?"
+        - trigger: "Completing a commitment"
+          prompt: "What growth did this create?"
+        - trigger: "Daily check-in"
+          prompt: "What expands your energy today?"
+        - trigger: "Goal review"
+          prompt: "Does this still ignite passion?"
+        - trigger: "After missing commitment"
+          prompt: "What can you learn from this?"
+      
+      settings:
+        - "Prompts can be enabled/disabled per type"
+        - "Frequency adjustable"
+
+# =============================================================================
+# NOTES
+# =============================================================================
+
+notes:
+  phase_summary: |
+    Now:   Inbox triage (in progress), Honor-your-word protocol (spec exists)
+    Next:  Wire AI to chat, persist handlers, navigation, integrity metrics, stakeholder views, guardrails, recurring TUI, goal review
+    Later: Daily check-in, notifications, weekly report, graceful degradation, import, web access, cloud sync, mobile, coaching
+  
+  review_cadence: |
+    This document should be reviewed when:
+    - Starting a new development cycle
+    - User feedback suggests feature gaps
+    - New MPI guidance becomes available
+  
+  promotion_criteria: |
+    Items move from Later → Next when:
+    - Higher priority items are complete
+    - User demand is demonstrated
+    - Prerequisite features are complete
+    
+    Items move from Next → Now when:
+    - Spec is created/proposed
+    - Active development begins
+  
+  philosophy_alignment: |
+    All features should align with MPI principles:
+    - Does this help users keep commitments?
+    - Does this support integrity (deliver, notify, cleanup)?
+    - Does this connect actions to vision?

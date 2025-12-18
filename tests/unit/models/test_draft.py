@@ -40,12 +40,22 @@ class TestEntityType:
     """Tests for EntityType enum."""
 
     def test_has_all_entity_types(self) -> None:
-        """EntityType has commitment, goal, task, vision, milestone."""
+        """EntityType has commitment, goal, task, vision, milestone, unknown."""
         assert EntityType.COMMITMENT.value == "commitment"
         assert EntityType.GOAL.value == "goal"
         assert EntityType.TASK.value == "task"
         assert EntityType.VISION.value == "vision"
         assert EntityType.MILESTONE.value == "milestone"
+        assert EntityType.UNKNOWN.value == "unknown"
+
+    def test_unknown_type_for_triage_items(self) -> None:
+        """UNKNOWN type is used for triage items."""
+        draft = Draft(
+            entity_type=EntityType.UNKNOWN,
+            partial_data={"raw_text": "Call mom about birthday plans"},
+        )
+        assert draft.entity_type == EntityType.UNKNOWN
+        assert draft.partial_data["raw_text"] == "Call mom about birthday plans"
 
 
 class TestDraftValidation:

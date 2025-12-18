@@ -17,6 +17,7 @@ class EntityType(str, Enum):
     TASK = "task"
     VISION = "vision"
     MILESTONE = "milestone"
+    UNKNOWN = "unknown"  # For triage items captured without type
 
 
 def utc_now() -> datetime:

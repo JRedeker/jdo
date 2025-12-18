@@ -10,8 +10,12 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Vertical
 from textual.message import Message
+from textual.reactive import reactive
 from textual.screen import Screen
 from textual.widgets import Static
+
+from jdo.db import get_session
+from jdo.db.session import get_triage_count
 
 
 class HomeScreen(Screen[None]):
@@ -76,6 +80,18 @@ class HomeScreen(Screen[None]):
         color: $accent;
         text-style: bold;
     }
+
+    HomeScreen #triage-indicator {
+        text-align: center;
+        color: $warning;
+        text-style: bold;
+        margin-top: 1;
+        margin-bottom: 1;
+    }
+
+    HomeScreen #triage-indicator.hidden {
+        display: none;
+    }
     """
 
     BINDINGS: ClassVar[list[Binding]] = [
@@ -86,9 +102,12 @@ class HomeScreen(Screen[None]):
         Binding("m", "show_milestones", "Milestones"),
         Binding("o", "show_orphans", "Orphans"),
         Binding("h", "show_hierarchy", "Hierarchy"),
+        Binding("t", "start_triage", "Triage", show=False),
         Binding("s", "settings", "Settings"),
         Binding("q", "quit", "Quit"),
     ]
+
+    triage_count: reactive[int] = reactive(0)
 
     def __init__(
         self,
@@ -111,12 +130,42 @@ class HomeScreen(Screen[None]):
         with Container(id="welcome-container"), Vertical(id="welcome-box"):
             yield Static("JDO", classes="title")
             yield Static("Just Do One thing at a time", classes="subtitle")
+            yield Static("", id="triage-indicator", classes="hidden")
             yield Static("")
             yield Static("What would you like to do?")
             yield Static("")
             yield Static("[n] New chat    [g] Goals    [c] Commitments", classes="shortcut-row")
             yield Static("[v] Visions     [m] Milestones  [o] Orphans", classes="shortcut-row")
             yield Static("[h] Hierarchy   [s] Settings    [q] Quit", classes="shortcut-row")
+
+    def on_mount(self) -> None:
+        """Handle mount event - check for triage items."""
+        self._check_triage_count()
+
+    def _check_triage_count(self) -> None:
+        """Check database for items needing triage and update count.
+
+        Silently handles database errors (e.g., missing tables during testing).
+        """
+        try:
+            with get_session() as session:
+                self.triage_count = get_triage_count(session)
+        except Exception:
+            # Database may not be initialized (e.g., in tests)
+            self.triage_count = 0
+
+    def watch_triage_count(self, count: int) -> None:
+        """React to triage_count changes by updating the indicator.
+
+        Args:
+            count: The new triage count.
+        """
+        indicator = self.query_one("#triage-indicator", Static)
+        if count > 0:
+            indicator.update(f"{count} item(s) need triage [t]")
+            indicator.remove_class("hidden")
+        else:
+            indicator.add_class("hidden")
 
     def action_new_chat(self) -> None:
         """Start a new chat conversation."""
@@ -151,6 +200,11 @@ class HomeScreen(Screen[None]):
         """Show the full hierarchy tree view."""
         self.post_message(self.ShowHierarchy())
 
+    def action_start_triage(self) -> None:
+        """Start triage workflow for captured items."""
+        if self.triage_count > 0:
+            self.post_message(self.StartTriage())
+
     # Custom messages for parent app to handle
     class NewChat(Message):
         """Message to start a new chat."""
@@ -175,3 +229,6 @@ class HomeScreen(Screen[None]):
 
     class OpenSettings(Message):
         """Message to open settings."""
+
+    class StartTriage(Message):
+        """Message to start triage workflow."""

@@ -10,6 +10,7 @@ from sqlmodel import Session, func, select
 from jdo.db.engine import get_engine
 from jdo.models import Commitment, Draft, Goal, Milestone, RecurringCommitment, Vision
 from jdo.models.commitment import CommitmentStatus
+from jdo.models.draft import EntityType
 from jdo.models.goal import GoalProgress, GoalStatus
 from jdo.models.milestone import MilestoneStatus
 from jdo.models.recurring_commitment import RecurringCommitmentStatus
@@ -308,3 +309,40 @@ def get_commitment_progress(session: Session, goal_id: UUID) -> GoalProgress:
         pending=counts[CommitmentStatus.PENDING],
         abandoned=counts[CommitmentStatus.ABANDONED],
     )
+
+
+def get_triage_items(session: Session) -> list[Draft]:
+    """Get all drafts with UNKNOWN entity type for triage.
+
+    Returns items in FIFO order (oldest first) for processing.
+
+    Args:
+        session: Database session.
+
+    Returns:
+        List of drafts needing triage, ordered by creation date (oldest first).
+    """
+    statement = (
+        select(Draft)
+        .where(
+            Draft.entity_type == EntityType.UNKNOWN,
+        )
+        .order_by(Draft.created_at.asc())
+    )
+    return list(session.exec(statement).all())
+
+
+def get_triage_count(session: Session) -> int:
+    """Get count of items needing triage.
+
+    Args:
+        session: Database session.
+
+    Returns:
+        Number of drafts with UNKNOWN entity type.
+    """
+    statement = select(func.count(Draft.id)).where(
+        Draft.entity_type == EntityType.UNKNOWN,
+    )
+    result = session.exec(statement).one()
+    return int(result)
