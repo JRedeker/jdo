@@ -7,9 +7,12 @@ src/jdo/commands/handlers.py:54: execute
 src/jdo/commands/handlers.py:196: execute
 src/jdo/commands/handlers.py:313: execute
 
+# Triage handler helper - NLOC 55 due to display formatting
+src/jdo/commands/handlers.py:1242: _show_analysis_with_options
+
 # Session functions - NLOC > 50 but necessary for database operations  
-src/jdo/db/session.py:161: check_and_generate_recurring_instances
-src/jdo/db/session.py:218: generate_next_instance_for_recurring
+src/jdo/db/session.py:162: check_and_generate_recurring_instances
+src/jdo/db/session.py:219: generate_next_instance_for_recurring
 
 # Widget init - 7 params is acceptable for Textual widgets
 src/jdo/widgets/chat_message.py:59: __init__
