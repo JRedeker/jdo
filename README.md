@@ -1,4 +1,4 @@
-# jdo
+# jdo ✨
 
 **Just Do One thing at a time**
 
@@ -6,7 +6,7 @@ An AI-powered terminal app for people who want to achieve their goals without dr
 
 ---
 
-## Why jdo?
+## 🤔 Why jdo?
 
 Most productivity tools ask you to learn their system. jdo asks you one question: *What do you want to accomplish?*
 
@@ -14,39 +14,52 @@ Tell it in plain language. The AI extracts goals, milestones, tasks, and commitm
 
 ---
 
-## Features
+## ⚡ Features
 
 | | |
 |---|---|
-| **Conversational Interface** | Chat naturally—the AI structures your goals for you |
-| **Flexible Hierarchy** | Visions → Goals → Milestones → Tasks → Commitments |
-| **Keyboard-First Design** | Navigate everything without touching your mouse |
-| **Draft Recovery** | Crash mid-thought? Pick up right where you left off |
-| **Multiple AI Providers** | Anthropic, OpenAI, or OpenRouter—your choice |
-| **Local-First Storage** | Your data stays on your machine, always |
+| 💬 **Conversational Interface** | Chat naturally—the AI structures your goals for you |
+| 🏗️ **Flexible Hierarchy** | Visions → Goals → Milestones → Tasks → Commitments |
+| ⌨️ **Keyboard-First Design** | Navigate everything without touching your mouse |
+| 🔄 **Recurring Commitments** | Set it once, generate instances automatically |
+| 💾 **Draft Recovery** | Crash mid-thought? Pick up right where you left off |
+| 🤖 **Multiple AI Providers** | Anthropic, OpenAI, or OpenRouter—your choice |
+| 🔒 **Local-First Storage** | Your data stays on your machine, always |
 
 ---
 
-## Installation
+## 📦 Installation
 
-**Requirements:** Python 3.11+
+**Requirements:** Python 3.11+ and [uv](https://docs.astral.sh/uv/)
 
 ```bash
-pip install jdo
+# Clone the repository
+git clone https://github.com/JRedeker/jdo.git
+cd jdo
+
+# Install dependencies
+uv sync
+
+# Run the app
+uv run jdo
 ```
 
 <details>
-<summary>Alternative: install with uv</summary>
+<summary>🔧 Install uv if you don't have it</summary>
 
 ```bash
-uv pip install jdo
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
 </details>
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
 **1. Configure your AI provider**
 
@@ -55,7 +68,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
 <details>
-<summary>Using a different provider?</summary>
+<summary>🔌 Using a different provider?</summary>
 
 ```bash
 # OpenAI
@@ -72,14 +85,14 @@ export JDO_AI_PROVIDER="openrouter"
 **2. Launch**
 
 ```bash
-jdo
+uv run jdo
 ```
 
 **3. Press `n` to start a new chat and describe what you want to accomplish.**
 
 ---
 
-## Keyboard Shortcuts
+## ⌨️ Keyboard Shortcuts
 
 ```
 Navigation                      Views
@@ -94,7 +107,7 @@ d   Toggle dark/light mode      m   Milestones
 
 ---
 
-## How It Works
+## 🧠 How It Works
 
 ### The Hierarchy
 
@@ -137,7 +150,7 @@ You: I need to lead a major project and improve my system design skills
 
 ---
 
-## Configuration
+## ⚙️ Configuration
 
 ### Environment Variables
 
@@ -164,12 +177,12 @@ All data is stored locally using platform-appropriate directories:
 
 ---
 
-## Development
+## 🛠️ Development
 
 ### Setup
 
 ```bash
-git clone https://github.com/your-username/jdo.git
+git clone https://github.com/JRedeker/jdo.git
 cd jdo
 uv sync --all-groups
 ```
@@ -202,9 +215,10 @@ src/jdo/
 
 ---
 
-## Requirements
+## 📋 Requirements
 
 - Python 3.11 or later
+- [uv](https://docs.astral.sh/uv/) package manager
 - Modern terminal with Unicode support
 - API key from Anthropic, OpenAI, or OpenRouter
 
@@ -212,7 +226,7 @@ src/jdo/
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -221,10 +235,10 @@ src/jdo/
 
 ---
 
-## License
+## 📄 License
 
-*[Add your license here]*
+MIT
 
 ---
 
-<sub>Built with [Textual](https://textual.textualize.io/) · [PydanticAI](https://ai.pydantic.dev/) · [SQLModel](https://sqlmodel.tiangolo.com/) · [Rich](https://rich.readthedocs.io/)</sub>
+<sub>Built with 💜 using [Textual](https://textual.textualize.io/) · [PydanticAI](https://ai.pydantic.dev/) · [SQLModel](https://sqlmodel.tiangolo.com/) · [Rich](https://rich.readthedocs.io/)</sub>
