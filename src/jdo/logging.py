@@ -13,11 +13,13 @@ import logging
 import sys
 from typing import TYPE_CHECKING, ClassVar
 
-from loguru import Logger, logger
+from loguru import logger
 
 if TYPE_CHECKING:
     from pathlib import Path
     from types import FrameType
+
+    import loguru
 
 
 class InterceptHandler(logging.Handler):
@@ -112,7 +114,7 @@ def configure_logging(
             logging.getLogger(logger_name).handlers = [InterceptHandler()]
 
 
-def get_logger(name: str) -> Logger:
+def get_logger(name: str) -> loguru.Logger:
     """Get a logger instance bound to a module name.
 
     Args:

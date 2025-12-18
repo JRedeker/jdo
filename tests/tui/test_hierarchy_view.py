@@ -3,12 +3,14 @@
 Phase 12: Tree view showing Vision > Goal > Milestone > Commitment.
 """
 
+from __future__ import annotations
+
 from typing import ClassVar
 from uuid import uuid4
 
 import pytest
 from textual.app import App, ComposeResult
-from textual.binding import Binding
+from textual.binding import Binding, BindingType
 from textual.message import Message
 from textual.widgets import Tree
 
@@ -16,6 +18,7 @@ from jdo.models import Commitment, Goal, Milestone, Stakeholder, Vision
 from jdo.models.commitment import CommitmentStatus
 from jdo.models.goal import GoalStatus
 from jdo.models.milestone import MilestoneStatus
+from jdo.models.stakeholder import StakeholderType
 from jdo.models.vision import VisionStatus
 
 
@@ -32,7 +35,7 @@ class TestHierarchyViewWidget:
         """HierarchyView has navigation key bindings."""
         from jdo.widgets.hierarchy_view import HierarchyView
 
-        binding_keys = [binding[0] for binding in HierarchyView.BINDINGS]
+        binding_keys = [binding.key for binding in HierarchyView.BINDINGS]
 
         # Arrow keys for expand/collapse
         assert "right" in binding_keys or "enter" in binding_keys
@@ -160,13 +163,13 @@ class TestHierarchyViewStructure:
             target_date=date(2025, 3, 1),
             status=MilestoneStatus.PENDING,
         )
-        stakeholder = Stakeholder(id=uuid4(), name="DevOps Team")
+        stakeholder = Stakeholder(id=uuid4(), name="DevOps Team", type=StakeholderType.TEAM)
         commitment = Commitment(
             id=uuid4(),
             milestone_id=milestone.id,
             stakeholder_id=stakeholder.id,
             deliverable="Configure GitHub Actions",
-            due_date=datetime(2025, 2, 15),
+            due_date=date(2025, 2, 15),
             status=CommitmentStatus.PENDING,
         )
 
@@ -218,8 +221,8 @@ class TestHierarchyViewNavigation:
         """Create a test app with HierarchyView."""
         from jdo.widgets.hierarchy_view import HierarchyView
 
-        class HierarchyApp(App):
-            BINDINGS: ClassVar[list[Binding]] = [
+        class HierarchyApp(App[None]):
+            BINDINGS: ClassVar[list[BindingType]] = [
                 Binding("q", "quit", "Quit"),
             ]
 

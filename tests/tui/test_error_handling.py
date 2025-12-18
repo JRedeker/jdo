@@ -103,7 +103,8 @@ class TestConnectionErrorHandling:
         error_msg = create_connection_error_message()
 
         # Should mention retry or connection
-        assert "retry" in error_msg.content.lower() or "connection" in error_msg.content.lower()
+        text = str(error_msg.content).lower()
+        assert "retry" in text or "connection" in text
 
 
 class TestErrorRecovery:
