@@ -7,6 +7,12 @@ like `jdo capture "text"` for quick capture from scripts and shortcuts.
 import click
 
 from jdo.db import create_db_and_tables, get_session
+from jdo.db.migrations import (
+    create_revision,
+    downgrade_database,
+    get_migration_status,
+    upgrade_database,
+)
 from jdo.models.draft import Draft, EntityType
 
 
@@ -50,6 +56,49 @@ def capture(text: str) -> None:
         session.add(draft)
 
     click.echo(f"Captured: {text}")
+
+
+@cli.group()
+def db() -> None:
+    """Database migration commands."""
+
+
+@db.command("status")
+def db_status() -> None:
+    """Show current migration status."""
+    click.echo("Current migration status:")
+    get_migration_status()
+
+
+@db.command("upgrade")
+@click.option("--revision", "-r", default="head", help="Target revision (default: head)")
+def db_upgrade(revision: str) -> None:
+    """Upgrade database to a later version."""
+    click.echo(f"Upgrading database to: {revision}")
+    upgrade_database(revision)
+    click.echo("Database upgraded successfully.")
+
+
+@db.command("downgrade")
+@click.option("--revision", "-r", default="-1", help="Target revision (default: -1)")
+def db_downgrade(revision: str) -> None:
+    """Downgrade database to an earlier version."""
+    click.echo(f"Downgrading database to: {revision}")
+    downgrade_database(revision)
+    click.echo("Database downgraded successfully.")
+
+
+@db.command("revision")
+@click.option("--message", "-m", required=True, help="Migration description")
+@click.option("--autogenerate/--no-autogenerate", default=True, help="Auto-detect changes")
+def db_revision(message: str, *, autogenerate: bool) -> None:
+    """Create a new migration revision."""
+    click.echo(f"Creating new revision: {message}")
+    result = create_revision(message, autogenerate=autogenerate)
+    if result:
+        click.echo(f"Revision created: {result}")
+    else:
+        click.echo("No changes detected or revision creation failed.")
 
 
 def main() -> None:

@@ -18,6 +18,7 @@ from jdo.db.session import get_pending_drafts, get_visions_due_for_review
 from jdo.logging import configure_logging
 from jdo.models.draft import Draft
 from jdo.models.vision import Vision
+from jdo.observability import init_sentry
 from jdo.screens.chat import ChatScreen
 from jdo.screens.draft_restore import DraftRestoreScreen
 from jdo.screens.home import HomeScreen
@@ -52,10 +53,14 @@ class JdoApp(App[None]):
         self._snoozed_reviews: set[UUID] = set()
         self._visions_due_for_review: list[Vision] = []
 
-        # Configure logging
+        # Configure logging and observability
         settings = get_settings()
         log_path = settings.log_file_path if settings.log_to_file else None
         configure_logging(level=settings.log_level, log_file_path=log_path)
+
+        # Initialize Sentry (optional - only if DSN configured)
+        init_sentry(settings)
+
         logger.info("JDO application initialized")
 
     def compose(self) -> ComposeResult:

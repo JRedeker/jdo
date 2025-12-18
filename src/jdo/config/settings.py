@@ -38,6 +38,11 @@ class JDOSettings(BaseSettings):
     log_file_path: Path | None = None
     log_to_file: bool = False
 
+    # Sentry/Observability settings (optional)
+    sentry_dsn: str | None = None
+    sentry_traces_sample_rate: float = 0.1  # 10% of transactions
+    environment: str = "development"
+
     # Application settings
     timezone: str = "America/New_York"
 

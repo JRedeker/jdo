@@ -16,6 +16,8 @@ dependencies = [
     "httpx>=0.27.0",
     "click>=8.1.0",
     "loguru>=0.7.0",
+    "sentry-sdk>=2.0.0",
+    "alembic>=1.13.0",
 ]
 
 [project.scripts]
@@ -121,6 +123,9 @@ ignore = [
 ]
 "src/jdo/cli.py" = [
     "PLC0415", # Lazy import of TUI to avoid loading when running CLI subcommands
+]
+"src/jdo/observability.py" = [
+    "PLC0415", # Lazy import of JDOError to avoid circular import
 ]
 
 [tool.ruff.lint.isort]

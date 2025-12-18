@@ -84,6 +84,56 @@ class MyWidget(Widget):
 
 When pyrefly reports errors on working code, verify at runtime then document here.
 
+## Pre-commit Hooks
+
+Pre-commit hooks are configured to run automatically before each commit:
+
+```bash
+# Install hooks (one-time setup)
+uv run pre-commit install
+
+# Run manually on all files
+uv run pre-commit run --all-files
+
+# Skip hooks if needed (not recommended)
+git commit --no-verify
+```
+
+Hooks configured:
+- `trailing-whitespace` - Remove trailing whitespace
+- `end-of-file-fixer` - Ensure files end with newline
+- `check-yaml` - Validate YAML syntax
+- `check-toml` - Validate TOML syntax
+- `check-added-large-files` - Block files > 500KB
+- `ruff` - Lint with auto-fix
+- `ruff-format` - Format code
+- `pyrefly` - Type checking on src/
+
+## Database Migrations
+
+Database migrations are managed with Alembic:
+
+```bash
+# Check current migration status
+jdo db status
+
+# Apply all pending migrations
+jdo db upgrade
+
+# Create a new migration (auto-detects model changes)
+jdo db revision -m "Add new field to model"
+
+# Rollback one migration
+jdo db downgrade
+```
+
+**Workflow for schema changes**:
+1. Modify SQLModel model in `src/jdo/models/`
+2. Create migration: `jdo db revision -m "Description"`
+3. Review generated migration in `migrations/versions/`
+4. Apply migration: `jdo db upgrade`
+5. Run tests: `uv run pytest`
+
 ## Context7 Docs (check before coding)
 
 | Tech | ID | Topics |
