@@ -264,7 +264,24 @@ The following items are deferred to future iterations. Each is tracked here with
 **Effort**: Small (1-2 hours)
 **Priority**: Low - Helps user understand score
 
-### D8: Snapshot Tests
+### D8: Recovery Flow (at_risk → in_progress)
+**Current**: No handling when commitment recovers from at_risk
+**Target**: Cancel CleanupPlan and prompt about notification task when recovering
+
+**Implementation**:
+- [ ] Add /recover command or status change handler
+- [ ] When commitment status changes at_risk → in_progress:
+  - Set CleanupPlan.status = CANCELLED
+  - Prompt user: "Do you still need to notify [stakeholder], or has the situation resolved?"
+  - If resolved: Mark notification task as skipped with reason "Situation resolved"
+  - If still need to notify: Keep task active
+- [ ] Update IntegrityService with recover_commitment() method
+- [ ] Add tests for recovery flow
+
+**Effort**: Medium (2-3 hours)
+**Priority**: Medium - Completes the at-risk lifecycle
+
+### D9: Snapshot Tests
 **Current**: No snapshot tests for integrity views
 **Target**: Visual regression tests for integrity UI
 
@@ -283,10 +300,11 @@ The following items are deferred to future iterations. Each is tracked here with
 ### Deferred Work Priority Order
 
 1. **D3: Soft Enforcement** - High priority, core to integrity philosophy
-2. **D1: Notification Timeliness** - Medium, improves score accuracy
-3. **D2: Reliability Streak** - Medium, gamification
-4. **D4: Pre-Abandon Prompt** - Medium, encourages workflow
-5. **D5: Visual Indicators** - Low, polish
-6. **D6: Metric Trends** - Low, analytics
-7. **D7: Affecting Commitments** - Low, debugging aid
-8. **D8: Snapshot Tests** - Low, infrastructure
+2. **D8: Recovery Flow** - Medium, completes at-risk lifecycle
+3. **D1: Notification Timeliness** - Medium, improves score accuracy
+4. **D2: Reliability Streak** - Medium, gamification
+5. **D4: Pre-Abandon Prompt** - Medium, encourages workflow
+6. **D5: Visual Indicators** - Low, polish
+7. **D6: Metric Trends** - Low, analytics
+8. **D7: Affecting Commitments** - Low, debugging aid
+9. **D9: Snapshot Tests** - Low, infrastructure

@@ -80,9 +80,11 @@ The system SHALL track CleanupPlan progress through the recovery workflow.
 - **WHEN** user abandons commitment without completing notification task and confirms override
 - **THEN** CleanupPlan status changes to "skipped" with skipped_reason recorded
 
-#### Scenario: Transition to cancelled on recovery
+#### Scenario: Transition to cancelled on recovery (Deferred)
 - **WHEN** the associated Commitment recovers from "at_risk" to "in_progress"
 - **THEN** CleanupPlan status changes to "cancelled" (commitment no longer needs cleanup)
+
+**Note**: Recovery flow deferred to future iteration. Currently no automatic handling when commitment recovers.
 
 ### Requirement: Integrity Metrics Calculation
 
