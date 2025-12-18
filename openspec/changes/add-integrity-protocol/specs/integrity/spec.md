@@ -95,8 +95,9 @@ The system SHALL calculate integrity metrics from commitment history to measure 
 
 #### Scenario: Calculate notification timeliness
 - **WHEN** system calculates notification_timeliness metric
-- **THEN** it measures average days between marked_at_risk_at and due_date for at-risk commitments
-- **AND** normalizes to 0.0-1.0 scale where 7+ days early = 1.0, 0 days = 0.0
+- **THEN** it returns 1.0 (clean slate default)
+
+**Note**: Full timeliness calculation (measuring days between marked_at_risk_at and due_date) deferred to future iteration.
 
 #### Scenario: Calculate cleanup completion rate
 - **WHEN** system calculates cleanup_completion_rate metric
@@ -105,8 +106,9 @@ The system SHALL calculate integrity metrics from commitment history to measure 
 
 #### Scenario: Calculate reliability streak
 - **WHEN** system calculates current_streak_weeks metric
-- **THEN** it counts consecutive weeks where all commitments due that week were completed on time
-- **AND** streak resets to 0 when any commitment is late, abandoned, or skipped cleanup
+- **THEN** it returns 0 (no streak tracking yet)
+
+**Note**: Full streak calculation (counting consecutive on-time weeks) deferred to future iteration.
 
 ### Requirement: Integrity Score Calculation
 
@@ -126,9 +128,9 @@ The system SHALL calculate a composite integrity score from weighted metrics, di
   - D+: 67-69, D: 63-66, D-: 60-62
   - F: below 60
 
-#### Scenario: New user starts with A+
+#### Scenario: New user starts with A-
 - **WHEN** user has no commitment history
-- **THEN** integrity score displays as "A+" (clean slate, not penalized for no data)
+- **THEN** integrity score displays as "A-" (90 score: 1.0 on_time + 1.0 timeliness + 1.0 cleanup + 0 streak bonus)
 
 #### Scenario: Score updates on commitment status change
 - **WHEN** any commitment status changes to completed, abandoned, or at_risk
@@ -147,12 +149,16 @@ The system SHALL provide an integrity dashboard showing metrics breakdown.
   - Cleanup completion rate as percentage
   - Current reliability streak in weeks
 
-#### Scenario: Display metric trends
+#### Scenario: Display metric trends (Deferred)
 - **WHEN** user views integrity dashboard
-- **THEN** each metric shows direction indicator (improving, stable, declining) compared to previous period
+- **THEN** trend indicators are not yet implemented
 
-#### Scenario: Display commitments affecting score
+**Note**: Metric trends deferred to future iteration.
+
+#### Scenario: Display commitments affecting score (Deferred)
 - **WHEN** user views integrity dashboard
-- **THEN** the system lists recent commitments that negatively impacted score (late, abandoned without cleanup)
+- **THEN** commitment impact list is not yet implemented
+
+**Note**: Commitment impact list deferred to future iteration.
 
 

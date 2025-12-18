@@ -53,14 +53,17 @@ The system SHALL enforce valid status transitions involving the `at_risk` status
 - **WHEN** user changes Commitment status from "at_risk" to "abandoned" and CleanupPlan notification task is completed
 - **THEN** the status is updated and CleanupPlan status changes to "completed"
 
-#### Scenario: Abandon at-risk commitment without cleanup (soft enforcement)
+#### Scenario: Abandon at-risk commitment without cleanup (soft enforcement - Deferred)
 - **WHEN** user changes Commitment status from "at_risk" to "abandoned" and CleanupPlan notification task is NOT completed
-- **THEN** the system warns: "You haven't notified [stakeholder] yet. This will affect your integrity score. Continue anyway?"
-- **AND** if user confirms, status is updated and CleanupPlan status changes to "skipped"
+- **THEN** the status is updated and CleanupPlan status changes to "skipped"
 
-#### Scenario: Abandon commitment directly (bypass at-risk)
+**Note**: Soft enforcement warning deferred to future iteration. Currently allows direct abandonment.
+
+#### Scenario: Abandon commitment directly (bypass at-risk - Deferred)
 - **WHEN** user changes Commitment status directly from "pending" or "in_progress" to "abandoned"
-- **THEN** the system prompts: "Would you like to notify [stakeholder] before abandoning? This maintains your integrity." with options to mark at-risk first or abandon directly
+- **THEN** the status is updated without prompting
+
+**Note**: Pre-abandon at-risk prompt deferred to future iteration.
 
 ### Requirement: At-Risk Commitment Queries
 
