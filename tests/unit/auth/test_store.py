@@ -1,10 +1,8 @@
 """Tests for AuthStore credential storage."""
 
 import json
-import os
 import stat
 import sys
-import time
 from pathlib import Path
 
 import pytest
@@ -90,13 +88,12 @@ class TestAuthStoreReadWrite:
         store = AuthStore(auth_file)
 
         creds = ApiKeyCredentials(api_key="sk-12345")
-        store.save("anthropic", creds)
+        store.save("openai", creds)
 
         # Verify file content directly
         data = json.loads(auth_file.read_text())
-        assert "anthropic" in data
-        assert data["anthropic"]["type"] == "api"
-        assert data["anthropic"]["api_key"] == "sk-12345"
+        assert "openai" in data
+        assert data["openai"]["api_key"] == "sk-12345"
 
     def test_auth_store_updates_existing_credentials(self, tmp_path):
         """AuthStore updates existing credentials."""
@@ -157,32 +154,17 @@ class TestAuthStoreMultipleProviders:
 
     def test_auth_store_stores_multiple_providers(self, tmp_path):
         """AuthStore can store credentials for multiple providers."""
-        from jdo.auth.models import ApiKeyCredentials, OAuthCredentials
+        from jdo.auth.models import ApiKeyCredentials
         from jdo.auth.store import AuthStore
 
         auth_file = tmp_path / "auth.json"
         store = AuthStore(auth_file)
 
-        # Save credentials for multiple providers
-        expires = int(time.time() * 1000) + 3600000
         store.save("openai", ApiKeyCredentials(api_key="sk-openai"))
-        store.save(
-            "anthropic",
-            OAuthCredentials(
-                access_token="access_token",
-                refresh_token="refresh_token",
-                expires_at=expires,
-            ),
-        )
+        store.save("openrouter", ApiKeyCredentials(api_key="sk-openrouter"))
 
-        # Verify both exist
-        openai_creds = store.get("openai")
-        anthropic_creds = store.get("anthropic")
-
-        assert openai_creds is not None
-        assert anthropic_creds is not None
-        assert isinstance(openai_creds, ApiKeyCredentials)
-        assert isinstance(anthropic_creds, OAuthCredentials)
+        assert store.get("openai") is not None
+        assert store.get("openrouter") is not None
 
     def test_auth_store_update_preserves_other_providers(self, tmp_path):
         """Updating one provider's credentials doesn't affect others."""
@@ -203,33 +185,6 @@ class TestAuthStoreMultipleProviders:
         openrouter_creds = store.get("openrouter")
         assert openrouter_creds is not None
         assert openrouter_creds.api_key == "sk-openrouter"
-
-
-class TestAuthStoreOAuthCredentials:
-    """Tests for OAuth credential storage."""
-
-    def test_auth_store_saves_and_loads_oauth_credentials(self, tmp_path):
-        """AuthStore correctly saves and loads OAuth credentials."""
-        from jdo.auth.models import OAuthCredentials
-        from jdo.auth.store import AuthStore
-
-        auth_file = tmp_path / "auth.json"
-        store = AuthStore(auth_file)
-
-        expires = int(time.time() * 1000) + 3600000
-        original = OAuthCredentials(
-            access_token="access_xyz",
-            refresh_token="refresh_abc",
-            expires_at=expires,
-        )
-        store.save("anthropic", original)
-
-        loaded = store.get("anthropic")
-        assert loaded is not None
-        assert isinstance(loaded, OAuthCredentials)
-        assert loaded.access_token == "access_xyz"
-        assert loaded.refresh_token == "refresh_abc"
-        assert loaded.expires_at == expires
 
 
 class TestAuthStoreAtomicWrite:

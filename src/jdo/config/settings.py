@@ -11,14 +11,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from jdo.paths import get_database_path, get_log_file_path
 
 # Valid AI providers
-AIProvider = Literal["anthropic", "openai", "openrouter"]
+AIProvider = Literal["openai", "openrouter"]
 
 
 class JDOSettings(BaseSettings):
     """Application settings loaded from environment variables.
 
     Environment variables should be prefixed with JDO_.
-    Example: JDO_AI_PROVIDER=anthropic
+    Example: JDO_AI_PROVIDER=openai
     """
 
     model_config = SettingsConfigDict(
@@ -29,8 +29,8 @@ class JDOSettings(BaseSettings):
     )
 
     # AI Provider settings
-    ai_provider: AIProvider = "anthropic"
-    ai_model: str = "claude-sonnet-4-20250514"
+    ai_provider: AIProvider = "openai"
+    ai_model: str = "gpt-4o-mini"
 
     # Database settings
     database_path: Path | None = None

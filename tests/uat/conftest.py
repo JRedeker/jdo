@@ -34,7 +34,7 @@ def pytest_configure(config: pytest.Config) -> None:
 
 def has_ai_credentials() -> bool:
     """Check if valid AI credentials are available."""
-    if os.environ.get("ANTHROPIC_API_KEY"):
+    if os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENROUTER_API_KEY"):
         return True
     try:
         settings = get_settings()
@@ -60,12 +60,12 @@ def uat_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[JdoApp]
     # Set up test database
     db_path = tmp_path / "uat_test.db"
     monkeypatch.setenv("JDO_DATABASE_PATH", str(db_path))
-    monkeypatch.setenv("JDO_AI_PROVIDER", "anthropic")
-    monkeypatch.setenv("JDO_AI_MODEL", "claude-sonnet-4-20250514")
+    monkeypatch.setenv("JDO_AI_PROVIDER", "openai")
+    monkeypatch.setenv("JDO_AI_MODEL", "gpt-4o")
     monkeypatch.setenv("JDO_TIMEZONE", "UTC")
     monkeypatch.setenv("JDO_LOG_LEVEL", "INFO")
     # Set a test API key to bypass AI-required screen in mocked tests
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-for-uat")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-for-uat")
 
     reset_settings()
     create_db_and_tables()
@@ -88,11 +88,11 @@ def live_uat_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Jd
     # Set up test database
     db_path = tmp_path / "uat_live_test.db"
     monkeypatch.setenv("JDO_DATABASE_PATH", str(db_path))
-    monkeypatch.setenv("JDO_AI_PROVIDER", "anthropic")
-    monkeypatch.setenv("JDO_AI_MODEL", "claude-sonnet-4-20250514")
+    monkeypatch.setenv("JDO_AI_PROVIDER", "openai")
+    monkeypatch.setenv("JDO_AI_MODEL", "gpt-4o")
     monkeypatch.setenv("JDO_TIMEZONE", "UTC")
     monkeypatch.setenv("JDO_LOG_LEVEL", "INFO")
-    # Do NOT set ANTHROPIC_API_KEY - let it use stored credentials
+    # Do NOT set API key - let it use stored credentials
 
     reset_settings()
     create_db_and_tables()
@@ -157,5 +157,5 @@ def live_uat_driver(uat_app: JdoApp, live_uat_agent: Agent[None, UATAction]) -> 
 # Skip marker for tests requiring live AI
 skip_without_credentials = pytest.mark.skipif(
     not has_ai_credentials(),
-    reason="No AI credentials available - set ANTHROPIC_API_KEY or authenticate via OAuth",
+    reason="No AI credentials available - set OPENAI_API_KEY or OPENROUTER_API_KEY",
 )

@@ -1025,12 +1025,13 @@ class TestChatScreenAtRiskShortcut:
                 async with app.run_test() as pilot:
                     await pilot.pause()
 
-                    # Press 'r' without viewing a commitment
-                    await pilot.press("r")
-                    await pilot.pause()
+                    screen = pilot.app.screen
+                    assert isinstance(screen, ChatScreen)
+
+                    # Call action directly so PromptInput doesn't intercept the key
+                    await screen.action_mark_at_risk()
                     await pilot.pause()
 
-                    screen = pilot.app.screen
                     container = screen.query_one(ChatContainer)
                     messages = container.query(ChatMessage)
                     assistant_msgs = [m for m in messages if m.role == MessageRole.ASSISTANT]

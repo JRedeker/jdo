@@ -19,8 +19,8 @@ def test_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[None, 
     # Configure test database
     db_path = tmp_path / "test_e2e.db"
     monkeypatch.setenv("JDO_DATABASE_PATH", str(db_path))
-    monkeypatch.setenv("JDO_AI_PROVIDER", "anthropic")
-    monkeypatch.setenv("JDO_AI_MODEL", "claude-sonnet-4-20250514")
+    monkeypatch.setenv("JDO_AI_PROVIDER", "openai")
+    monkeypatch.setenv("JDO_AI_MODEL", "gpt-4o")
     monkeypatch.setenv("JDO_TIMEZONE", "UTC")
     monkeypatch.setenv("JDO_LOG_LEVEL", "ERROR")  # Reduce noise in e2e tests
     reset_settings()

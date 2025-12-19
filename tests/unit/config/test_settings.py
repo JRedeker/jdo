@@ -16,14 +16,14 @@ class TestJDOSettings:
         """JDOSettings loads from environment variables with JDO_ prefix."""
         from jdo.config.settings import JDOSettings
 
-        monkeypatch.setenv("JDO_AI_PROVIDER", "anthropic")
-        monkeypatch.setenv("JDO_AI_MODEL", "claude-3-sonnet")
+        monkeypatch.setenv("JDO_AI_PROVIDER", "openai")
+        monkeypatch.setenv("JDO_AI_MODEL", "gpt-4o")
 
         with patch("jdo.config.settings.get_database_path", return_value=tmp_path / "test.db"):
             settings = JDOSettings()
 
-        assert settings.ai_provider == "anthropic"
-        assert settings.ai_model == "claude-3-sonnet"
+        assert settings.ai_provider == "openai"
+        assert settings.ai_model == "gpt-4o"
 
     def test_ai_provider_env_var_sets_field(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -89,17 +89,17 @@ class TestJDOSettings:
 
         # Create a .env file
         env_file = tmp_path / ".env"
-        env_file.write_text("JDO_AI_PROVIDER=openai\n")
+        env_file.write_text("JDO_AI_PROVIDER=openrouter\n")
 
         # But set env var to different value
-        monkeypatch.setenv("JDO_AI_PROVIDER", "anthropic")
+        monkeypatch.setenv("JDO_AI_PROVIDER", "openai")
         monkeypatch.chdir(tmp_path)
 
         with patch("jdo.config.settings.get_database_path", return_value=tmp_path / "test.db"):
             settings = JDOSettings(_env_file=env_file)
 
         # Env var should win
-        assert settings.ai_provider == "anthropic"
+        assert settings.ai_provider == "openai"
 
     def test_has_default_values(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Settings has sensible defaults."""
@@ -199,12 +199,12 @@ class TestSettingsSingleton:
         from jdo.config.settings import get_settings, reset_settings
 
         with patch("jdo.config.settings.get_database_path", return_value=tmp_path / "test.db"):
-            monkeypatch.setenv("JDO_AI_PROVIDER", "anthropic")
-            reset_settings()
-            settings1 = get_settings()
-            assert settings1.ai_provider == "anthropic"
-
             monkeypatch.setenv("JDO_AI_PROVIDER", "openai")
             reset_settings()
+            settings1 = get_settings()
+            assert settings1.ai_provider == "openai"
+
+            monkeypatch.setenv("JDO_AI_PROVIDER", "openrouter")
+            reset_settings()
             settings2 = get_settings()
-            assert settings2.ai_provider == "openai"
+            assert settings2.ai_provider == "openrouter"

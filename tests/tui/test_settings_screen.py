@@ -86,8 +86,8 @@ class TestSettingsScreenProviderInfo:
         from jdo.screens.settings import SettingsScreen
 
         with patch("jdo.screens.settings.get_settings") as mock_settings:
-            mock_settings.return_value.ai_provider = "anthropic"
-            mock_settings.return_value.ai_model = "claude-sonnet-4-20250514"
+            mock_settings.return_value.ai_provider = "openai"
+            mock_settings.return_value.ai_model = "gpt-4o"
 
             app = create_test_app_for_screen(SettingsScreen())
             async with app.run_test() as pilot:
@@ -100,8 +100,8 @@ class TestSettingsScreenProviderInfo:
         from jdo.screens.settings import SettingsScreen
 
         with patch("jdo.screens.settings.get_settings") as mock_settings:
-            mock_settings.return_value.ai_provider = "anthropic"
-            mock_settings.return_value.ai_model = "claude-sonnet-4-20250514"
+            mock_settings.return_value.ai_provider = "openai"
+            mock_settings.return_value.ai_model = "gpt-4o"
 
             app = create_test_app_for_screen(SettingsScreen())
             async with app.run_test() as pilot:
@@ -112,41 +112,6 @@ class TestSettingsScreenProviderInfo:
 
 class TestSettingsScreenAuthFlows:
     """Tests for launching authentication flows."""
-
-    async def test_launches_oauth_flow_for_claude(self) -> None:
-        """Settings launches OAuth flow for Claude/Anthropic."""
-        from jdo.auth.screens import OAuthScreen
-        from jdo.screens.settings import SettingsScreen
-
-        # Track if OAuth screen is launched
-        oauth_launched = False
-
-        class TestApp(App):
-            BINDINGS: ClassVar[list[Binding]] = [
-                Binding("escape", "back", "Back"),
-            ]
-
-            def compose(self) -> ComposeResult:
-                return
-                yield
-
-            async def on_mount(self) -> None:
-                await self.push_screen(SettingsScreen())
-
-            def push_screen(self, screen, callback=None):
-                nonlocal oauth_launched
-                if isinstance(screen, OAuthScreen):
-                    oauth_launched = True
-                return super().push_screen(screen, callback)
-
-        app = TestApp()
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            screen = pilot.app.screen
-            assert isinstance(screen, SettingsScreen)
-            screen.launch_oauth_flow("anthropic")
-            await pilot.pause()
-            assert oauth_launched
 
     async def test_launches_api_key_flow_for_openai(self) -> None:
         """Settings launches API key flow for OpenAI."""

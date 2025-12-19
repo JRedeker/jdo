@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import TypeAdapter
 
-from jdo.auth.models import ApiKeyCredentials, OAuthCredentials, ProviderAuth
+from jdo.auth.models import ApiKeyCredentials
 from jdo.paths import get_auth_path
 
 
@@ -35,7 +35,7 @@ class AuthStore:
                   uses get_auth_path() from jdo.paths.
         """
         self.path = path if path is not None else get_auth_path()
-        self._adapter: TypeAdapter[OAuthCredentials | ApiKeyCredentials] = TypeAdapter(ProviderAuth)
+        self._adapter: TypeAdapter[ApiKeyCredentials] = TypeAdapter(ApiKeyCredentials)
 
     def _read_store(self) -> dict[str, dict[str, Any]]:
         """Read the current auth store from disk.
@@ -89,11 +89,11 @@ class AuthStore:
                 tmp_file.unlink()
             raise
 
-    def get(self, provider_id: str) -> OAuthCredentials | ApiKeyCredentials | None:
+    def get(self, provider_id: str) -> ApiKeyCredentials | None:
         """Get credentials for a provider.
 
         Args:
-            provider_id: The provider identifier (e.g., "anthropic", "openai").
+            provider_id: The provider identifier (e.g., "openai", "openrouter").
 
         Returns:
             The credentials if found, None otherwise.
@@ -110,12 +110,12 @@ class AuthStore:
     def save(
         self,
         provider_id: str,
-        credentials: OAuthCredentials | ApiKeyCredentials,
+        credentials: ApiKeyCredentials,
     ) -> None:
         """Save credentials for a provider.
 
         Args:
-            provider_id: The provider identifier (e.g., "anthropic", "openai").
+            provider_id: The provider identifier (e.g., "openai", "openrouter").
             credentials: The credentials to save.
         """
         store = self._read_store()

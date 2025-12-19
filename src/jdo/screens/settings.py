@@ -18,7 +18,7 @@ from textual.widgets import Button, Static
 
 from jdo.auth.api import is_authenticated
 from jdo.auth.registry import AuthMethod, get_auth_methods, get_provider_info, list_providers
-from jdo.auth.screens import ApiKeyScreen, OAuthScreen
+from jdo.auth.screens import ApiKeyScreen
 from jdo.config.settings import get_settings
 
 
@@ -27,7 +27,7 @@ class SettingsScreen(Screen[None]):
 
     Provides:
     - View authentication status per provider
-    - Launch OAuth/API key authentication flows
+    - Launch API key authentication flows
     - View current AI provider and model settings
 
     Keyboard shortcuts:
@@ -187,30 +187,11 @@ class SettingsScreen(Screen[None]):
         """
         auth_methods = get_auth_methods(provider_id)
 
-        # Prefer OAuth if available (currently only Anthropic)
-        if AuthMethod.OAUTH in auth_methods:
-            self.launch_oauth_flow(provider_id)
-        elif AuthMethod.API_KEY in auth_methods:
+        if AuthMethod.API_KEY in auth_methods:
             self.launch_api_key_flow(provider_id)
 
-    def launch_oauth_flow(self, provider_id: str) -> None:
-        """Launch OAuth authentication flow.
-
-        Args:
-            provider_id: The provider to authenticate with (currently only anthropic).
-        """
-        # Store provider_id for potential multi-provider OAuth support
-        _ = provider_id  # Currently only Anthropic supports OAuth
-        # Push the OAuthScreen modal
-        self.app.push_screen(OAuthScreen(), self._on_auth_complete)
-
     def launch_api_key_flow(self, provider_id: str) -> None:
-        """Launch API key authentication flow.
-
-        Args:
-            provider_id: The provider to authenticate with.
-        """
-        # Push the ApiKeyScreen modal
+        """Launch API key authentication flow."""
         self.app.push_screen(ApiKeyScreen(provider_id), self._on_auth_complete)
 
     def _on_auth_complete(self, success: bool | None) -> None:

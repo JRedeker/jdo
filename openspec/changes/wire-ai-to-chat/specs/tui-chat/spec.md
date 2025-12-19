@@ -68,7 +68,7 @@ The system SHALL display user-friendly error messages for AI failures.
 The system SHALL verify AI credentials before sending messages.
 
 #### Scenario: No credentials configured
-- **WHEN** user sends a message and no API key or OAuth token is configured
+- **WHEN** user sends a message and no API key is configured
 - **THEN** chat displays "AI not configured. Set up your API key in settings."
 - **AND** user is guided to settings screen
 

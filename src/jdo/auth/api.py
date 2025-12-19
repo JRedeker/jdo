@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import os
 
-from jdo.auth.models import ApiKeyCredentials, OAuthCredentials
+from jdo.auth.models import ApiKeyCredentials
 from jdo.auth.store import AuthStore
 from jdo.paths import get_auth_path
 
 # Environment variable mapping for providers
 ENV_VAR_MAP = {
-    "anthropic": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
     "openrouter": "OPENROUTER_API_KEY",
 }
@@ -40,13 +39,13 @@ def _get_env_credentials(provider_id: str) -> ApiKeyCredentials | None:
 
 def get_credentials(
     provider_id: str,
-) -> OAuthCredentials | ApiKeyCredentials | None:
+) -> ApiKeyCredentials | None:
     """Get credentials for a provider.
 
     Checks stored credentials first, then falls back to environment variables.
 
     Args:
-        provider_id: The provider identifier (e.g., "anthropic", "openai").
+        provider_id: The provider identifier (e.g., "openai", "openrouter").
 
     Returns:
         Credentials if found, None otherwise.
@@ -63,7 +62,7 @@ def get_credentials(
 
 def save_credentials(
     provider_id: str,
-    credentials: OAuthCredentials | ApiKeyCredentials,
+    credentials: ApiKeyCredentials,
 ) -> None:
     """Save credentials for a provider.
 
@@ -105,8 +104,6 @@ def get_auth_headers(provider_id: str) -> dict[str, str] | None:
     """Get HTTP authentication headers for a provider.
 
     Returns appropriate headers based on credential type:
-    - OAuth (Anthropic): Authorization: Bearer + anthropic-beta header
-    - API key (Anthropic): x-api-key header
     - API key (OpenAI/OpenRouter): Authorization: Bearer header
 
     Args:
@@ -119,15 +116,5 @@ def get_auth_headers(provider_id: str) -> dict[str, str] | None:
     if creds is None:
         return None
 
-    if isinstance(creds, OAuthCredentials):
-        return {
-            "Authorization": f"Bearer {creds.access_token}",
-            "anthropic-beta": "oauth-2025-04-20",
-        }
-
-    # API key credentials
-    if provider_id == "anthropic":
-        return {"x-api-key": creds.api_key}
-
-    # OpenAI, OpenRouter use Bearer token format
+    # All providers use Bearer token format
     return {"Authorization": f"Bearer {creds.api_key}"}

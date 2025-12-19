@@ -8,8 +8,8 @@ Define the application configuration system using pydantic-settings, supporting 
 The system SHALL provide a `JDOSettings` pydantic-settings model with the following configuration options:
 
 - `database_path` (Path | None): Override path to SQLite database, defaults to platformdirs location
-- `ai_provider` (str): AI provider identifier, defaults to "anthropic"
-- `ai_model` (str): Model identifier, defaults to "claude-sonnet-4-20250514"
+- `ai_provider` (str): AI provider identifier, defaults to "openai"
+- `ai_model` (str): Model identifier, defaults to "gpt-4o"
 - `timezone` (str): Default timezone for datetime fields, defaults to "America/New_York"
 - `log_level` (str): Logging level, defaults to "INFO"
 
@@ -18,8 +18,8 @@ The system SHALL provide a `JDOSettings` pydantic-settings model with the follow
 - **THEN** JDOSettings loads with all default values
 
 #### Scenario: Load settings from environment variables
-- **WHEN** environment variable `JDO_AI_MODEL` is set to "claude-opus-4-20250514"
-- **THEN** JDOSettings.ai_model equals "claude-opus-4-20250514"
+- **WHEN** environment variable `JDO_AI_MODEL` is set to "gpt-4o-mini"
+- **THEN** JDOSettings.ai_model equals "gpt-4o-mini"
 
 #### Scenario: Load settings from .env file
 - **WHEN** a `.env` file exists with `JDO_TIMEZONE=Europe/London`
@@ -61,13 +61,13 @@ The system SHALL support configurable database path with sensible defaults.
 
 The system SHALL support configuration of AI provider and model selection.
 
-#### Scenario: Configure Anthropic provider
-- **WHEN** `JDO_AI_PROVIDER=anthropic` and `JDO_AI_MODEL=claude-sonnet-4-20250514`
-- **THEN** AI agent is configured to use Anthropic with the specified model
-
 #### Scenario: Configure OpenAI provider
 - **WHEN** `JDO_AI_PROVIDER=openai` and `JDO_AI_MODEL=gpt-4o`
 - **THEN** AI agent is configured to use OpenAI with the specified model
+
+#### Scenario: Configure OpenRouter provider
+- **WHEN** `JDO_AI_PROVIDER=openrouter` and `JDO_AI_MODEL=anthropic/claude-3.5-sonnet`
+- **THEN** AI agent is configured to use OpenRouter with the specified model
 
 #### Scenario: Invalid provider raises error
 - **WHEN** `JDO_AI_PROVIDER=invalid_provider` is set

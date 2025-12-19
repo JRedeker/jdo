@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from typing import ClassVar
-from urllib.parse import parse_qs, urlparse
 
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -13,47 +12,9 @@ from textual.widgets import Button, Input, Label, Static
 
 from jdo.auth.api import save_credentials
 from jdo.auth.models import ApiKeyCredentials
-from jdo.auth.oauth import (
-    AuthenticationError,
-    build_authorization_url,
-    exchange_code,
-)
-
-
-def _extract_auth_code(value: str) -> str:
-    """Extract authorization code from user input.
-
-    Handles both raw codes and full callback URLs like:
-    https://console.anthropic.com/oauth/code/callback?code=XXX&state=YYY
-
-    Args:
-        value: User input (raw code or URL)
-
-    Returns:
-        The extracted authorization code
-    """
-    value = value.strip()
-    if not value:
-        return ""
-
-    # Check if it looks like a URL
-    if value.startswith(("http://", "https://")):
-        parsed = urlparse(value)
-        query_params = parse_qs(parsed.query)
-        if "code" in query_params:
-            return query_params["code"][0]
-        # If no code param found, return as-is and let the API error
-        return value
-
-    return value
-
 
 # Provider info for display
 PROVIDER_INFO = {
-    "anthropic": {
-        "name": "Anthropic (Claude)",
-        "api_key_url": "https://console.anthropic.com/settings/keys",
-    },
     "openai": {
         "name": "OpenAI",
         "api_key_url": "https://platform.openai.com/api-keys",
@@ -63,132 +24,6 @@ PROVIDER_INFO = {
         "api_key_url": "https://openrouter.ai/keys",
     },
 }
-
-
-class OAuthScreen(ModalScreen[bool]):
-    """Modal screen for OAuth authentication flow.
-
-    Returns True on successful authentication, False on cancel.
-    """
-
-    DEFAULT_CSS = """
-    OAuthScreen {
-        align: center middle;
-    }
-
-    OAuthScreen > Container {
-        width: 100;
-        height: auto;
-        max-height: 28;
-        border: thick $background 80%;
-        background: $surface;
-        padding: 1 2;
-    }
-
-    OAuthScreen #title {
-        text-style: bold;
-        margin-bottom: 1;
-    }
-
-    OAuthScreen #instructions {
-        margin-bottom: 1;
-    }
-
-    OAuthScreen #auth-url {
-        margin-bottom: 1;
-    }
-
-    OAuthScreen #code-input {
-        margin-bottom: 1;
-    }
-
-    OAuthScreen #error-label {
-        color: $error;
-        margin-bottom: 1;
-        display: none;
-    }
-
-    OAuthScreen #buttons {
-        height: auto;
-        width: 100%;
-        align: right middle;
-    }
-
-    OAuthScreen Button {
-        margin-left: 1;
-    }
-    """
-
-    BINDINGS: ClassVar[list[Binding]] = [
-        Binding("escape", "cancel", "Cancel"),
-    ]
-
-    def __init__(self) -> None:
-        """Initialize the OAuth screen."""
-        super().__init__()
-        self.auth_url, self.verifier = build_authorization_url()
-
-    def compose(self) -> ComposeResult:
-        """Compose the OAuth screen."""
-        # Create a clickable hyperlink using Rich markup
-        # URL must be quoted to handle special characters like = and &
-        link_markup = f'[link="{self.auth_url}"]{self.auth_url}[/link]'
-
-        with Container():
-            yield Static("Claude OAuth Authentication", id="title")
-            yield Static(
-                "1. Click the link below (or copy it to your browser)\n"
-                "2. Sign in to your Claude account\n"
-                "3. Copy the authorization code and paste it below",
-                id="instructions",
-            )
-            yield Static(link_markup, id="auth-url", markup=True)
-            yield Input(
-                placeholder="Paste authorization code here",
-                id="code-input",
-            )
-            yield Label("", id="error-label")
-            with Horizontal(id="buttons"):
-                yield Button("Submit", id="submit-btn", variant="primary")
-                yield Button("Cancel", id="cancel-btn", variant="default")
-
-    def action_cancel(self) -> None:
-        """Handle cancel action."""
-        self.dismiss(False)
-
-    async def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button presses."""
-        if event.button.id == "cancel-btn":
-            self.dismiss(False)
-        elif event.button.id == "submit-btn":
-            await self._submit_code()
-
-    async def on_input_submitted(self, event: Input.Submitted) -> None:
-        """Handle input submission (Enter key)."""
-        if event.input.id == "code-input":
-            await self._submit_code()
-
-    async def _submit_code(self) -> None:
-        """Submit the authorization code for token exchange."""
-        code_input = self.query_one("#code-input", Input)
-        error_label = self.query_one("#error-label", Label)
-
-        code = _extract_auth_code(code_input.value)
-        if not code:
-            error_label.update("Please enter the authorization code")
-            error_label.display = True
-            return
-
-        try:
-            # Exchange code for tokens
-            credentials = await exchange_code(code, self.verifier)
-            # Save credentials
-            save_credentials("anthropic", credentials)
-            self.notify("Authentication successful!", severity="information")
-            self.dismiss(True)
-        except AuthenticationError as e:
-            error_label.update(f"Authentication failed: {e}")
-            error_label.display = True
 
 
 class ApiKeyScreen(ModalScreen[bool]):

@@ -11,21 +11,21 @@ from pydantic_ai.models.test import TestModel
 class TestGetModelIdentifier:
     """Tests for get_model_identifier function."""
 
-    def test_returns_anthropic_identifier(
+    def test_returns_openrouter_identifier(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """get_model_identifier returns anthropic:model format."""
+        """get_model_identifier returns openrouter:model format."""
         from jdo.ai.agent import get_model_identifier
         from jdo.config.settings import reset_settings
 
         reset_settings()
-        monkeypatch.setenv("JDO_AI_PROVIDER", "anthropic")
-        monkeypatch.setenv("JDO_AI_MODEL", "claude-sonnet-4-20250514")
+        monkeypatch.setenv("JDO_AI_PROVIDER", "openrouter")
+        monkeypatch.setenv("JDO_AI_MODEL", "anthropic/claude-3.5-sonnet")
 
         with patch("jdo.config.settings.get_database_path", return_value=tmp_path / "test.db"):
             result = get_model_identifier()
 
-        assert result == "anthropic:claude-sonnet-4-20250514"
+        assert result == "openrouter:anthropic/claude-3.5-sonnet"
         reset_settings()
 
     def test_returns_openai_identifier(

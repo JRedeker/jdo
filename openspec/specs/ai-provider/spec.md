@@ -7,13 +7,13 @@ Define the PydanticAI agent configuration for commitment management assistance, 
 
 The system SHALL provide a PydanticAI agent configured for commitment management assistance.
 
-#### Scenario: Create agent with Anthropic provider
-- **WHEN** settings specify `ai_provider=anthropic` and `ai_model=claude-sonnet-4-20250514`
-- **THEN** agent is created with model identifier "anthropic:claude-sonnet-4-20250514"
-
 #### Scenario: Create agent with OpenAI provider
 - **WHEN** settings specify `ai_provider=openai` and `ai_model=gpt-4o`
 - **THEN** agent is created with model identifier "openai:gpt-4o"
+
+#### Scenario: Create agent with OpenRouter provider
+- **WHEN** settings specify `ai_provider=openrouter` and `ai_model=anthropic/claude-3.5-sonnet`
+- **THEN** agent is created with model identifier "openrouter:anthropic/claude-3.5-sonnet"
 
 #### Scenario: Agent has system prompt
 - **WHEN** agent is created
@@ -97,19 +97,11 @@ The system SHALL handle AI provider errors gracefully.
 
 ### Requirement: Token Management
 
-The system SHALL use OAuth tokens or API keys based on provider configuration.
+The system SHALL use API keys based on provider configuration.
 
-#### Scenario: Use OAuth token for Claude Max
-- **WHEN** Anthropic OAuth credentials are stored
-- **THEN** agent uses OAuth access token with beta header
-
-#### Scenario: Use API key for standard access
+#### Scenario: Use API key for provider access
 - **WHEN** API key is configured for provider
 - **THEN** agent uses API key for authentication
-
-#### Scenario: Refresh expired OAuth token
-- **WHEN** OAuth access token is expired
-- **THEN** token is refreshed before making API call
 
 ### Requirement: AI Coaching System Prompt
 

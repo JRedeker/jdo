@@ -9,7 +9,6 @@ from enum import Enum, auto
 class AuthMethod(Enum):
     """Authentication methods supported by providers."""
 
-    OAUTH = auto()
     API_KEY = auto()
 
 
@@ -32,12 +31,6 @@ class ProviderInfo:
 
 # Registry of supported providers
 _PROVIDERS: dict[str, ProviderInfo] = {
-    "anthropic": ProviderInfo(
-        name="Anthropic (Claude)",
-        api_key_url="https://console.anthropic.com/settings/keys",
-        auth_methods=[AuthMethod.OAUTH, AuthMethod.API_KEY],
-        env_var="ANTHROPIC_API_KEY",
-    ),
     "openai": ProviderInfo(
         name="OpenAI",
         api_key_url="https://platform.openai.com/api-keys",

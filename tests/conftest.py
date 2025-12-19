@@ -60,8 +60,8 @@ def test_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     # Set up test environment
     monkeypatch.setenv("JDO_DATABASE_PATH", str(tmp_path / "test.db"))
-    monkeypatch.setenv("JDO_AI_PROVIDER", "anthropic")
-    monkeypatch.setenv("JDO_AI_MODEL", "claude-sonnet-4-20250514")
+    monkeypatch.setenv("JDO_AI_PROVIDER", "openai")
+    monkeypatch.setenv("JDO_AI_MODEL", "gpt-4o")
     monkeypatch.setenv("JDO_TIMEZONE", "UTC")
     monkeypatch.setenv("JDO_LOG_LEVEL", "DEBUG")
 
