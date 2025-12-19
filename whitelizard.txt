@@ -33,4 +33,4 @@ src/jdo/integrity/service.py:327: warning: calculate_integrity_metrics has 53 NL
 src/jdo/integrity/service.py:410: warning: detect_risks has 45 NLOC, 4 CCN, 252 token, 2 PARAM, 73 length, 0 ND
 src/jdo/integrity/service.py:525: warning: _calculate_streak_weeks has 51 NLOC, 14 CCN, 315 token, 2 PARAM, 79 length, 0 ND
 src/jdo/integrity/service.py:605: warning: _calculate_estimation_accuracy has 33 NLOC, 8 CCN, 237 token, 2 PARAM, 66 length, 0 ND
-src/jdo/app.py:613: warning: on_hierarchy_view_item_selected has 53 NLOC, 8 CCN, 288 token, 2 PARAM, 62 length, 0 ND
+src/jdo/app.py:417: warning: on_hierarchy_view_item_selected has 47 NLOC, 9 CCN, 284 token, 2 PARAM, 57 length, 0 ND

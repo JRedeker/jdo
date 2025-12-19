@@ -15,6 +15,7 @@ When a feature spec is archived, it should be added here and removed from `ROADM
 #### AI Integration
 - **wire-ai-to-chat** (2025-12-19): Connected PydanticAI agent to ChatScreen with streaming responses and tool invocation
 - **persist-handler-results** (2025-12-19): Wired command handlers to database persistence with confirmation flow
+- **add-ai-coaching-time-management** (2025-12-19): AI time coaching with /hours command and task duration tracking
 
 ## [0.1.0] - 2025-12-17
 
