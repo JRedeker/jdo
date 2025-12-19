@@ -20,6 +20,10 @@ When a feature spec is archived, it should be added here and removed from `ROADM
 - **persist-handler-results** (2025-12-19): Wired command handlers to database persistence with confirmation flow
 - **add-ai-coaching-time-management** (2025-12-19): AI time coaching with /hours command and task duration tracking
 
+#### Reliability & Validation
+- **add-commitment-guardrails** (2025-12-19): Validation guardrails for commitment creation with stakeholder and timeline requirements
+- **add-reliability-compliance** (2025-12-19): Command timeout handling, retry logic, and reliability patterns
+
 ## [0.1.0] - 2025-12-17
 
 Initial development release with core functionality.
