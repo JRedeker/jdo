@@ -12,6 +12,8 @@ The system SHALL implement full-screen views as Textual `Screen` subclasses that
 - **WHEN** the HomeScreen is displayed
 - **THEN** it is an instance of `textual.screen.Screen` that can be pushed/popped from the screen stack
 
+> **Note**: HomeScreen is being superseded by NavSidebar for navigation. HomeScreen remains for backwards compatibility but NavSidebar is the preferred navigation pattern. See "Navigation Sidebar Widget" requirement.
+
 #### Scenario: ChatScreen is a Screen subclass
 - **GIVEN** the user navigates to the chat view
 - **WHEN** the ChatScreen is displayed
@@ -414,4 +416,38 @@ The system SHALL calculate allocated hours from active tasks for AI context.
 - **WHEN** the allocated hours query fails
 - **THEN** `allocated_hours` returns 0.0
 - **AND** a warning is logged with message "Failed to calculate allocated hours: {error}"
+
+### Requirement: Navigation Sidebar Widget
+
+The system SHALL provide a NavSidebar widget for persistent, discoverable navigation.
+
+#### Scenario: NavSidebar is a Widget
+- **GIVEN** the application is displayed
+- **WHEN** the sidebar is rendered
+- **THEN** NavSidebar is a `Widget` subclass that can be composed within any Screen or App
+
+#### Scenario: NavSidebar uses OptionList
+- **GIVEN** the NavSidebar is composed
+- **WHEN** it renders navigation items
+- **THEN** it uses Textual's `OptionList` widget for keyboard-friendly selection
+
+#### Scenario: NavSidebar posts Selected message
+- **GIVEN** the user selects a navigation item
+- **WHEN** the selection is made (via Enter, click, or number key)
+- **THEN** NavSidebar posts a `NavSidebar.Selected` message with `item_id` attribute
+
+#### Scenario: NavSidebar supports collapse mode
+- **GIVEN** the sidebar is in expanded mode
+- **WHEN** the user presses `[` key
+- **THEN** the sidebar collapses to show single-letter shortcuts only
+
+#### Scenario: NavSidebar number key navigation
+- **GIVEN** the sidebar has focus
+- **WHEN** the user presses a number key (1-9)
+- **THEN** the corresponding navigation item is selected directly
+
+#### Scenario: NavSidebar triage badge
+- **GIVEN** there are items needing triage
+- **WHEN** the sidebar is rendered in expanded mode
+- **THEN** the Triage item shows a badge with the count
 

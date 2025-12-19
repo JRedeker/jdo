@@ -159,12 +159,13 @@ jdo db downgrade
 ```
 src/jdo/
 ├── ai/           # AI agent, tools
-├── auth/         # OAuth, API keys, screens
+├── auth/         # API key authentication, screens
 ├── commands/     # Command parser
 ├── config/       # Settings, paths
 ├── db/           # Engine, session, migrations
 ├── models/       # SQLModel entities
-├── widgets/      # Textual widgets
+├── screens/      # Textual screens (HomeScreen, ChatScreen, etc.)
+├── widgets/      # Textual widgets (NavSidebar, DataPanel, etc.)
 └── app.py        # Main application
 
 tests/
@@ -172,6 +173,54 @@ tests/
 ├── integration/  # Database tests
 ├── tui/          # Textual Pilot tests
 └── uat/          # AI-driven UAT tests
+```
+
+## Navigation Architecture
+
+The app uses a **NavSidebar** widget for navigation:
+
+| Component | Purpose |
+|-----------|---------|
+| `NavSidebar` | Persistent left sidebar with navigation items |
+| `HomeScreen` | Landing screen (being superseded by sidebar) |
+| `ChatScreen` | Main chat interface with AI |
+| `SettingsScreen` | Configuration and API key management |
+
+### Key Navigation Bindings
+
+| Key | Action |
+|-----|--------|
+| `[` | Toggle sidebar collapse |
+| `1-9` | Quick-nav to sidebar items |
+| `Tab` | Cycle focus between widgets |
+| `Escape` | Context-aware back/cancel |
+| `q` | Quit application |
+
+### Adding Navigation Items
+
+Edit `src/jdo/widgets/nav_sidebar.py`:
+
+```python
+NAV_ITEMS: list[NavItem | None] = [
+    NavItem(id="chat", label="Chat", shortcut="n"),
+    None,  # Separator
+    NavItem(id="goals", label="Goals", shortcut="g"),
+    # Add new items here...
+]
+```
+
+Handle selections in `src/jdo/app.py`:
+
+```python
+def on_nav_sidebar_selected(self, message: NavSidebar.Selected) -> None:
+    handlers = {
+        "chat": self._nav_to_chat,
+        "goals": self._nav_to_goals,
+        # Add handlers here...
+    }
+    handler = handlers.get(message.item_id)
+    if handler:
+        handler()
 ```
 
 ## AI-Driven UAT Testing

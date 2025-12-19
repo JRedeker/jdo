@@ -256,3 +256,27 @@ class TestIntegritySnapshots:
             str(app_path),
             terminal_size=(60, 25),
         )
+
+
+class TestNavSidebarSnapshots:
+    """Snapshot tests for NavSidebar widget."""
+
+    def test_nav_sidebar_expanded(self, snap_compare: object) -> None:
+        """Snapshot of NavSidebar in expanded state with all items."""
+        from pathlib import Path
+
+        app_path = Path(__file__).parent / "snapshot_apps" / "nav_sidebar_expanded_app.py"
+        assert snap_compare(  # type: ignore[operator]
+            str(app_path),
+            terminal_size=(30, 20),
+        )
+
+    def test_nav_sidebar_collapsed(self, snap_compare: object) -> None:
+        """Snapshot of NavSidebar in collapsed state with letters."""
+        from pathlib import Path
+
+        app_path = Path(__file__).parent / "snapshot_apps" / "nav_sidebar_collapsed_app.py"
+        assert snap_compare(  # type: ignore[operator]
+            str(app_path),
+            terminal_size=(15, 20),
+        )

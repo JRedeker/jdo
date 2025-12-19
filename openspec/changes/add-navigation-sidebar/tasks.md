@@ -82,22 +82,25 @@ For now, NavSidebar widget and handlers are ready for integration.
   - Update imports to not expose HomeScreen
   - Keep for backwards compatibility
 
-## 5. Visual Polish (PARTIAL)
+## 5. Visual Polish (COMPLETE)
 
 - [x] 5.2 Add triage badge support to sidebar
   - NavSidebar.set_triage_count() implemented
   - Badge displays in expanded mode
 
-- [ ] 5.1 Add snapshot tests for sidebar states
+- [x] 5.1 Add snapshot tests for sidebar states
   - Expanded state with all items
   - Collapsed state with letters
-  - Active item highlighting
+  - Snapshot apps: nav_sidebar_expanded_app.py, nav_sidebar_collapsed_app.py
 
-## 6. Documentation
+## 6. Documentation (COMPLETE)
 
-- [ ] 6.1 Update tui-core spec with new patterns
-- [ ] 6.2 Archive HomeScreen-related requirements
-- [ ] 6.3 Update AGENTS.md with navigation info
+- [x] 6.1 Update tui-core spec with new patterns
+  - Added "Navigation Sidebar Widget" requirement section
+- [x] 6.2 Archive HomeScreen-related requirements
+  - Added deprecation note to HomeScreen scenario in tui-core spec
+- [x] 6.3 Update AGENTS.md with navigation info
+  - Added "Navigation Architecture" section with bindings and examples
 
 ## Dependencies
 
