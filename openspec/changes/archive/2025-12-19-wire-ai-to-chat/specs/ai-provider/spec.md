@@ -6,13 +6,13 @@
 
 The system SHALL provide a PydanticAI agent configured for commitment management assistance.
 
-#### Scenario: Create agent with Anthropic provider
-- **WHEN** settings specify `ai_provider=anthropic` and `ai_model=claude-sonnet-4-20250514`
-- **THEN** agent is created with model identifier "anthropic:claude-sonnet-4-20250514"
-
 #### Scenario: Create agent with OpenAI provider
 - **WHEN** settings specify `ai_provider=openai` and `ai_model=gpt-4o`
 - **THEN** agent is created with model identifier "openai:gpt-4o"
+
+#### Scenario: Create agent with OpenRouter provider
+- **WHEN** settings specify `ai_provider=openrouter` and `ai_model=anthropic/claude-3.5-sonnet`
+- **THEN** agent is created with model identifier "openrouter:anthropic/claude-3.5-sonnet"
 
 #### Scenario: Agent has system prompt
 - **WHEN** agent is created
@@ -38,3 +38,4 @@ The system SHALL register all query tools when creating the agent.
 - **WHEN** AI agent determines it needs commitment data
 - **THEN** it can call the appropriate query tool
 - **AND** tool results are incorporated into the response
+

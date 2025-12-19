@@ -19,6 +19,11 @@ The system SHALL provide a PydanticAI agent configured for commitment management
 - **WHEN** agent is created
 - **THEN** it has a system prompt focused on commitment tracking assistance
 
+#### Scenario: Agent has tools registered
+- **WHEN** agent is created via `create_agent()`
+- **THEN** all query tools are registered (commitments, goals, milestones, visions)
+- **AND** tools are ready to be called during agent execution
+
 ### Requirement: Agent Dependencies
 
 The system SHALL provide a dependencies class for injecting runtime context into agent tools.
@@ -247,4 +252,18 @@ The system SHALL define timeout constants for different operation types.
 - **THEN** it defines `AI_TIMEOUT_SECONDS = 120` for standard AI calls
 - **AND** it defines `AI_STREAM_TIMEOUT = 180` for streaming operations
 - **AND** constants are importable from `jdo.ai.timeout`
+
+### Requirement: Agent Tool Registration
+
+The system SHALL register all query tools when creating the agent.
+
+#### Scenario: Tools registered on creation
+- **WHEN** `create_agent()` is called
+- **THEN** `register_tools()` is called on the agent
+- **AND** all 5 query tools are available for agent use
+
+#### Scenario: Tools accessible during execution
+- **WHEN** AI agent determines it needs commitment data
+- **THEN** it can call the appropriate query tool
+- **AND** tool results are incorporated into the response
 
