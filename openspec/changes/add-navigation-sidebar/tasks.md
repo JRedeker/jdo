@@ -58,7 +58,14 @@
   - Test: Arrow keys and Enter work when collapsed
   - Test: Focus management still behaves correctly
 
-## 4. HomeScreen Deprecation
+## 4. HomeScreen Deprecation (DEFERRED)
+
+**Status**: Deferred to future work. The full layout refactor requires:
+- Moving ChatContainer, PromptInput, DataPanel from ChatScreen to JdoApp
+- Significant test updates
+- AI agent logic migration
+
+For now, NavSidebar widget and handlers are ready for integration.
 
 - [ ] 4.1 Update startup flow
   - App mounts directly to main layout (no HomeScreen push)
@@ -75,16 +82,16 @@
   - Update imports to not expose HomeScreen
   - Keep for backwards compatibility
 
-## 5. Visual Polish
+## 5. Visual Polish (PARTIAL)
+
+- [x] 5.2 Add triage badge support to sidebar
+  - NavSidebar.set_triage_count() implemented
+  - Badge displays in expanded mode
 
 - [ ] 5.1 Add snapshot tests for sidebar states
   - Expanded state with all items
   - Collapsed state with letters
   - Active item highlighting
-
-- [ ] 5.2 Add triage badge to sidebar
-  - Show count when items exist
-  - Update on navigation return
 
 ## 6. Documentation
 
