@@ -124,8 +124,8 @@ This task list tracks implementation status for the integrity protocol.
 ### 8.1-8.2 At-Risk Styling
 - [x] DataPanel has INTEGRITY, CLEANUP, ATRISK_WORKFLOW modes
 - [x] Rendering methods for each new mode
-- [ ] At-risk commitment shows warning color in lists (deferred)
-- [ ] Notification task shows distinct icon (deferred)
+- [x] At-risk commitment shows warning color in lists (CSS class `.status-at_risk`)
+- [x] Notification task shows distinct icon (🔔)
 
 ## Phase 9: Integration Tests
 - [x] Integration tests for integrity dashboard flows
@@ -134,19 +134,20 @@ This task list tracks implementation status for the integrity protocol.
 - [x] Integration tests for ChatScreen integrity features
 - [x] Integration tests for HomeScreen integrity features
 
-## Phase 10: Snapshot Tests (Deferred)
-- [ ] Snapshot: Integrity dashboard
-- [ ] Snapshot: Commitment list with at_risk items
-- [ ] Snapshot: CleanupPlan view
+## Phase 10: Snapshot Tests
+- [x] Snapshot: Integrity dashboard (A- and C- grade scenarios)
+- [x] Snapshot: Commitment list with at_risk items
+- [x] Snapshot: CleanupPlan view
 
 ## Summary
 
 **Implemented**:
-- Core models (CommitmentStatus.AT_RISK, CleanupPlan, IntegrityMetrics)
-- IntegrityService (mark_at_risk, calculate_metrics, detect_risks)
-- Commands (/atrisk, /cleanup, /integrity)
-- TUI integration (HomeScreen grade, ChatScreen risk detection, DataPanel modes)
-- Full test coverage
+- Core models (CommitmentStatus.AT_RISK, CleanupPlan, IntegrityMetrics with TrendDirection)
+- IntegrityService (mark_at_risk, calculate_metrics, detect_risks, recover_commitment, get_affecting_commitments, calculate_metrics_with_trends)
+- Commands (/atrisk, /cleanup, /integrity, /abandon, /recover)
+- TUI integration (HomeScreen grade, ChatScreen risk detection, DataPanel modes with trends and affecting commitments)
+- Full test coverage including snapshot tests
+- Visual indicators for at-risk status and notification tasks
 
 ## Running Tests
 
@@ -217,89 +218,75 @@ The following items are deferred to future iterations. Each is tracked here with
 - [x] If mark at-risk, user can type 'atrisk' to redirect to /atrisk flow
 - [x] Tests added to verify prompt behavior
 
-### D5: Visual Indicators for At-Risk Status
-**Current**: No visual distinction in lists
-**Target**: Warning color for at-risk commitments, distinct icon for notification tasks
+### D5: Visual Indicators for At-Risk Status ✅ COMPLETED
+**Status**: Already implemented in DataPanel
 
 **Implementation**:
-- [ ] Add CSS class `.commitment-at-risk` with warning color (yellow/orange)
-- [ ] Update commitment list rendering to apply class based on status
-- [ ] Add notification task icon (e.g., 📢 or ⚠️) in task list
-- [ ] Sort commitment lists: overdue > at_risk > pending > in_progress
+- [x] CSS class `.status-at_risk` with warning color (yellow/bold) in `DataPanel.DEFAULT_CSS`
+- [x] CSS class `.notification-task` with warning color for notification tasks
+- [x] Status icons including ⚠ for at-risk and 🔔 for notification tasks in `_render_list_item()`
+- [x] `_sort_items_by_priority()` sorts: at_risk > in_progress > pending > completed > abandoned
 
-**Effort**: Small (1-2 hours)
-**Priority**: Low - Polish/UX improvement
-
-### D6: Metric Trends
-**Current**: Not implemented
-**Target**: Show improving/stable/declining indicators for each metric
+### D6: Metric Trends ✅ COMPLETED
+**Status**: Implemented in `IntegrityService` and `DataPanel`
 
 **Implementation**:
-- [ ] Store previous period metrics (could use session cache or simple comparison)
-- [ ] Calculate delta for each metric vs previous period
-- [ ] Add trend indicator to IntegrityMetrics dataclass
-- [ ] Display ↑/→/↓ in integrity dashboard
+- [x] Added `TrendDirection` enum (UP, DOWN, STABLE) to `IntegrityMetrics`
+- [x] Added trend fields to `IntegrityMetrics`: on_time_trend, notification_trend, cleanup_trend, overall_trend
+- [x] Implemented `calculate_integrity_metrics_with_trends()` method
+- [x] Added `_calculate_period_on_time_rate()`, `_calculate_period_cleanup_rate()`, `_calculate_period_notification_timeliness()` for period-based calculations
+- [x] Added `_determine_trend()` helper with 5% threshold
+- [x] Updated `DataPanel._render_integrity()` to display trend indicators (↑/→/↓)
+- [x] Added 8 unit tests in `tests/unit/integrity/test_service.py`
+- [x] Added 7 unit tests in `tests/unit/models/test_integrity_metrics.py`
 
-**Effort**: Medium (2-3 hours)
-**Priority**: Low - Nice-to-have analytics
-
-### D7: Commitments Affecting Score
-**Current**: Not implemented
-**Target**: List recent commitments that negatively impacted score
-
-**Implementation**:
-- [ ] Query commitments where: completed_on_time=False OR status=abandoned
-- [ ] Filter to recent (last 30 days)
-- [ ] Include in integrity dashboard response
-- [ ] Render as list in DataPanel integrity mode
-
-**Effort**: Small (1-2 hours)
-**Priority**: Low - Helps user understand score
-
-### D8: Recovery Flow (at_risk → in_progress)
-**Current**: No handling when commitment recovers from at_risk
-**Target**: Cancel CleanupPlan and prompt about notification task when recovering
+### D7: Commitments Affecting Score ✅ COMPLETED
+**Status**: Implemented in `IntegrityService` and `DataPanel`
 
 **Implementation**:
-- [ ] Add /recover command or status change handler
-- [ ] When commitment status changes at_risk → in_progress:
-  - Set CleanupPlan.status = CANCELLED
-  - Prompt user: "Do you still need to notify [stakeholder], or has the situation resolved?"
-  - If resolved: Mark notification task as skipped with reason "Situation resolved"
-  - If still need to notify: Keep task active
-- [ ] Update IntegrityService with recover_commitment() method
-- [ ] Add tests for recovery flow
+- [x] Added `AffectingCommitment` dataclass with commitment and reason fields
+- [x] Implemented `get_affecting_commitments()` method in `IntegrityService`
+- [x] Query late completions (completed_on_time=False) from last 30 days
+- [x] Query abandoned commitments from last 30 days
+- [x] Limit to 5 most recent affecting commitments
+- [x] Updated `IntegrityHandler._show_dashboard()` to include affecting commitments
+- [x] Added `_render_affecting_commitments()` method to DataPanel
+- [x] Added 6 unit tests in `tests/unit/integrity/test_service.py`
 
-**Effort**: Medium (2-3 hours)
-**Priority**: Medium - Completes the at-risk lifecycle
-
-### D9: Snapshot Tests
-**Current**: No snapshot tests for integrity views
-**Target**: Visual regression tests for integrity UI
+### D8: Recovery Flow (at_risk → in_progress) ✅ COMPLETED
+**Status**: Implemented in `IntegrityService` and `RecoverHandler`
 
 **Implementation**:
-- [ ] Create snapshot app for integrity dashboard (A+ grade scenario)
-- [ ] Create snapshot app for integrity dashboard (C- grade scenario)
-- [ ] Create snapshot for commitment list with at_risk items
-- [ ] Create snapshot for CleanupPlan view
-- [ ] Run `uv run pytest --snapshot-update` to generate baselines
+- [x] Added `/recover` command to parser
+- [x] Created `RecoverHandler` class in handlers.py
+- [x] Implemented `recover_commitment()` method in `IntegrityService`
+- [x] Sets CleanupPlan.status = CANCELLED on recovery
+- [x] Prompts about notification task if still pending
+- [x] `/recover resolved` skips notification task with reason "Situation resolved"
+- [x] Added 9 unit tests for recover_commitment() in `tests/unit/integrity/test_service.py`
+- [x] Added 7 unit tests for RecoverHandler in `tests/unit/commands/test_handlers.py`
 
-**Effort**: Small (1-2 hours)
-**Priority**: Low - Testing infrastructure
+### D9: Snapshot Tests ✅ COMPLETED
+**Status**: Snapshot tests exist in `tests/tui/test_snapshots.py`
+
+**Implementation**:
+- [x] `integrity_dashboard_app.py` - A- grade scenario
+- [x] `integrity_dashboard_low_app.py` - C- grade scenario
+- [x] `commitment_list_atrisk_app.py` - Commitment list with at-risk items
+- [x] `cleanup_plan_app.py` - CleanupPlan view
+- [x] All 13 snapshot tests passing
 
 ---
 
 ### Deferred Work Priority Order
 
-**Completed**:
+**All Completed**:
 1. ✅ **D1: Notification Timeliness** - Implemented
 2. ✅ **D2: Reliability Streak** - Implemented
 3. ✅ **D3: Soft Enforcement** - Implemented
 4. ✅ **D4: Pre-Abandon Prompt** - Implemented
-
-**Remaining**:
-1. **D8: Recovery Flow** - Medium, completes at-risk lifecycle
-2. **D5: Visual Indicators** - Low, polish
-3. **D6: Metric Trends** - Low, analytics
-4. **D7: Affecting Commitments** - Low, debugging aid
-5. **D9: Snapshot Tests** - Low, infrastructure
+5. ✅ **D5: Visual Indicators** - Implemented (was already done)
+6. ✅ **D6: Metric Trends** - Implemented
+7. ✅ **D7: Affecting Commitments** - Implemented
+8. ✅ **D8: Recovery Flow** - Implemented (was already done)
+9. ✅ **D9: Snapshot Tests** - Implemented (were already done)

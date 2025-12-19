@@ -105,7 +105,7 @@ The system SHALL implement context-aware Escape key behavior that varies based o
 - **WHEN** the user presses Escape
 - **THEN** the screen is popped and MainScreen becomes active
 
-### Requirement: MainScreen Compose Structure
+### Requirement: Screen Compose Structure
 
 The system SHALL ensure MainScreen's compose method yields the expected child widgets.
 
@@ -119,28 +119,4 @@ The system SHALL ensure MainScreen's compose method yields the expected child wi
 - **WHEN** compose() is called
 - **THEN** it yields the expected widgets for settings configuration
 
-## REMOVED Requirements
 
-### Requirement: HomeScreen Architecture
-
-**Reason**: HomeScreen is being replaced by NavSidebar integrated into MainScreen.
-
-**Migration**: Use MainScreen with NavSidebar for navigation discovery.
-
-### Requirement: ChatScreen as Separate Screen
-
-**Reason**: ChatScreen is no longer a separate pushable screen. Its widgets (ChatContainer, PromptInput, DataPanel) are embedded directly in MainScreen.
-
-**Migration**: Chat functionality is now part of MainScreen. No screen transitions needed for chat - just select "Chat" from NavSidebar to show chat-only view.
-
-### Requirement: Screen Stack for Navigation (Partial)
-
-**Reason**: Navigation between data views no longer uses screen push/pop. Only Settings uses push_screen.
-
-#### Scenario: Navigate forward with push_screen (MODIFIED)
-- **GIVEN** the user is on the MainScreen
-- **WHEN** the user triggers navigation to Settings
-- **THEN** `push_screen("settings")` is called and SettingsScreen becomes the active screen
-- **AND** navigation to data views (Goals, Commitments, etc.) does NOT use push_screen
-
-**Migration**: Data view navigation is handled by updating DataPanel content, not screen transitions.

@@ -1,6 +1,6 @@
 # provider-auth Specification Delta
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Settings Access
 

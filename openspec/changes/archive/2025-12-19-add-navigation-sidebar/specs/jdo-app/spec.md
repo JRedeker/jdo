@@ -95,6 +95,8 @@ The system SHALL provide consistent global key bindings.
 - **WHEN** the user presses Tab
 - **THEN** focus cycles in order: NavSidebar → PromptInput → NavSidebar
 
+## ADDED Requirements
+
 ### Requirement: Application Layout
 
 The system SHALL display a three-panel layout with sidebar, chat, and data panel.

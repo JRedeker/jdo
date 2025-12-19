@@ -5,12 +5,12 @@ Define the main JDO application shell including startup initialization, screen n
 ## Requirements
 ### Requirement: Application Startup
 
-The system SHALL initialize the application with database setup and screen display.
+The system SHALL initialize the application with database setup and main layout display.
 
 #### Scenario: AI configuration required on startup
 - **GIVEN** the application is launched
 - **AND** no credentials exist for the configured AI provider
-- **WHEN** the Home screen is displayed
+- **WHEN** the main layout is displayed
 - **THEN** a blocking modal is shown
 - **AND** the modal offers an option to open Settings
 - **AND** the modal offers an option to quit
@@ -20,10 +20,11 @@ The system SHALL initialize the application with database setup and screen displ
 - **WHEN** the app mounts
 - **THEN** the database tables are created if they don't exist
 
-#### Scenario: Home screen on startup
+#### Scenario: Main layout on startup
 - **GIVEN** the application is launched
 - **WHEN** initialization completes
-- **THEN** the Home screen is displayed
+- **THEN** the main layout with NavSidebar and content area is displayed
+- **AND** focus is on the PromptInput
 
 #### Scenario: Startup completes without error
 - **GIVEN** a valid configuration
@@ -32,32 +33,33 @@ The system SHALL initialize the application with database setup and screen displ
 
 #### Scenario: Triage count checked on startup
 - **GIVEN** the application is launched
-- **WHEN** the home screen is displayed
-- **THEN** the triage item count is checked and stored for display
+- **WHEN** the main layout is displayed
+- **THEN** the triage item count is checked and shown as badge on Triage nav item
 
 ### Requirement: Screen Navigation
 
-The system SHALL support navigation between Home, Chat, and Settings screens.
+The system SHALL support navigation via the NavSidebar and Settings screen.
 
-#### Scenario: Navigate to Chat from Home
-- **GIVEN** the user is on the Home screen
-- **WHEN** the user triggers new chat action (n key or message)
-- **THEN** the Chat screen is pushed onto the screen stack
+#### Scenario: Navigate to Chat via sidebar
+- **GIVEN** the main layout is displayed
+- **WHEN** the user selects "Chat" from NavSidebar
+- **THEN** the content area shows chat-only view with DataPanel hidden
 
-#### Scenario: Navigate to Settings from Home
-- **GIVEN** the user is on the Home screen
-- **WHEN** the user triggers settings action (s key or message)
+#### Scenario: Navigate to Settings via sidebar
+- **GIVEN** the main layout is displayed
+- **WHEN** the user selects "Settings" from NavSidebar
 - **THEN** the Settings screen is pushed onto the screen stack
 
-#### Scenario: Return to Home from Chat
-- **GIVEN** the user is on the Chat screen
-- **WHEN** the user presses Escape
-- **THEN** the Chat screen is popped and Home screen is visible
-
-#### Scenario: Return to Home from Settings
+#### Scenario: Return from Settings
 - **GIVEN** the user is on the Settings screen
 - **WHEN** the user presses Escape
-- **THEN** the Settings screen is popped and Home screen is visible
+- **THEN** the Settings screen is popped and main layout is visible
+
+#### Scenario: Navigate to data views via sidebar
+- **GIVEN** the main layout is displayed
+- **WHEN** the user selects a data view (Goals, Commitments, etc.) from NavSidebar
+- **THEN** the DataPanel updates to show the selected content
+- **AND** the chat area remains visible
 
 ### Requirement: Draft Restoration
 
@@ -111,10 +113,26 @@ The system SHALL provide consistent global key bindings.
 - **WHEN** the user presses 'd'
 - **THEN** the theme toggles between dark and light mode
 
-#### Scenario: Escape returns to previous screen
-- **GIVEN** a screen is pushed onto the stack
-- **WHEN** the user presses Escape
-- **THEN** the current screen is popped (unless on Home)
+#### Scenario: Toggle sidebar collapse
+- **GIVEN** the application is running
+- **WHEN** the user presses '['
+- **THEN** the NavSidebar toggles between expanded and collapsed states
+
+#### Scenario: Number keys provide quick navigation
+- **GIVEN** the application is running
+- **WHEN** the user presses a number key (1-9)
+- **THEN** the corresponding NavSidebar item is selected (1=Chat, 2=Goals, 3=Commitments, etc.)
+- **AND** number keys work regardless of which widget has focus
+
+#### Scenario: Tab cycles focus with visible widgets
+- **GIVEN** the application is running with DataPanel visible
+- **WHEN** the user presses Tab
+- **THEN** focus cycles in order: NavSidebar → PromptInput → DataPanel → NavSidebar
+
+#### Scenario: Tab skips hidden DataPanel
+- **GIVEN** the application is running with DataPanel hidden (Chat view)
+- **WHEN** the user presses Tab
+- **THEN** focus cycles in order: NavSidebar → PromptInput → NavSidebar
 
 ### Requirement: Application Header and Footer
 
@@ -130,127 +148,6 @@ The system SHALL display consistent header and footer widgets.
 - **WHEN** any screen is displayed
 - **THEN** the footer shows context-appropriate key bindings
 
-### Requirement: Home Screen Triage Indicator
-
-The system SHALL display a triage indicator on the home screen when items need attention.
-
-#### Scenario: Triage indicator shown when items exist
-- **WHEN** the home screen is displayed and triage count > 0
-- **THEN** an indicator shows "N items need triage [t]" where N is the count
-
-#### Scenario: Triage indicator hidden when queue empty
-- **WHEN** the home screen is displayed and triage count = 0
-- **THEN** no triage indicator is shown
-
-#### Scenario: Triage indicator updates on return to home
-- **WHEN** user returns to home screen after processing triage items
-- **THEN** the indicator count is refreshed
-
-#### Scenario: Triage shortcut from home
-- **WHEN** user presses `t` on the home screen with triage items
-- **THEN** the system navigates to chat and starts triage mode
-
-#### Scenario: Triage shortcut with empty queue
-- **WHEN** user presses `t` on the home screen with no triage items
-- **THEN** the system displays a notification "No items to triage"
-
-### Requirement: Goals Navigation
-
-The system SHALL handle the ShowGoals message from HomeScreen by navigating to a view displaying the user's goals.
-
-#### Scenario: Show goals list via keyboard shortcut
-- **WHEN** user presses 'g' on HomeScreen
-- **THEN** HomeScreen posts ShowGoals message
-- **AND** JdoApp navigates to ChatScreen with goals list loaded in DataPanel
-
-#### Scenario: Goals list empty
-- **WHEN** ShowGoals message handled with no goals in database
-- **THEN** DataPanel displays empty state with guidance on creating first goal
-
-### Requirement: Commitments Navigation
-
-The system SHALL handle the ShowCommitments message from HomeScreen by navigating to a view displaying the user's commitments.
-
-#### Scenario: Show commitments list via keyboard shortcut
-- **WHEN** user presses 'c' on HomeScreen
-- **THEN** HomeScreen posts ShowCommitments message
-- **AND** JdoApp navigates to ChatScreen with commitments list loaded in DataPanel
-
-#### Scenario: Commitments sorted by priority
-- **WHEN** ShowCommitments message handled
-- **THEN** commitments are sorted with at_risk items first, then by due date
-
-### Requirement: Visions Navigation
-
-The system SHALL handle the ShowVisions message from HomeScreen by navigating to a view displaying the user's visions.
-
-#### Scenario: Show visions list via keyboard shortcut
-- **WHEN** user presses 'v' on HomeScreen
-- **THEN** HomeScreen posts ShowVisions message
-- **AND** JdoApp navigates to ChatScreen with visions list loaded in DataPanel
-
-#### Scenario: Vision review indicators
-- **WHEN** ShowVisions displays visions due for review
-- **THEN** those visions are highlighted or marked with review indicator
-
-### Requirement: Milestones Navigation
-
-The system SHALL handle the ShowMilestones message from HomeScreen by navigating to a view displaying the user's milestones.
-
-#### Scenario: Show milestones list via keyboard shortcut
-- **WHEN** user presses 'm' on HomeScreen
-- **THEN** HomeScreen posts ShowMilestones message
-- **AND** JdoApp navigates to ChatScreen with milestones list loaded in DataPanel
-
-#### Scenario: Milestones grouped by goal
-- **WHEN** milestones are displayed
-- **THEN** they can optionally be grouped by their parent goal
-
-### Requirement: Orphan Commitments Navigation
-
-The system SHALL handle the ShowOrphans message from HomeScreen by navigating to a view displaying commitments without goal/milestone linkage.
-
-#### Scenario: Show orphan commitments via keyboard shortcut
-- **WHEN** user presses 'o' on HomeScreen
-- **THEN** HomeScreen posts ShowOrphans message
-- **AND** JdoApp navigates to ChatScreen with orphan commitments list
-
-#### Scenario: Orphan definition
-- **WHEN** querying orphan commitments
-- **THEN** return commitments where goal_id, milestone_id, and recurring_commitment_id are all null
-
-#### Scenario: No orphan commitments
-- **WHEN** ShowOrphans handled with no orphan commitments
-- **THEN** DataPanel displays message "All commitments are linked to goals or milestones"
-
-### Requirement: Hierarchy Navigation
-
-The system SHALL handle the ShowHierarchy message from HomeScreen by navigating to a full hierarchy tree view.
-
-#### Scenario: Show hierarchy tree via keyboard shortcut
-- **WHEN** user presses 'h' on HomeScreen
-- **THEN** HomeScreen posts ShowHierarchy message
-- **AND** JdoApp navigates to ChatScreen with hierarchy view loaded
-
-#### Scenario: Hierarchy shows all levels
-- **WHEN** hierarchy view is displayed
-- **THEN** it shows vision → goal → milestone → commitment hierarchy
-- **AND** orphan commitments are shown in separate section
-
-### Requirement: Integrity Dashboard Navigation
-
-The system SHALL handle the ShowIntegrity message from HomeScreen by navigating to the integrity dashboard view.
-
-#### Scenario: Show integrity dashboard via keyboard shortcut
-- **WHEN** user presses 'i' on HomeScreen
-- **THEN** HomeScreen posts ShowIntegrity message
-- **AND** JdoApp navigates to ChatScreen with integrity dashboard loaded
-
-#### Scenario: Integrity metrics calculated on navigation
-- **WHEN** ShowIntegrity message is handled
-- **THEN** IntegrityService calculates current metrics
-- **AND** letter grade and all metrics are displayed in DataPanel
-
 ### Requirement: Navigation State Initialization
 
 The system SHALL support initializing ChatScreen with pre-loaded data in the DataPanel to enable instant data display on navigation.
@@ -264,4 +161,28 @@ The system SHALL support initializing ChatScreen with pre-loaded data in the Dat
 - **WHEN** ChatScreen is constructed without initial data
 - **THEN** DataPanel starts in empty state
 - **AND** behaves as current implementation
+
+### Requirement: Application Layout
+
+The system SHALL display a three-panel layout with sidebar, chat, and data panel.
+
+#### Scenario: NavSidebar docked left
+- **GIVEN** the application is running
+- **WHEN** the main layout is displayed
+- **THEN** the NavSidebar is docked to the left edge
+
+#### Scenario: Content area fills remaining space
+- **GIVEN** the application is running
+- **WHEN** the main layout is displayed
+- **THEN** the content area (chat + data panel) fills the space to the right of NavSidebar
+
+#### Scenario: Header shows app title
+- **GIVEN** the application is running
+- **WHEN** the main layout is displayed
+- **THEN** the header shows "JDO" as the title
+
+#### Scenario: Footer shows key bindings
+- **GIVEN** the application is running
+- **WHEN** the main layout is displayed
+- **THEN** the footer shows context-appropriate key bindings
 

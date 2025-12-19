@@ -164,24 +164,4 @@ The system SHALL provide access to integrity features through NavSidebar.
 - **WHEN** user is viewing a commitment in DataPanel and types `/atrisk`
 - **THEN** the at-risk workflow begins for that commitment
 
-## REMOVED Requirements
 
-### Requirement: Legacy Letter-Key Integrity Shortcut
-
-**Reason**: Letter-key shortcuts are replaced by NavSidebar navigation per `add-navigation-sidebar` change.
-
-#### Scenario: Quick access integrity via 'i' key (REMOVED)
-- **WHEN** user presses 'i' on home screen
-- **THEN** the integrity dashboard is displayed in the data panel
-
-**Migration**: Use NavSidebar selection "Integrity" or press number key '7'.
-
-### Requirement: Legacy Footer Shortcuts
-
-**Reason**: Footer letter shortcuts are replaced by NavSidebar per `add-navigation-sidebar` change.
-
-#### Scenario: Home screen footer includes i:integrity (REMOVED)
-- **WHEN** viewing home screen
-- **THEN** footer includes: i:integrity alongside existing shortcuts
-
-**Migration**: Integrity is accessible via NavSidebar; footer shows context-appropriate bindings only.

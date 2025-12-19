@@ -1,6 +1,6 @@
 # inbox Specification Delta
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Triage Workflow
 
