@@ -14,6 +14,7 @@ from jdo.ai.time_parsing import format_hours, parse_time_input
 from jdo.commands.parser import CommandType, ParsedCommand
 from jdo.db.persistence import PersistenceService
 from jdo.db.session import get_session
+from jdo.integrity.service import IntegrityService
 from jdo.models.draft import EntityType
 
 
@@ -882,6 +883,19 @@ class HelpHandler(CommandHandler):
             "  /hours 90min  - Set 90 minutes (1.5 hours) available\n\n"
             "The AI will warn you when task estimates exceed available time."
         ),
+        "recover": (
+            "/recover - Recover an at-risk commitment\n\n"
+            "Moves an at-risk commitment back to in-progress status.\n"
+            "Use this when the situation has improved and you can deliver.\n\n"
+            "The workflow:\n"
+            "  1. Select an at-risk commitment (or have one in context)\n"
+            "  2. Run /recover to change status to in_progress\n"
+            "  3. Cleanup plan is cancelled automatically\n"
+            "  4. If notification task is pending, you'll be asked:\n"
+            "     - '/recover resolved' to skip notification\n"
+            "     - Keep the task to complete it\n\n"
+            "This is the happy path when things get back on track."
+        ),
     }
 
     def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:
@@ -921,6 +935,7 @@ class HelpHandler(CommandHandler):
             "  /abandon    - Mark commitment as abandoned",
             "  /cancel     - Cancel current draft",
             "  /atrisk     - Mark commitment as at-risk",
+            "  /recover    - Recover at-risk commitment",
             "  /cleanup    - View/update cleanup plan",
             "  /integrity  - Show integrity dashboard",
             "  /hours      - Set available hours for time coaching",
@@ -2216,6 +2231,123 @@ class HoursHandler(CommandHandler):
         )
 
 
+class RecoverHandler(CommandHandler):
+    """Handler for /recover command - recovers at-risk commitment to in_progress.
+
+    Used when the situation has improved and the commitment can be delivered.
+    """
+
+    def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:
+        """Execute /recover command.
+
+        Args:
+            cmd: The parsed command.
+            context: Context with current commitment data.
+
+        Returns:
+            HandlerResult for recovery workflow.
+        """
+        current_commitment = context.get("current_commitment")
+
+        # Check if we have a commitment in context
+        if not current_commitment:
+            return HandlerResult(
+                message="No commitment selected. Use /show commitments to view "
+                "your commitments, then select one to recover.",
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        # Check if commitment is at-risk
+        status = current_commitment.get("status", "")
+        if hasattr(status, "value"):
+            status = status.value
+
+        if status != "at_risk":
+            return HandlerResult(
+                message=f"This commitment is not at-risk (current status: {status}). "
+                "Only at-risk commitments can be recovered.",
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        commitment_id = current_commitment.get("id")
+        if not commitment_id:
+            return HandlerResult(
+                message="Could not identify commitment. Please try again.",
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        # Check for notification_resolved argument
+        notification_resolved = False
+        if cmd.args and cmd.args[0].lower() in ("resolved", "yes", "y"):
+            notification_resolved = True
+
+        try:
+            with get_session() as session:
+                service = IntegrityService()
+                result = service.recover_commitment(
+                    session=session,
+                    commitment_id=commitment_id,
+                    notification_resolved=notification_resolved,
+                )
+
+                deliverable = result.commitment.deliverable or "Commitment"
+                stakeholder = current_commitment.get("stakeholder_name", "stakeholder")
+
+                if result.notification_still_needed:
+                    # Prompt user about notification task
+                    message = (
+                        f"'{deliverable}' has been recovered to in-progress.\n\n"
+                        f"You previously marked this as at-risk. "
+                        f"Do you still need to notify {stakeholder}, "
+                        "or has the situation resolved?\n\n"
+                        "Reply with:\n"
+                        "  - '/recover resolved' to skip the notification (situation resolved)\n"
+                        "  - Keep the notification task to complete it"
+                    )
+                else:
+                    message = (
+                        f"'{deliverable}' has been recovered to in-progress.\n\n"
+                        "The cleanup plan has been cancelled. "
+                        "Great work getting things back on track!"
+                    )
+
+                # Build updated commitment data for panel
+                updated_data = dict(current_commitment)
+                updated_data["status"] = "in_progress"
+
+                return HandlerResult(
+                    message=message,
+                    panel_update={
+                        "mode": "view",
+                        "entity_type": "commitment",
+                        "data": updated_data,
+                    },
+                    draft_data=None,
+                    needs_confirmation=False,
+                )
+
+        except ValueError as e:
+            return HandlerResult(
+                message=f"Could not recover commitment: {e}",
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+        except Exception as e:
+            return HandlerResult(
+                message=f"An error occurred: {e}",
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+
 # Handler registry
 _HANDLERS: dict[CommandType, type[CommandHandler]] = {
     CommandType.COMMIT: CommitHandler,
@@ -2237,6 +2369,7 @@ _HANDLERS: dict[CommandType, type[CommandHandler]] = {
     CommandType.INTEGRITY: IntegrityHandler,
     CommandType.ABANDON: AbandonHandler,
     CommandType.HOURS: HoursHandler,
+    CommandType.RECOVER: RecoverHandler,
 }
 
 # Cache handler instances

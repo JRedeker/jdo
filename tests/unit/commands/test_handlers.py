@@ -2119,3 +2119,123 @@ class TestHelpHandlerHoursCommand:
         result = handler.execute(cmd, {})
 
         assert "time coaching" in result.message.lower() or "/hours" in result.message
+
+
+# ============================================================
+# D8: /recover Command Tests (Recovery Flow)
+# ============================================================
+
+
+class TestRecoverHandler:
+    """Tests for the /recover command handler."""
+
+    def test_recover_without_commitment_shows_error(self) -> None:
+        """Test: /recover without commitment context shows error."""
+        from jdo.commands.handlers import RecoverHandler
+
+        handler = RecoverHandler()
+        cmd = ParsedCommand(CommandType.RECOVER, [], "/recover")
+
+        context = {}  # No commitment
+
+        result = handler.execute(cmd, context)
+
+        assert "no commitment" in result.message.lower()
+        assert result.panel_update is None
+
+    def test_recover_on_non_at_risk_commitment_shows_error(self) -> None:
+        """Test: /recover on non at-risk commitment shows error."""
+        from jdo.commands.handlers import RecoverHandler
+
+        handler = RecoverHandler()
+        cmd = ParsedCommand(CommandType.RECOVER, [], "/recover")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "In progress task",
+                "status": "in_progress",
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "not at-risk" in result.message.lower()
+        assert "in_progress" in result.message.lower()
+
+    def test_recover_on_pending_commitment_shows_error(self) -> None:
+        """Test: /recover on pending commitment shows error."""
+        from jdo.commands.handlers import RecoverHandler
+
+        handler = RecoverHandler()
+        cmd = ParsedCommand(CommandType.RECOVER, [], "/recover")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "Pending task",
+                "status": "pending",
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "not at-risk" in result.message.lower()
+
+    def test_recover_on_completed_commitment_shows_error(self) -> None:
+        """Test: /recover on completed commitment shows error."""
+        from jdo.commands.handlers import RecoverHandler
+
+        handler = RecoverHandler()
+        cmd = ParsedCommand(CommandType.RECOVER, [], "/recover")
+
+        context = {
+            "current_commitment": {
+                "id": uuid4(),
+                "deliverable": "Done task",
+                "status": "completed",
+            }
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "not at-risk" in result.message.lower()
+
+
+class TestRecoverHandlerRegistration:
+    """Tests for RecoverHandler registration."""
+
+    def test_recover_handler_registered(self) -> None:
+        """Test: RecoverHandler is registered in handler registry."""
+        from jdo.commands.handlers import RecoverHandler, get_handler
+
+        handler = get_handler(CommandType.RECOVER)
+        assert isinstance(handler, RecoverHandler)
+
+
+class TestHelpHandlerRecoverCommand:
+    """Tests for /help with recover command."""
+
+    def test_help_lists_recover_command(self) -> None:
+        """Test: /help lists /recover command."""
+        from jdo.commands.handlers import HelpHandler
+
+        handler = HelpHandler()
+        cmd = ParsedCommand(CommandType.HELP, [], "/help")
+
+        result = handler.execute(cmd, {})
+
+        assert "/recover" in result.message
+
+    def test_help_recover_shows_detailed_help(self) -> None:
+        """Test: /help recover shows detailed help."""
+        from jdo.commands.handlers import HelpHandler
+
+        handler = HelpHandler()
+        cmd = ParsedCommand(CommandType.HELP, ["recover"], "/help recover")
+
+        result = handler.execute(cmd, {})
+
+        assert "recover" in result.message.lower()
+        assert "at-risk" in result.message.lower()
+        assert "in-progress" in result.message.lower() or "in_progress" in result.message.lower()
