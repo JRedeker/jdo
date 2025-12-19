@@ -44,7 +44,7 @@ def has_ai_credentials() -> bool:
 # Skip all tests in this module if no credentials
 pytestmark = pytest.mark.skipif(
     not has_ai_credentials(),
-    reason="No AI credentials available - set ANTHROPIC_API_KEY or authenticate via OAuth",
+    reason="No AI credentials available - set ANTHROPIC_API_KEY or configure API key in settings",
 )
 
 

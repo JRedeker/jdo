@@ -12,7 +12,7 @@ from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
 # Network timeouts (based on httpx defaults + industry standards)
-HTTP_TIMEOUT_SECONDS = 30.0  # Total timeout for HTTP operations (OAuth, etc.)
+HTTP_TIMEOUT_SECONDS = 30.0  # Total timeout for HTTP operations
 
 # AI operation timeouts (LLM API calls can be slow)
 AI_TIMEOUT_SECONDS = 120  # 2 minutes for standard AI calls

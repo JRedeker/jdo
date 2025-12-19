@@ -14,7 +14,7 @@ Hierarchy:
     ├── AIError              # Provider, model, tool issues
     │   ├── ProviderError    # API failures
     │   └── ExtractionError  # Response parsing
-    ├── AuthError            # OAuth, token issues
+    ├── AuthError            # API key, credential issues
     └── TUIError             # Textual, widget issues
 """
 
@@ -200,9 +200,8 @@ class AuthError(JDOError):
     """Exception for authentication and authorization errors.
 
     Raised when:
-    - OAuth flow fails
-    - Tokens are expired or invalid
     - API keys are missing or invalid
+    - Credentials are expired
     - Permission denied
     """
 

@@ -413,7 +413,7 @@ class ChatScreen(Screen[None]):
         """Check if AI credentials are configured.
 
         Returns:
-            True if API key or OAuth token exists for the provider.
+            True if API key exists for the provider.
         """
         settings = get_settings()
         return is_authenticated(settings.ai_provider)

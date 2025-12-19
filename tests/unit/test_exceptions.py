@@ -185,9 +185,9 @@ class TestAuthError:
 
     def test_with_recovery_hint(self):
         """AuthError supports recovery hints."""
-        error = AuthError("OAuth flow failed", recovery_hint="Try logging in again")
+        error = AuthError("API key invalid", recovery_hint="Check your API key in settings")
 
-        assert error.recovery_hint == "Try logging in again"
+        assert error.recovery_hint == "Check your API key in settings"
 
 
 class TestTUIError:
