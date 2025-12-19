@@ -13,8 +13,8 @@
 # Status: proposed, approved, in_progress, completed, deferred
 
 metadata:
-  version: "4.0"
-  last_updated: "2025-12-17"
+  version: "4.1"
+  last_updated: "2025-12-19"
   philosophy: |
     JDO is built on Meta Performance™ Institute (MPI) principles:
     - Commitments are promises, not preferences - make fewer, keep them all
@@ -22,7 +22,7 @@ metadata:
     - Vision leads - goals and commitments must trace back to a vivid future picture
 
 # =============================================================================
-# IMPLEMENTATION STATUS (as of 2025-12-17)
+# IMPLEMENTATION STATUS (as of 2025-12-19)
 # =============================================================================
 # 
 # COMPLETED (Archived):
@@ -33,8 +33,13 @@ metadata:
 # - add-vision-milestone-hierarchy: Vision, Milestone models with review tracking
 # - add-conversational-tui: ChatScreen, DataPanel, HierarchyView widgets
 # - add-recurring-commitments: RecurringCommitment model, calculator, generator
+# - add-dev-infrastructure: Logging, exceptions, pre-commit, migrations (2025-12-18)
+# - add-integrity-protocol: Honor-Your-Word protocol with at-risk workflow (2025-12-18)
+# - wire-ai-to-chat: PydanticAI agent connected to ChatScreen (2025-12-19)
+# - persist-handler-results: Command handlers persist to database (2025-12-19)
+# - fix-navigation-and-review-textual: All navigation shortcuts working (2025-12-19)
 #
-# TEST STATUS: 790 passed, 6 snapshots
+# TEST STATUS: 1,268 passed, 11 snapshots
 # LINT STATUS: All checks passed (ruff, pyrefly)
 
 features:
@@ -121,9 +126,10 @@ features:
     title: "Wire AI Agent to Chat Flow"
     priority: critical
     complexity: medium
-    status: proposed
+    status: completed
     category: core
-    phase: next
+    phase: now
+    change_spec: "wire-ai-to-chat"
     
     description: |
       The AI agent exists (ai/agent.py), tools are registered (ai/tools.py), 
@@ -150,9 +156,10 @@ features:
     title: "Persist Command Handler Results"
     priority: critical
     complexity: medium
-    status: proposed
+    status: completed
     category: core
-    phase: next
+    phase: now
+    change_spec: "persist-handler-results"
     
     description: |
       Command handlers (e.g., CommitHandler.execute()) build draft data but never 
@@ -180,9 +187,10 @@ features:
     title: "Connect Navigation Messages"
     priority: critical
     complexity: low
-    status: proposed
+    status: completed
     category: core
-    phase: next
+    phase: now
+    change_spec: "fix-navigation-and-review-textual"
     
     description: |
       HomeScreen posts messages like ShowGoals, ShowCommitments, ShowHierarchy,
@@ -766,8 +774,8 @@ features:
 
 notes:
   phase_summary: |
-    Now:   Inbox triage (in progress), Honor-your-word protocol (spec exists)
-    Next:  Wire AI to chat, persist handlers, navigation, integrity metrics, stakeholder views, guardrails, recurring TUI, goal review
+    Now:   All core features complete - AI chat, persistence, navigation, integrity protocol
+    Next:  Integrity metrics, stakeholder views, commitment guardrails, recurring TUI, goal review
     Later: Daily check-in, notifications, weekly report, graceful degradation, import, web access, cloud sync, mobile, coaching
   
   review_cadence: |
