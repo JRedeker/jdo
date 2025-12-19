@@ -50,6 +50,43 @@ features:
 # =============================================================================
 # Features with specs already created/proposed, or actively in progress.
 
+  navigation_sidebar:
+    title: "Navigation Sidebar"
+    priority: high
+    complexity: medium
+    status: in_progress
+    category: core
+    phase: now
+    change_spec: "add-navigation-sidebar"
+    
+    description: |
+      Unified navigation sidebar for switching between app sections.
+      Replaces HomeScreen tabs with persistent sidebar navigation.
+    
+    acceptance_criteria:
+      - "NavSidebar displays all navigation items"
+      - "Keyboard shortcuts 1-0 select items"
+      - "Triage badge shows pending count"
+      - "Collapsible sidebar mode works"
+
+  codebase_maintainability:
+    title: "Codebase Maintainability Refactor"
+    priority: medium
+    complexity: high
+    status: proposed
+    category: infrastructure
+    phase: now
+    change_spec: "refactor-codebase-maintainability"
+    
+    description: |
+      Reduce cyclomatic complexity and improve code maintainability.
+      Target hotspots identified by lizard analysis.
+    
+    acceptance_criteria:
+      - "All functions under complexity threshold"
+      - "Whitelist reduced or eliminated"
+      - "Test coverage maintained"
+
   honor_your_word_protocol:
     title: "Honor-Your-Word Protocol"
     priority: critical
