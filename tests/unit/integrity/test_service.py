@@ -11,7 +11,7 @@ import pytest
 from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.pool import StaticPool
 
-from jdo.integrity.service import IntegrityService, RiskSummary
+from jdo.integrity.service import IntegrityService, RecoveryResult, RiskSummary
 from jdo.models.cleanup_plan import CleanupPlan, CleanupPlanStatus
 from jdo.models.commitment import Commitment, CommitmentStatus
 from jdo.models.stakeholder import Stakeholder, StakeholderType
@@ -1142,3 +1142,354 @@ class TestEstimationAccuracy:
         accuracy, count = service._calculate_estimation_accuracy(session)
         assert count == 0
         assert accuracy == 1.0
+
+
+class TestRecoverCommitment:
+    """Tests for recovering an at-risk commitment to in_progress."""
+
+    def test_changes_status_from_at_risk_to_in_progress(self, session: Session) -> None:
+        """Recovering changes commitment status from at_risk to in_progress."""
+        # Setup
+        stakeholder = Stakeholder(name="Alice", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Send report",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.AT_RISK,
+            marked_at_risk_at=datetime.now(UTC),
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+        commitment_id = commitment.id
+
+        # Create cleanup plan
+        cleanup_plan = CleanupPlan(
+            commitment_id=commitment_id,
+            status=CleanupPlanStatus.PLANNED,
+        )
+        session.add(cleanup_plan)
+        session.commit()
+
+        # Act
+        service = IntegrityService()
+        result = service.recover_commitment(
+            session=session,
+            commitment_id=commitment_id,
+        )
+
+        # Assert
+        session.refresh(commitment)
+        assert commitment.status == CommitmentStatus.IN_PROGRESS
+        assert result.commitment.status == CommitmentStatus.IN_PROGRESS
+
+    def test_sets_cleanup_plan_status_to_cancelled(self, session: Session) -> None:
+        """Recovering sets the cleanup plan status to cancelled."""
+        stakeholder = Stakeholder(name="Bob", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Complete task",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.AT_RISK,
+            marked_at_risk_at=datetime.now(UTC),
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+        commitment_id = commitment.id
+
+        cleanup_plan = CleanupPlan(
+            commitment_id=commitment_id,
+            status=CleanupPlanStatus.PLANNED,
+        )
+        session.add(cleanup_plan)
+        session.commit()
+        session.refresh(cleanup_plan)
+        cleanup_plan_id = cleanup_plan.id
+
+        # Act
+        service = IntegrityService()
+        result = service.recover_commitment(
+            session=session,
+            commitment_id=commitment_id,
+        )
+
+        # Assert
+        session.refresh(cleanup_plan)
+        assert cleanup_plan.status == CleanupPlanStatus.CANCELLED
+        assert result.cleanup_plan is not None
+        assert result.cleanup_plan.status == CleanupPlanStatus.CANCELLED
+
+    def test_raises_error_for_non_at_risk_commitment(self, session: Session) -> None:
+        """Raises ValueError when trying to recover a non-at_risk commitment."""
+        stakeholder = Stakeholder(name="Carol", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Regular task",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.IN_PROGRESS,
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+
+        service = IntegrityService()
+        with pytest.raises(ValueError, match="not at-risk"):
+            service.recover_commitment(
+                session=session,
+                commitment_id=commitment.id,
+            )
+
+    def test_raises_error_for_nonexistent_commitment(self, session: Session) -> None:
+        """Raises ValueError for non-existent commitment ID."""
+        service = IntegrityService()
+        fake_id = uuid4()
+
+        with pytest.raises(ValueError, match="not found"):
+            service.recover_commitment(
+                session=session,
+                commitment_id=fake_id,
+            )
+
+    def test_returns_notification_still_needed_when_task_pending(self, session: Session) -> None:
+        """Returns notification_still_needed=True when notification task is pending."""
+        stakeholder = Stakeholder(name="Dave", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Notify test",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.AT_RISK,
+            marked_at_risk_at=datetime.now(UTC),
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+        commitment_id = commitment.id
+
+        # Create notification task
+        notification_task = Task(
+            commitment_id=commitment_id,
+            title="Notify Dave",
+            scope="Notification draft",
+            order=0,
+            is_notification_task=True,
+            status=TaskStatus.PENDING,
+        )
+        session.add(notification_task)
+        session.commit()
+        session.refresh(notification_task)
+
+        # Create cleanup plan linked to notification task
+        cleanup_plan = CleanupPlan(
+            commitment_id=commitment_id,
+            status=CleanupPlanStatus.PLANNED,
+            notification_task_id=notification_task.id,
+        )
+        session.add(cleanup_plan)
+        session.commit()
+
+        # Act
+        service = IntegrityService()
+        result = service.recover_commitment(
+            session=session,
+            commitment_id=commitment_id,
+        )
+
+        # Assert
+        assert result.notification_still_needed is True
+        # Notification task should NOT be marked skipped yet (user decides)
+        session.refresh(notification_task)
+        assert notification_task.status == TaskStatus.PENDING
+
+    def test_skips_notification_task_when_resolved_flag_set(self, session: Session) -> None:
+        """Marks notification task as SKIPPED when notification_resolved=True."""
+        stakeholder = Stakeholder(name="Eve", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Skip notify test",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.AT_RISK,
+            marked_at_risk_at=datetime.now(UTC),
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+        commitment_id = commitment.id
+
+        # Create notification task
+        notification_task = Task(
+            commitment_id=commitment_id,
+            title="Notify Eve",
+            scope="Notification draft",
+            order=0,
+            is_notification_task=True,
+            status=TaskStatus.PENDING,
+        )
+        session.add(notification_task)
+        session.commit()
+        session.refresh(notification_task)
+
+        # Create cleanup plan linked to notification task
+        cleanup_plan = CleanupPlan(
+            commitment_id=commitment_id,
+            status=CleanupPlanStatus.PLANNED,
+            notification_task_id=notification_task.id,
+        )
+        session.add(cleanup_plan)
+        session.commit()
+
+        # Act
+        service = IntegrityService()
+        result = service.recover_commitment(
+            session=session,
+            commitment_id=commitment_id,
+            notification_resolved=True,
+        )
+
+        # Assert
+        assert result.notification_still_needed is False
+        session.refresh(notification_task)
+        assert notification_task.status == TaskStatus.SKIPPED
+        assert "Situation resolved" in notification_task.scope
+
+    def test_returns_notification_not_needed_when_no_pending_task(self, session: Session) -> None:
+        """Returns notification_still_needed=False when no pending notification task."""
+        stakeholder = Stakeholder(name="Frank", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="No notify test",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.AT_RISK,
+            marked_at_risk_at=datetime.now(UTC),
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+        commitment_id = commitment.id
+
+        # Create cleanup plan WITHOUT notification task
+        cleanup_plan = CleanupPlan(
+            commitment_id=commitment_id,
+            status=CleanupPlanStatus.PLANNED,
+        )
+        session.add(cleanup_plan)
+        session.commit()
+
+        # Act
+        service = IntegrityService()
+        result = service.recover_commitment(
+            session=session,
+            commitment_id=commitment_id,
+        )
+
+        # Assert
+        assert result.notification_still_needed is False
+
+    def test_returns_result_with_all_entities(self, session: Session) -> None:
+        """recover_commitment returns RecoveryResult with all entities."""
+        stakeholder = Stakeholder(name="Grace", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Full result test",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.AT_RISK,
+            marked_at_risk_at=datetime.now(UTC),
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+        commitment_id = commitment.id
+
+        notification_task = Task(
+            commitment_id=commitment_id,
+            title="Notify Grace",
+            scope="Notification",
+            order=0,
+            is_notification_task=True,
+            status=TaskStatus.PENDING,
+        )
+        session.add(notification_task)
+        session.commit()
+        session.refresh(notification_task)
+
+        cleanup_plan = CleanupPlan(
+            commitment_id=commitment_id,
+            status=CleanupPlanStatus.PLANNED,
+            notification_task_id=notification_task.id,
+        )
+        session.add(cleanup_plan)
+        session.commit()
+
+        # Act
+        service = IntegrityService()
+        result = service.recover_commitment(
+            session=session,
+            commitment_id=commitment_id,
+        )
+
+        # Assert
+        assert isinstance(result, RecoveryResult)
+        assert result.commitment is not None
+        assert result.cleanup_plan is not None
+        assert result.notification_task is not None
+        assert result.commitment.status == CommitmentStatus.IN_PROGRESS
+        assert result.cleanup_plan.status == CleanupPlanStatus.CANCELLED
+
+    def test_handles_commitment_without_cleanup_plan(self, session: Session) -> None:
+        """Handles at-risk commitment that has no cleanup plan gracefully."""
+        stakeholder = Stakeholder(name="Henry", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="No plan test",
+            stakeholder_id=stakeholder.id,
+            due_date=date(2025, 12, 31),
+            status=CommitmentStatus.AT_RISK,
+            marked_at_risk_at=datetime.now(UTC),
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+
+        # Act - no cleanup plan exists
+        service = IntegrityService()
+        result = service.recover_commitment(
+            session=session,
+            commitment_id=commitment.id,
+        )
+
+        # Assert
+        assert result.commitment.status == CommitmentStatus.IN_PROGRESS
+        assert result.cleanup_plan is None
+        assert result.notification_task is None
+        assert result.notification_still_needed is False

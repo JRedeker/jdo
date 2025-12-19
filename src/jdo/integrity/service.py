@@ -107,6 +107,16 @@ class AtRiskResult:
     notification_task: Task
 
 
+@dataclass
+class RecoveryResult:
+    """Result of recovering a commitment from at-risk status."""
+
+    commitment: Commitment
+    cleanup_plan: CleanupPlan | None
+    notification_task: Task | None
+    notification_still_needed: bool
+
+
 class IntegrityService:
     """Service for managing the Honor-Your-Word integrity protocol.
 
@@ -207,6 +217,85 @@ class IntegrityService:
             commitment=commitment,
             cleanup_plan=cleanup_plan,
             notification_task=notification_task,
+        )
+
+    def recover_commitment(
+        self,
+        session: Session,
+        commitment_id: UUID,
+        *,
+        notification_resolved: bool = False,
+    ) -> RecoveryResult:
+        """Recover a commitment from at-risk status back to in_progress.
+
+        This handles the recovery flow when the situation has improved:
+        1. Updates commitment status to in_progress
+        2. Sets CleanupPlan status to cancelled
+        3. Optionally marks notification task as skipped if resolved
+
+        Args:
+            session: Database session
+            commitment_id: ID of commitment to recover
+            notification_resolved: If True, mark notification task as skipped
+
+        Returns:
+            RecoveryResult with updated entities
+
+        Raises:
+            ValueError: If commitment not found or not in at_risk status
+        """
+        # Get commitment
+        commitment = session.get(Commitment, commitment_id)
+        if commitment is None:
+            msg = f"Commitment {commitment_id} not found"
+            raise ValueError(msg)
+
+        # Verify status is at_risk
+        if commitment.status != CommitmentStatus.AT_RISK:
+            msg = f"Commitment is not at-risk (current status: {commitment.status.value})"
+            raise ValueError(msg)
+
+        # Update commitment status
+        commitment.status = CommitmentStatus.IN_PROGRESS
+        commitment.updated_at = datetime.now(UTC)
+        session.add(commitment)
+
+        # Get cleanup plan and cancel it
+        cleanup_plan = session.exec(
+            select(CleanupPlan).where(CleanupPlan.commitment_id == commitment_id)
+        ).first()
+
+        notification_task: Task | None = None
+        notification_still_needed = False
+
+        if cleanup_plan:
+            cleanup_plan.status = CleanupPlanStatus.CANCELLED
+            cleanup_plan.updated_at = datetime.now(UTC)
+            session.add(cleanup_plan)
+
+            # Handle notification task
+            if cleanup_plan.notification_task_id:
+                notification_task = session.get(Task, cleanup_plan.notification_task_id)
+                if notification_task and notification_task.status == TaskStatus.PENDING:
+                    if notification_resolved:
+                        # Mark as skipped with reason
+                        notification_task.status = TaskStatus.SKIPPED
+                        notification_task.scope = (
+                            notification_task.scope or ""
+                        ) + "\n\n[Skipped: Situation resolved]"
+                        notification_task.updated_at = datetime.now(UTC)
+                        session.add(notification_task)
+                    else:
+                        # User still needs to decide about notification
+                        notification_still_needed = True
+
+        session.commit()
+
+        return RecoveryResult(
+            commitment=commitment,
+            cleanup_plan=cleanup_plan,
+            notification_task=notification_task,
+            notification_still_needed=notification_still_needed,
         )
 
     def _generate_notification_scope(

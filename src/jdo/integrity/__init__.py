@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
-from jdo.integrity.service import AtRiskResult, IntegrityService, RiskSummary
+from jdo.integrity.service import (
+    AtRiskResult,
+    IntegrityService,
+    RecoveryResult,
+    RiskSummary,
+)
 
-__all__ = ["AtRiskResult", "IntegrityService", "RiskSummary"]
+__all__ = ["AtRiskResult", "IntegrityService", "RecoveryResult", "RiskSummary"]
