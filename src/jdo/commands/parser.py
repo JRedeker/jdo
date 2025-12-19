@@ -33,6 +33,7 @@ class CommandType(str, Enum):
     CLEANUP = "cleanup"  # View/update cleanup plan
     INTEGRITY = "integrity"  # Show integrity dashboard
     ABANDON = "abandon"  # Mark commitment as abandoned
+    HOURS = "hours"  # Set available hours for time coaching
     MESSAGE = "message"  # Not a command, just a regular message
 
 
@@ -83,6 +84,7 @@ _COMMAND_MAP: dict[str, CommandType] = {
     "cleanup": CommandType.CLEANUP,
     "integrity": CommandType.INTEGRITY,
     "abandon": CommandType.ABANDON,
+    "hours": CommandType.HOURS,
 }
 
 

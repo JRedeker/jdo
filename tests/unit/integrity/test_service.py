@@ -870,3 +870,275 @@ class TestReliabilityStreak:
         service = IntegrityService()
         streak = service._calculate_streak_weeks(session)
         assert streak == 1  # Only this week counts
+
+
+class TestEstimationAccuracy:
+    """Tests for estimation accuracy calculation."""
+
+    def test_returns_1_when_no_history(self, session: Session) -> None:
+        """Returns 1.0 (clean slate) when no task history exists."""
+        service = IntegrityService()
+        accuracy, count = service._calculate_estimation_accuracy(session)
+        assert accuracy == 1.0
+        assert count == 0
+
+    def test_returns_1_when_less_than_5_tasks(self, session: Session) -> None:
+        """Returns 1.0 when fewer than 5 tasks with estimates exist."""
+        from jdo.models.task import ActualHoursCategory
+        from jdo.models.task_history import TaskEventType, TaskHistoryEntry
+
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=stakeholder.id,
+            due_date=date.today(),
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+
+        task = Task(
+            commitment_id=commitment.id,
+            title="Test",
+            scope="Scope",
+            order=1,
+            estimated_hours=2.0,
+        )
+        session.add(task)
+        session.commit()
+        session.refresh(task)
+
+        entry = TaskHistoryEntry(
+            task_id=task.id,
+            commitment_id=commitment.id,
+            event_type=TaskEventType.COMPLETED,
+            new_status=TaskStatus.COMPLETED,
+            estimated_hours=2.0,
+            actual_hours_category=ActualHoursCategory.ON_TARGET,
+        )
+        session.add(entry)
+        session.commit()
+
+        service = IntegrityService()
+        accuracy, count = service._calculate_estimation_accuracy(session)
+        assert accuracy == 1.0
+        assert count == 1
+
+    def test_returns_1_for_perfect_estimates(self, session: Session) -> None:
+        """Returns 1.0 when all tasks were ON_TARGET."""
+        from jdo.models.task import ActualHoursCategory
+        from jdo.models.task_history import TaskEventType, TaskHistoryEntry
+
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=stakeholder.id,
+            due_date=date.today(),
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+
+        task = Task(
+            commitment_id=commitment.id,
+            title="Test",
+            scope="Scope",
+            order=1,
+            estimated_hours=2.0,
+        )
+        session.add(task)
+        session.commit()
+        session.refresh(task)
+
+        now = datetime.now(UTC)
+        for i in range(5):
+            entry = TaskHistoryEntry(
+                task_id=task.id,
+                commitment_id=commitment.id,
+                event_type=TaskEventType.COMPLETED,
+                new_status=TaskStatus.COMPLETED,
+                estimated_hours=2.0,
+                actual_hours_category=ActualHoursCategory.ON_TARGET,
+                created_at=now - timedelta(days=i),
+            )
+            session.add(entry)
+        session.commit()
+
+        service = IntegrityService()
+        accuracy, count = service._calculate_estimation_accuracy(session)
+        assert accuracy == pytest.approx(1.0)
+        assert count == 5
+
+    def test_returns_lower_accuracy_for_inaccurate_estimates(self, session: Session) -> None:
+        """Returns <1.0 when estimates were inaccurate."""
+        from jdo.models.task import ActualHoursCategory
+        from jdo.models.task_history import TaskEventType, TaskHistoryEntry
+
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=stakeholder.id,
+            due_date=date.today(),
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+
+        task = Task(
+            commitment_id=commitment.id,
+            title="Test",
+            scope="Scope",
+            order=1,
+            estimated_hours=2.0,
+        )
+        session.add(task)
+        session.commit()
+        session.refresh(task)
+
+        now = datetime.now(UTC)
+        categories = [
+            ActualHoursCategory.ON_TARGET,
+            ActualHoursCategory.SHORTER,
+            ActualHoursCategory.LONGER,
+            ActualHoursCategory.MUCH_SHORTER,
+            ActualHoursCategory.MUCH_LONGER,
+        ]
+        for cat in categories:
+            entry = TaskHistoryEntry(
+                task_id=task.id,
+                commitment_id=commitment.id,
+                event_type=TaskEventType.COMPLETED,
+                new_status=TaskStatus.COMPLETED,
+                estimated_hours=2.0,
+                actual_hours_category=cat,
+                created_at=now,
+            )
+            session.add(entry)
+        session.commit()
+
+        service = IntegrityService()
+        accuracy, count = service._calculate_estimation_accuracy(session)
+        assert count == 5
+        assert accuracy < 1.0
+        assert accuracy > 0.0
+
+    def test_applies_exponential_decay_weight(self, session: Session) -> None:
+        """Recent tasks are weighted more heavily than older ones."""
+        from jdo.models.task import ActualHoursCategory
+        from jdo.models.task_history import TaskEventType, TaskHistoryEntry
+
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=stakeholder.id,
+            due_date=date.today(),
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+
+        task = Task(
+            commitment_id=commitment.id,
+            title="Test",
+            scope="Scope",
+            order=1,
+            estimated_hours=2.0,
+        )
+        session.add(task)
+        session.commit()
+        session.refresh(task)
+
+        now = datetime.now(UTC)
+
+        recent_on_target = TaskHistoryEntry(
+            task_id=task.id,
+            commitment_id=commitment.id,
+            event_type=TaskEventType.COMPLETED,
+            new_status=TaskStatus.COMPLETED,
+            estimated_hours=2.0,
+            actual_hours_category=ActualHoursCategory.ON_TARGET,
+            created_at=now,
+        )
+        session.add(recent_on_target)
+
+        for i in range(1, 5):
+            old_inaccurate = TaskHistoryEntry(
+                task_id=task.id,
+                commitment_id=commitment.id,
+                event_type=TaskEventType.COMPLETED,
+                new_status=TaskStatus.COMPLETED,
+                estimated_hours=2.0,
+                actual_hours_category=ActualHoursCategory.MUCH_LONGER,
+                created_at=now - timedelta(days=30 + i),
+            )
+            session.add(old_inaccurate)
+        session.commit()
+
+        service = IntegrityService()
+        accuracy, count = service._calculate_estimation_accuracy(session)
+        assert count == 5
+        assert accuracy > 0.5
+
+    def test_ignores_entries_older_than_90_days(self, session: Session) -> None:
+        """Entries older than 90 days are not included."""
+        from jdo.models.task import ActualHoursCategory
+        from jdo.models.task_history import TaskEventType, TaskHistoryEntry
+
+        stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Test",
+            stakeholder_id=stakeholder.id,
+            due_date=date.today(),
+        )
+        session.add(commitment)
+        session.commit()
+        session.refresh(commitment)
+
+        task = Task(
+            commitment_id=commitment.id,
+            title="Test",
+            scope="Scope",
+            order=1,
+            estimated_hours=2.0,
+        )
+        session.add(task)
+        session.commit()
+        session.refresh(task)
+
+        now = datetime.now(UTC)
+        old_entry = TaskHistoryEntry(
+            task_id=task.id,
+            commitment_id=commitment.id,
+            event_type=TaskEventType.COMPLETED,
+            new_status=TaskStatus.COMPLETED,
+            estimated_hours=2.0,
+            actual_hours_category=ActualHoursCategory.ON_TARGET,
+            created_at=now - timedelta(days=100),
+        )
+        session.add(old_entry)
+        session.commit()
+
+        service = IntegrityService()
+        accuracy, count = service._calculate_estimation_accuracy(session)
+        assert count == 0
+        assert accuracy == 1.0

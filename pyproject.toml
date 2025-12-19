@@ -121,6 +121,9 @@ ignore = [
     "FBT001",  # push_screen callbacks require positional bool - Textual API
     "BLE001",  # Catch Exception for database errors in _check_triage_count
 ]
+"src/jdo/db/task_history_service.py" = [
+    "PLR0913", # log_event needs 8 args for complete event context (task, commitment, status, etc.)
+]
 "src/jdo/commands/handlers.py" = [
     "ARG002",  # Unused cmd/context args - handlers implement common interface
     "ANN401",  # Any for goal_id - accepts UUID or other ID types from context

@@ -48,7 +48,7 @@ features:
     title: "Honor-Your-Word Protocol"
     priority: critical
     complexity: high
-    status: proposed
+    status: completed
     category: integrity
     phase: now
     change_spec: "add-integrity-protocol"
@@ -208,7 +208,7 @@ features:
     title: "Integrity Metrics & Scoring"
     priority: high
     complexity: high
-    status: proposed
+    status: completed
     category: integrity
     phase: next
     change_spec: "add-integrity-protocol"
@@ -738,7 +738,7 @@ features:
     title: "Developer Infrastructure"
     priority: low
     complexity: medium
-    status: proposed
+    status: completed
     category: infrastructure
     phase: later
     change_spec: "add-dev-infrastructure"

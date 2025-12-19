@@ -8,7 +8,13 @@ from uuid import UUID, uuid4
 import pytest
 from sqlmodel import SQLModel
 
-from jdo.models.task import SubTask, Task, TaskStatus
+from jdo.models.task import (
+    ActualHoursCategory,
+    EstimationConfidence,
+    SubTask,
+    Task,
+    TaskStatus,
+)
 
 
 class TestTaskModel:
@@ -35,6 +41,55 @@ class TestTaskModel:
         assert "order" in fields
         assert "created_at" in fields
         assert "updated_at" in fields
+
+    def test_has_time_estimation_fields(self) -> None:
+        """Task has time estimation fields."""
+        fields = Task.model_fields
+        assert "estimated_hours" in fields
+        assert "actual_hours_category" in fields
+        assert "estimation_confidence" in fields
+
+
+class TestActualHoursCategory:
+    """Tests for ActualHoursCategory enum."""
+
+    def test_has_all_categories(self) -> None:
+        """ActualHoursCategory has all 5 categories."""
+        assert ActualHoursCategory.MUCH_SHORTER.value == "much_shorter"
+        assert ActualHoursCategory.SHORTER.value == "shorter"
+        assert ActualHoursCategory.ON_TARGET.value == "on_target"
+        assert ActualHoursCategory.LONGER.value == "longer"
+        assert ActualHoursCategory.MUCH_LONGER.value == "much_longer"
+
+    def test_multiplier_much_shorter(self) -> None:
+        """MUCH_SHORTER returns 0.25 multiplier."""
+        assert ActualHoursCategory.MUCH_SHORTER.multiplier == 0.25
+
+    def test_multiplier_shorter(self) -> None:
+        """SHORTER returns 0.675 multiplier."""
+        assert ActualHoursCategory.SHORTER.multiplier == 0.675
+
+    def test_multiplier_on_target(self) -> None:
+        """ON_TARGET returns 1.0 multiplier."""
+        assert ActualHoursCategory.ON_TARGET.multiplier == 1.0
+
+    def test_multiplier_longer(self) -> None:
+        """LONGER returns 1.325 multiplier."""
+        assert ActualHoursCategory.LONGER.multiplier == 1.325
+
+    def test_multiplier_much_longer(self) -> None:
+        """MUCH_LONGER returns 2.0 multiplier."""
+        assert ActualHoursCategory.MUCH_LONGER.multiplier == 2.0
+
+
+class TestEstimationConfidence:
+    """Tests for EstimationConfidence enum."""
+
+    def test_has_all_confidence_levels(self) -> None:
+        """EstimationConfidence has high, medium, low."""
+        assert EstimationConfidence.HIGH.value == "high"
+        assert EstimationConfidence.MEDIUM.value == "medium"
+        assert EstimationConfidence.LOW.value == "low"
 
 
 class TestTaskValidation:
@@ -290,6 +345,132 @@ class TestTaskPersistence:
                 assert parsed[0].completed is False
                 assert parsed[1].description == "Step 2"
                 assert parsed[1].completed is True
+
+        reset_engine()
+
+
+class TestTimeEstimationFields:
+    """Tests for Task time estimation fields."""
+
+    def test_time_fields_default_to_none(self) -> None:
+        """Time estimation fields default to None."""
+        task = Task(
+            commitment_id=uuid4(),
+            title="Test",
+            scope="Test scope",
+            order=1,
+        )
+        assert task.estimated_hours is None
+        assert task.actual_hours_category is None
+        assert task.estimation_confidence is None
+
+    def test_create_task_with_estimated_hours(self) -> None:
+        """Task can be created with estimated_hours."""
+        task = Task(
+            commitment_id=uuid4(),
+            title="Test",
+            scope="Test scope",
+            order=1,
+            estimated_hours=2.5,
+        )
+        assert task.estimated_hours == 2.5
+
+    def test_create_task_with_estimation_confidence(self) -> None:
+        """Task can be created with estimation_confidence."""
+        task = Task(
+            commitment_id=uuid4(),
+            title="Test",
+            scope="Test scope",
+            order=1,
+            estimated_hours=1.0,
+            estimation_confidence=EstimationConfidence.HIGH,
+        )
+        assert task.estimation_confidence == EstimationConfidence.HIGH
+
+    def test_create_task_with_actual_hours_category(self) -> None:
+        """Task can be created with actual_hours_category."""
+        task = Task(
+            commitment_id=uuid4(),
+            title="Test",
+            scope="Test scope",
+            order=1,
+            estimated_hours=1.0,
+            actual_hours_category=ActualHoursCategory.ON_TARGET,
+        )
+        assert task.actual_hours_category == ActualHoursCategory.ON_TARGET
+
+    def test_create_task_with_all_time_fields(self) -> None:
+        """Task can be created with all time estimation fields."""
+        task = Task(
+            commitment_id=uuid4(),
+            title="Complex task",
+            scope="Detailed work",
+            order=1,
+            estimated_hours=4.0,
+            estimation_confidence=EstimationConfidence.MEDIUM,
+            actual_hours_category=ActualHoursCategory.LONGER,
+        )
+        assert task.estimated_hours == 4.0
+        assert task.estimation_confidence == EstimationConfidence.MEDIUM
+        assert task.actual_hours_category == ActualHoursCategory.LONGER
+
+    def test_time_fields_persist_to_database(self, tmp_path: Path) -> None:
+        """Time estimation fields persist to database."""
+        from sqlmodel import select
+
+        from jdo.db.engine import get_engine, reset_engine
+        from jdo.db.session import get_session
+        from jdo.models.commitment import Commitment
+        from jdo.models.stakeholder import Stakeholder, StakeholderType
+
+        reset_engine()
+        db_path = tmp_path / "test.db"
+
+        with patch("jdo.db.engine.get_settings") as mock_settings:
+            mock_settings.return_value.database_path = db_path
+            engine = get_engine()
+            SQLModel.metadata.create_all(engine)
+
+            # Create stakeholder and commitment
+            stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+            stakeholder_id = stakeholder.id
+
+            with get_session() as session:
+                session.add(stakeholder)
+
+            commitment = Commitment(
+                deliverable="Test",
+                stakeholder_id=stakeholder_id,
+                due_date=date(2025, 12, 31),
+            )
+            commitment_id = commitment.id
+
+            with get_session() as session:
+                session.add(commitment)
+
+            # Create task with time fields
+            task = Task(
+                commitment_id=commitment_id,
+                title="Timed task",
+                scope="Task with time estimates",
+                order=1,
+                estimated_hours=3.5,
+                estimation_confidence=EstimationConfidence.LOW,
+                actual_hours_category=ActualHoursCategory.MUCH_LONGER,
+            )
+            task_id = task.id
+
+            with get_session() as session:
+                session.add(task)
+
+            # Retrieve and verify
+            with get_session() as session:
+                result = session.exec(select(Task).where(Task.id == task_id)).first()
+
+                assert result is not None
+                assert result.estimated_hours == 3.5
+                assert result.estimation_confidence == EstimationConfidence.LOW
+                assert result.actual_hours_category == ActualHoursCategory.MUCH_LONGER
 
         reset_engine()
 

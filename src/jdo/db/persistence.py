@@ -13,6 +13,7 @@ from uuid import UUID
 from loguru import logger
 from sqlmodel import Session, func, select
 
+from jdo.db.task_history_service import TaskHistoryService
 from jdo.exceptions import JDOError
 from jdo.models import (
     Commitment,
@@ -25,6 +26,7 @@ from jdo.models import (
     Vision,
 )
 from jdo.models.recurring_commitment import RecurrenceType
+from jdo.models.task import ActualHoursCategory, TaskStatus
 from jdo.recurrence.calculator import get_next_due_date
 from jdo.recurrence.generator import generate_instance
 
@@ -188,6 +190,7 @@ class PersistenceService:
                 - commitment_id (required): UUID of parent commitment
                 - order (optional): Order within commitment (default 0)
                 - sub_tasks (optional): List of subtask dicts
+                - estimated_hours (optional): Time estimate in hours
 
         Returns:
             The saved Task entity.
@@ -221,11 +224,58 @@ class PersistenceService:
             commitment_id=commitment_id,
             order=order,
             sub_tasks=draft_data.get("sub_tasks", []),
+            estimated_hours=draft_data.get("estimated_hours"),
         )
 
         self.session.add(task)
         self.session.flush()
+
+        # Log task creation to history
+        history_service = TaskHistoryService(self.session)
+        history_service.log_task_created(task)
+
         logger.info(f"Saved task: {task.title} (id={task.id})")
+        return task
+
+    def update_task_status(
+        self,
+        task: Task,
+        new_status: TaskStatus,
+        actual_hours_category: ActualHoursCategory | None = None,
+        notes: str | None = None,
+    ) -> Task:
+        """Update a task's status and log history.
+
+        Args:
+            task: The task to update.
+            new_status: The new status to set.
+            actual_hours_category: Category for completed tasks (optional).
+            notes: Optional notes (e.g., skip reason).
+
+        Returns:
+            The updated task.
+        """
+        old_status = task.status
+        task.status = new_status
+
+        # Store actual hours category if completing
+        if new_status == TaskStatus.COMPLETED and actual_hours_category is not None:
+            task.actual_hours_category = actual_hours_category
+
+        self.session.add(task)
+        self.session.flush()
+
+        # Log status change to history
+        history_service = TaskHistoryService(self.session)
+        history_service.log_status_change(
+            task=task,
+            old_status=old_status,
+            new_status=new_status,
+            actual_hours_category=actual_hours_category,
+            notes=notes,
+        )
+
+        logger.info(f"Updated task status: {task.title} {old_status.value} -> {new_status.value}")
         return task
 
     def save_milestone(self, draft_data: dict[str, Any]) -> Milestone:

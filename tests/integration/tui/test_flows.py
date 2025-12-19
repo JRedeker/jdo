@@ -689,5 +689,5 @@ class TestHomeScreenIntegrityFlows:
         async with home_app().run_test() as pilot:
             screen = pilot.app.query_one(HomeScreen)
 
-            # Default grade is A- (0 streak weeks gives 90 composite score)
-            assert screen.integrity_grade == "A-"
+            # Default grade is A+ (clean slate with no commitment history)
+            assert screen.integrity_grade == "A+"

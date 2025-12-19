@@ -12,8 +12,13 @@ from jdo.db.session import (
     get_visions_due_for_review,
     update_overdue_milestones,
 )
+from jdo.db.task_history_service import TaskHistoryService
+from jdo.db.time_rollup_service import TimeRollup, TimeRollupService
 
 __all__ = [
+    "TaskHistoryService",
+    "TimeRollup",
+    "TimeRollupService",
     "create_db_and_tables",
     "delete_draft",
     "get_engine",

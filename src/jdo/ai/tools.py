@@ -7,7 +7,10 @@ to help users manage their commitments, goals, milestones, and visions.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    pass
 from uuid import UUID
 
 from loguru import logger
@@ -15,6 +18,10 @@ from pydantic_ai import Agent, RunContext
 from sqlmodel import Session, select
 
 from jdo.ai.agent import JDODependencies
+from jdo.ai.time_context import format_time_context_for_ai, get_time_context
+from jdo.db.task_history_service import TaskHistoryService
+from jdo.db.time_rollup_service import TimeRollupService
+from jdo.integrity.service import IntegrityService
 from jdo.models import (
     Commitment,
     CommitmentStatus,
@@ -23,6 +30,15 @@ from jdo.models import (
     Vision,
     VisionStatus,
 )
+from jdo.models.integrity_metrics import IntegrityMetrics
+from jdo.models.task_history import TaskEventType, TaskHistoryEntry
+
+# Coaching threshold constants
+COACHING_ON_TIME_THRESHOLD = 0.8
+COACHING_NOTIFICATION_THRESHOLD = 0.7
+COACHING_CLEANUP_THRESHOLD = 0.8
+COACHING_ESTIMATION_THRESHOLD = 0.7
+MIN_TASKS_FOR_ESTIMATION_COACHING = 5
 
 
 def get_current_commitments(session: Session) -> list[dict[str, Any]]:
@@ -253,6 +269,185 @@ def _register_milestone_vision_tools(agent: Agent[JDODependencies, str]) -> None
         return str(result)
 
 
+def _get_recent_task_history(session: Session, limit: int = 20) -> list[TaskHistoryEntry]:
+    """Get recent completed task history across all commitments.
+
+    Args:
+        session: Database session.
+        limit: Maximum entries to return.
+
+    Returns:
+        List of completed task history entries, most recent first.
+    """
+    statement = (
+        select(TaskHistoryEntry)
+        .where(TaskHistoryEntry.event_type == TaskEventType.COMPLETED)
+        .order_by(TaskHistoryEntry.created_at.desc())  # type: ignore[arg-type]
+        .limit(limit)
+    )
+    return list(session.exec(statement).all())
+
+
+def _format_task_history_entries(entries: list[TaskHistoryEntry], limit: int) -> str:
+    """Format task history entries as a string for AI consumption.
+
+    Args:
+        entries: Task history entries to format.
+        limit: Maximum entries to include.
+
+    Returns:
+        Formatted string with one entry per line.
+    """
+    result_lines = []
+    for entry in entries[:limit]:
+        line = f"- {entry.event_type.value}: {entry.created_at.strftime('%Y-%m-%d')}"
+        if entry.estimated_hours:
+            line += f" (est: {entry.estimated_hours}h"
+            if entry.actual_hours_category:
+                line += f", actual: {entry.actual_hours_category.value}"
+            line += ")"
+        result_lines.append(line)
+    return "\n".join(result_lines)
+
+
+def _get_coaching_areas(metrics: IntegrityMetrics) -> list[str]:
+    """Identify areas needing coaching attention from metrics.
+
+    Args:
+        metrics: IntegrityMetrics instance.
+
+    Returns:
+        List of area names needing attention.
+    """
+    coaching_areas = []
+    if metrics.on_time_rate < COACHING_ON_TIME_THRESHOLD:
+        coaching_areas.append("on-time delivery")
+    if metrics.notification_timeliness < COACHING_NOTIFICATION_THRESHOLD:
+        coaching_areas.append("earlier at-risk notification")
+    if metrics.cleanup_completion_rate < COACHING_CLEANUP_THRESHOLD:
+        coaching_areas.append("completing cleanup tasks")
+    if (
+        metrics.estimation_accuracy < COACHING_ESTIMATION_THRESHOLD
+        and metrics.tasks_with_estimates >= MIN_TASKS_FOR_ESTIMATION_COACHING
+    ):
+        coaching_areas.append("estimation accuracy")
+    return coaching_areas
+
+
+def _register_time_coaching_tools(agent: Agent[JDODependencies, str]) -> None:
+    """Register time management and coaching query tools."""
+
+    @agent.tool
+    def query_user_time_context(ctx: RunContext[JDODependencies]) -> str:
+        """Get the user's current time context for coaching decisions.
+
+        Returns available hours, allocated hours, remaining capacity, and utilization.
+        Use this to check if user is over-committed before accepting new tasks.
+        """
+        context = get_time_context(
+            ctx.deps.session,
+            available_hours=ctx.deps.available_hours_remaining,
+        )
+        return format_time_context_for_ai(context)
+
+    @agent.tool
+    def query_task_history(
+        ctx: RunContext[JDODependencies],
+        commitment_id: str | None = None,
+        limit: int = 20,
+    ) -> str:
+        """Get task completion history for pattern analysis.
+
+        Use this to check user's estimation accuracy and completion patterns.
+        Can filter by commitment_id for commitment-specific history.
+
+        Args:
+            ctx: Runtime context with database session.
+            commitment_id: Optional commitment UUID to filter history.
+            limit: Maximum entries to return (default 20).
+
+        Returns:
+            Task history with timestamps, estimates, and actual hours categories.
+        """
+        service = TaskHistoryService(ctx.deps.session)
+
+        if commitment_id:
+            entries = service.get_history_for_commitment(UUID(commitment_id))
+        else:
+            entries = _get_recent_task_history(ctx.deps.session, limit)
+
+        if not entries:
+            return "No task history found."
+
+        return _format_task_history_entries(entries, limit)
+
+    @agent.tool
+    def query_commitment_time_rollup(ctx: RunContext[JDODependencies], commitment_id: str) -> str:
+        """Get time rollup for a specific commitment.
+
+        Shows total/remaining/completed estimated hours and task counts.
+        Use this to understand workload breakdown for a commitment.
+
+        Args:
+            ctx: Runtime context with database session.
+            commitment_id: UUID of the commitment.
+
+        Returns:
+            Time breakdown including estimate coverage percentage.
+        """
+        service = TimeRollupService(ctx.deps.session)
+        rollup = service.get_rollup(UUID(commitment_id))
+
+        lines = [
+            f"Total estimated hours: {rollup.total_estimated_hours:.1f}",
+            f"Remaining estimated hours: {rollup.remaining_estimated_hours:.1f}",
+            f"Completed estimated hours: {rollup.completed_estimated_hours:.1f}",
+            f"Tasks: {rollup.task_count} total, {rollup.completed_task_count} completed",
+            f"Tasks with estimates: {rollup.tasks_with_estimates}/{rollup.task_count} "
+            f"({rollup.estimate_coverage * 100:.0f}% coverage)",
+        ]
+
+        return "\n".join(lines)
+
+    @agent.tool
+    def query_integrity_with_context(ctx: RunContext[JDODependencies]) -> str:
+        """Get user's integrity metrics with coaching context.
+
+        Returns letter grade, component scores, and areas needing attention.
+        Use this to provide integrity-based coaching and feedback.
+        """
+        service = IntegrityService()
+        metrics = service.calculate_integrity_metrics(ctx.deps.session)
+
+        notification_pct = metrics.notification_timeliness * 100
+        lines = [
+            f"Integrity Grade: {metrics.letter_grade}",
+            f"Composite Score: {metrics.composite_score:.0f}/100",
+            "",
+            "Component Scores:",
+            f"  On-time rate: {metrics.on_time_rate * 100:.0f}% (weight: 35%)",
+            f"  Notification timeliness: {notification_pct:.0f}% (weight: 25%)",
+            f"  Cleanup completion: {metrics.cleanup_completion_rate * 100:.0f}% (weight: 25%)",
+            f"  Estimation accuracy: {metrics.estimation_accuracy * 100:.0f}% (weight: 10%)",
+            f"  Streak bonus: {min(metrics.current_streak_weeks * 2, 5)}% (max 5%)",
+            "",
+            "History:",
+            f"  Completed: {metrics.total_completed}",
+            f"  On-time: {metrics.total_on_time}",
+            f"  At-risk: {metrics.total_at_risk}",
+            f"  Abandoned: {metrics.total_abandoned}",
+            f"  Current streak: {metrics.current_streak_weeks} weeks",
+        ]
+
+        # Add coaching hints for areas needing attention
+        coaching_areas = _get_coaching_areas(metrics)
+        if coaching_areas:
+            lines.append("")
+            lines.append("Areas to focus on: " + ", ".join(coaching_areas))
+
+        return "\n".join(lines)
+
+
 def register_tools(agent: Agent[JDODependencies, str]) -> None:
     """Register all query tools with the agent.
 
@@ -262,4 +457,5 @@ def register_tools(agent: Agent[JDODependencies, str]) -> None:
     logger.debug("Registering AI agent tools")
     _register_commitment_tools(agent)
     _register_milestone_vision_tools(agent)
+    _register_time_coaching_tools(agent)
     logger.debug("AI agent tools registered")

@@ -81,6 +81,7 @@ class MyWidget(Widget):
 
 ### Pyrefly false positives (safe to ignore at runtime)
 - SQLModel/SQLAlchemy column comparisons (`Commitment.status.in_([...])`)
+- SQLModel/SQLAlchemy `.order_by()` with datetime columns (`Entry.created_at`)
 - Rich `Text.append()` with certain argument types
 - Textual reactive attributes
 

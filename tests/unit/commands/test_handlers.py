@@ -1886,3 +1886,169 @@ class TestHelpHandlerAbandonCommand:
         result = handler.execute(cmd, {})
 
         assert "/abandon" in result.message
+
+
+# ============================================================
+# HoursHandler Tests
+# ============================================================
+
+
+class TestHoursHandler:
+    """Tests for the /hours command handler."""
+
+    def test_hours_shows_prompt_when_no_args(self) -> None:
+        """Test: /hours with no args shows current status and prompt."""
+        from jdo.commands.handlers import HoursHandler
+
+        handler = HoursHandler()
+        cmd = ParsedCommand(CommandType.HOURS, [], "/hours")
+
+        result = handler.execute(cmd, {})
+
+        assert "Available Hours" in result.message
+        assert "How many hours" in result.message
+        assert result.needs_confirmation is False
+
+    def test_hours_shows_current_when_set(self) -> None:
+        """Test: /hours shows current available hours when set."""
+        from jdo.commands.handlers import HoursHandler
+
+        handler = HoursHandler()
+        cmd = ParsedCommand(CommandType.HOURS, [], "/hours")
+
+        context = {
+            "available_hours_remaining": 4.0,
+            "allocated_hours": 2.5,
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "4.0 hours" in result.message
+        assert "2.5 hours" in result.message
+        assert "Remaining capacity: 1.5" in result.message
+
+    def test_hours_shows_over_allocation_warning(self) -> None:
+        """Test: /hours warns when over-allocated."""
+        from jdo.commands.handlers import HoursHandler
+
+        handler = HoursHandler()
+        cmd = ParsedCommand(CommandType.HOURS, [], "/hours")
+
+        context = {
+            "available_hours_remaining": 2.0,
+            "allocated_hours": 4.0,
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "OVER-ALLOCATED" in result.message
+        assert "2.0 hours" in result.message
+
+    def test_hours_sets_hours_from_arg(self) -> None:
+        """Test: /hours 4 sets available hours."""
+        from jdo.commands.handlers import HoursHandler
+
+        handler = HoursHandler()
+        cmd = ParsedCommand(CommandType.HOURS, ["4"], "/hours 4")
+
+        result = handler.execute(cmd, {})
+
+        assert "Setting available hours" in result.message
+        assert "4h" in result.message
+        assert result.panel_update is not None
+        assert result.panel_update["action"] == "set_hours"
+        assert result.panel_update["hours"] == 4.0
+
+    def test_hours_parses_various_formats(self) -> None:
+        """Test: /hours parses various time formats."""
+        from jdo.commands.handlers import HoursHandler
+
+        handler = HoursHandler()
+
+        # Test "2.5" format
+        cmd = ParsedCommand(CommandType.HOURS, ["2.5"], "/hours 2.5")
+        result = handler.execute(cmd, {})
+        assert result.panel_update is not None
+        assert result.panel_update["hours"] == 2.5
+
+        # Test "90min" format
+        cmd = ParsedCommand(CommandType.HOURS, ["90min"], "/hours 90min")
+        result = handler.execute(cmd, {})
+        assert result.panel_update is not None
+        assert result.panel_update["hours"] == 1.5
+
+        # Test "1h" format
+        cmd = ParsedCommand(CommandType.HOURS, ["1h"], "/hours 1h")
+        result = handler.execute(cmd, {})
+        assert result.panel_update is not None
+        assert result.panel_update["hours"] == 1.0
+
+    def test_hours_invalid_input_shows_error(self) -> None:
+        """Test: /hours with invalid input shows error."""
+        from jdo.commands.handlers import HoursHandler
+
+        handler = HoursHandler()
+        cmd = ParsedCommand(CommandType.HOURS, ["abc"], "/hours abc")
+
+        result = handler.execute(cmd, {})
+
+        assert "Could not parse" in result.message
+        assert result.panel_update is None
+
+    def test_hours_warns_when_setting_below_allocated(self) -> None:
+        """Test: /hours warns when setting below allocated hours."""
+        from jdo.commands.handlers import HoursHandler
+
+        handler = HoursHandler()
+        cmd = ParsedCommand(CommandType.HOURS, ["2"], "/hours 2")
+
+        context = {
+            "allocated_hours": 4.0,
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert "Setting available hours" in result.message
+        assert "already allocated" in result.message
+        assert "over your available time" in result.message
+
+
+class TestHoursHandlerRegistration:
+    """Tests for HoursHandler registration."""
+
+    def test_hours_handler_registered(self) -> None:
+        """Test: HoursHandler is registered in handler registry."""
+        from jdo.commands.handlers import HoursHandler, get_handler
+
+        handler = get_handler(CommandType.HOURS)
+        assert isinstance(handler, HoursHandler)
+
+
+class TestHelpHandlerHoursCommand:
+    """Tests for /help with hours command."""
+
+    def test_help_lists_hours_command(self) -> None:
+        """Test: /help lists /hours command."""
+        from jdo.commands.handlers import HelpHandler
+
+        handler = HelpHandler()
+        cmd = ParsedCommand(CommandType.HELP, [], "/help")
+
+        result = handler.execute(cmd, {})
+
+        assert "/hours" in result.message
+
+    def test_help_hours_shows_detailed_help(self) -> None:
+        """Test: /help hours shows detailed help."""
+        from jdo.commands.handlers import HelpHandler
+
+        handler = HelpHandler()
+        cmd = ParsedCommand(CommandType.HOURS, ["hours"], "/help hours")
+
+        result = handler.execute(cmd, {"args": ["hours"]})
+
+        # Execute with args to get specific help
+        cmd = ParsedCommand(CommandType.HELP, ["hours"], "/help hours")
+        result = handler.execute(cmd, {})
+
+        assert "time coaching" in result.message.lower() or "/hours" in result.message

@@ -124,8 +124,8 @@ This task list tracks implementation status for the integrity protocol.
 ### 8.1-8.2 At-Risk Styling
 - [x] DataPanel has INTEGRITY, CLEANUP, ATRISK_WORKFLOW modes
 - [x] Rendering methods for each new mode
-- [ ] At-risk commitment shows warning color in lists (deferred)
-- [ ] Notification task shows distinct icon (deferred)
+- [x] At-risk commitment shows warning color in lists (⚠ icon, bold yellow)
+- [x] Notification task shows distinct icon (🔔 bell icon)
 
 ## Phase 9: Integration Tests
 - [x] Integration tests for integrity dashboard flows
@@ -134,19 +134,22 @@ This task list tracks implementation status for the integrity protocol.
 - [x] Integration tests for ChatScreen integrity features
 - [x] Integration tests for HomeScreen integrity features
 
-## Phase 10: Snapshot Tests (Deferred)
-- [ ] Snapshot: Integrity dashboard
-- [ ] Snapshot: Commitment list with at_risk items
-- [ ] Snapshot: CleanupPlan view
+## Phase 10: Snapshot Tests
+- [x] Snapshot: Integrity dashboard (A- grade)
+- [x] Snapshot: Integrity dashboard (C- grade - low score)
+- [x] Snapshot: Commitment list with at_risk items
+- [x] Snapshot: CleanupPlan view
 
 ## Summary
 
-**Implemented**:
-- Core models (CommitmentStatus.AT_RISK, CleanupPlan, IntegrityMetrics)
-- IntegrityService (mark_at_risk, calculate_metrics, detect_risks)
-- Commands (/atrisk, /cleanup, /integrity)
-- TUI integration (HomeScreen grade, ChatScreen risk detection, DataPanel modes)
-- Full test coverage
+**Fully Implemented**:
+- ✅ Core models (CommitmentStatus.AT_RISK, CleanupPlan, IntegrityMetrics)
+- ✅ IntegrityService (mark_at_risk, calculate_metrics, detect_risks)
+- ✅ Commands (/atrisk, /cleanup, /integrity, /abandon)
+- ✅ TUI integration (HomeScreen grade, ChatScreen risk detection, DataPanel modes)
+- ✅ Visual indicators (at-risk warning colors, notification task icons)
+- ✅ Snapshot tests (4 integrity feature snapshots)
+- ✅ Full test coverage (1,132 tests passing)
 
 ## Running Tests
 
@@ -217,18 +220,15 @@ The following items are deferred to future iterations. Each is tracked here with
 - [x] If mark at-risk, user can type 'atrisk' to redirect to /atrisk flow
 - [x] Tests added to verify prompt behavior
 
-### D5: Visual Indicators for At-Risk Status
-**Current**: No visual distinction in lists
-**Target**: Warning color for at-risk commitments, distinct icon for notification tasks
+### D5: Visual Indicators for At-Risk Status ✅ COMPLETED
+**Status**: Implemented in `src/jdo/widgets/data_panel.py`
 
 **Implementation**:
-- [ ] Add CSS class `.commitment-at-risk` with warning color (yellow/orange)
-- [ ] Update commitment list rendering to apply class based on status
-- [ ] Add notification task icon (e.g., 📢 or ⚠️) in task list
-- [ ] Sort commitment lists: overdue > at_risk > pending > in_progress
-
-**Effort**: Small (1-2 hours)
-**Priority**: Low - Polish/UX improvement
+- [x] CSS class `.status-at_risk` with warning color (bold yellow)
+- [x] Commitment list rendering applies styling based on status
+- [x] Notification task icon (🔔 bell) in task list
+- [x] Sort commitment lists by priority: at_risk (1) > in_progress (2) > pending (3) > completed (4)
+- [x] At-risk items display ⚠ warning icon in lists
 
 ### D6: Metric Trends
 **Current**: Not implemented
@@ -273,19 +273,16 @@ The following items are deferred to future iterations. Each is tracked here with
 **Effort**: Medium (2-3 hours)
 **Priority**: Medium - Completes the at-risk lifecycle
 
-### D9: Snapshot Tests
-**Current**: No snapshot tests for integrity views
-**Target**: Visual regression tests for integrity UI
+### D9: Snapshot Tests ✅ COMPLETED
+**Status**: Implemented in `tests/tui/test_snapshots.py`
 
 **Implementation**:
-- [ ] Create snapshot app for integrity dashboard (A+ grade scenario)
-- [ ] Create snapshot app for integrity dashboard (C- grade scenario)
-- [ ] Create snapshot for commitment list with at_risk items
-- [ ] Create snapshot for CleanupPlan view
-- [ ] Run `uv run pytest --snapshot-update` to generate baselines
-
-**Effort**: Small (1-2 hours)
-**Priority**: Low - Testing infrastructure
+- [x] Created snapshot app for integrity dashboard (A- grade scenario)
+- [x] Created snapshot app for integrity dashboard (C- grade scenario)
+- [x] Created snapshot for commitment list with at_risk items
+- [x] Created snapshot for CleanupPlan view
+- [x] Generated baselines with `uv run pytest --snapshot-update`
+- [x] All 4 snapshot tests passing
 
 ---
 
@@ -296,10 +293,10 @@ The following items are deferred to future iterations. Each is tracked here with
 2. ✅ **D2: Reliability Streak** - Implemented
 3. ✅ **D3: Soft Enforcement** - Implemented
 4. ✅ **D4: Pre-Abandon Prompt** - Implemented
+5. ✅ **D5: Visual Indicators** - Implemented (at-risk colors & notification icons)
+6. ✅ **D9: Snapshot Tests** - Implemented (4 integrity snapshots)
 
-**Remaining**:
+**Remaining (Optional Enhancements)**:
 1. **D8: Recovery Flow** - Medium, completes at-risk lifecycle
-2. **D5: Visual Indicators** - Low, polish
-3. **D6: Metric Trends** - Low, analytics
-4. **D7: Affecting Commitments** - Low, debugging aid
-5. **D9: Snapshot Tests** - Low, infrastructure
+2. **D6: Metric Trends** - Low, analytics enhancement
+3. **D7: Affecting Commitments** - Low, debugging aid

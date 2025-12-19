@@ -19,9 +19,13 @@ Initial development release with core functionality.
 #### Inbox & Capture
 - **add-inbox-triage** (2025-12-18): CLI capture command (`jdo capture "text"`) and AI-powered triage classification
 
+#### Integrity & Accountability
+- **add-integrity-protocol** (2025-12-18): Honor-Your-Word protocol with at-risk status, cleanup plans, integrity metrics dashboard, and automated notification workflows
+
 #### Core Infrastructure
 - **refactor-core-libraries** (2025-12-16): Core infrastructure including paths, settings, database engine, and AI agent foundation
 - **add-testing-infrastructure** (2025-12-16): pytest fixtures, coverage configuration, test markers, and CI setup
+- **add-dev-infrastructure** (2025-12-18): Structured logging with Loguru, custom exception hierarchy, pre-commit hooks, Sentry observability, and Alembic database migrations
 
 #### Authentication
 - **add-provider-auth** (2025-12-16): OAuth PKCE + API key authentication for Anthropic, OpenAI, and OpenRouter providers

@@ -15,6 +15,7 @@ from textual.containers import VerticalScroll
 from textual.reactive import reactive
 from textual.widgets import Static
 
+from jdo.ai.time_parsing import format_hours
 from jdo.recurrence.formatter import DAY_NAMES, MONTH_NAMES
 
 # Validation constants for day of week
@@ -376,13 +377,25 @@ class DataPanel(VerticalScroll):
 
         # Render the item
         text.append(f"  {icon} ", style=style)
-        text.append(f"{summary}\n", style=style if status == "at_risk" else "")
+        text.append(f"{summary}", style=style if status == "at_risk" else "")
+
+        # Add estimated hours for tasks if available
+        estimated_hours = item.get("estimated_hours")
+        if estimated_hours is not None:
+            text.append(f" ({format_hours(estimated_hours)})", style="dim")
+
+        text.append("\n")
 
     def _render_view(self) -> None:
         """Render view mode content."""
         # Use specialized rendering for recurring_commitment
         if self._entity_type == "recurring_commitment":
             self._render_recurring_commitment_view()
+            return
+
+        # Use specialized rendering for commitment with time rollup
+        if self._entity_type == "commitment":
+            self._render_commitment_view()
             return
 
         text = Text()
@@ -396,6 +409,97 @@ class DataPanel(VerticalScroll):
             text.append(f"  {value}\n\n")
 
         self._content.update(text)
+
+    def _render_commitment_view(self) -> None:
+        """Render specialized view for commitments with time rollup."""
+        text = Text()
+        text.append("COMMITMENT\n", style="bold")
+        text.append("-" * 30 + "\n\n")
+
+        # Deliverable
+        deliverable = self._data.get("deliverable", "")
+        if deliverable:
+            text.append("Deliverable:\n", style="dim")
+            text.append(f"  {deliverable}\n\n")
+
+        # Stakeholder
+        stakeholder = self._data.get("stakeholder_name", self._data.get("stakeholder", ""))
+        if stakeholder:
+            text.append("Stakeholder:\n", style="dim")
+            text.append(f"  {stakeholder}\n\n")
+
+        # Due date and time
+        due_date = self._data.get("due_date", "")
+        due_time = self._data.get("due_time", "")
+        if due_date:
+            text.append("Due:\n", style="dim")
+            due_str = str(due_date)
+            if due_time:
+                due_str += f" {due_time}"
+            text.append(f"  {due_str}\n\n")
+
+        # Status
+        status = self._data.get("status", "")
+        if hasattr(status, "value"):
+            status = status.value
+        if status:
+            status_style = self._get_status_style(str(status))
+            text.append("Status:\n", style="dim")
+            text.append(f"  {status}\n\n", style=status_style)
+
+        # Time rollup (if available)
+        time_rollup = self._data.get("time_rollup")
+        if time_rollup:
+            self._render_time_rollup(text, time_rollup)
+
+        self._content.update(text)
+
+    def _render_time_rollup(self, text: Text, rollup: dict[str, Any]) -> None:
+        """Render time rollup section for a commitment.
+
+        Args:
+            text: Rich Text object to append to.
+            rollup: Time rollup data dict.
+        """
+        text.append("TIME ESTIMATE\n", style="bold")
+        text.append("-" * 20 + "\n")
+
+        total = rollup.get("total_estimated_hours", 0.0)
+        remaining = rollup.get("remaining_estimated_hours", 0.0)
+        completed = rollup.get("completed_estimated_hours", 0.0)
+        task_count = rollup.get("task_count", 0)
+        tasks_with_estimates = rollup.get("tasks_with_estimates", 0)
+
+        if total > 0:
+            text.append(f"  Total:     {format_hours(total)}\n")
+            text.append(f"  Completed: {format_hours(completed)}\n")
+            text.append(f"  Remaining: {format_hours(remaining)}\n")
+            if task_count > 0:
+                coverage_pct = (tasks_with_estimates / task_count) * 100
+                coverage_str = f"{tasks_with_estimates}/{task_count} ({coverage_pct:.0f}%)"
+                text.append(f"  Coverage:  {coverage_str}\n")
+        else:
+            text.append("  No time estimates yet\n", style="dim italic")
+
+        text.append("\n")
+
+    def _get_status_style(self, status: str) -> str:
+        """Get Rich style for a status value.
+
+        Args:
+            status: Status string (pending, in_progress, etc.)
+
+        Returns:
+            Rich style string.
+        """
+        status_styles = {
+            "pending": "dim",
+            "in_progress": "blue",
+            "at_risk": "bold yellow",
+            "completed": "green",
+            "abandoned": "red",
+        }
+        return status_styles.get(status.lower(), "")
 
     def _render_recurring_commitment_view(self) -> None:
         """Render specialized view for recurring commitments."""
@@ -528,6 +632,11 @@ class DataPanel(VerticalScroll):
             self._render_recurring_commitment_draft()
             return
 
+        # Use specialized rendering for task
+        if self._entity_type == "task":
+            self._render_task_draft()
+            return
+
         text = Text()
         entity_name = self._entity_type.upper()
         text.append(f"{entity_name} (draft)\n", style="bold yellow")
@@ -540,6 +649,38 @@ class DataPanel(VerticalScroll):
                 text.append(f"  {value}\n\n")
             else:
                 text.append("  (not set)\n\n", style="dim italic")
+
+        self._content.update(text)
+
+    def _render_task_draft(self) -> None:
+        """Render specialized draft view for tasks with time estimates."""
+        text = Text()
+        text.append("TASK (draft)\n", style="bold yellow")
+        text.append("-" * 30 + "\n\n")
+
+        # Title
+        text.append("Title:\n", style="dim")
+        title = self._data.get("title", "")
+        if title:
+            text.append(f"  {title}\n\n")
+        else:
+            text.append("  (not set)\n\n", style="dim italic")
+
+        # Scope
+        text.append("Scope:\n", style="dim")
+        scope = self._data.get("scope", "")
+        if scope:
+            text.append(f"  {scope}\n\n")
+        else:
+            text.append("  (not set)\n\n", style="dim italic")
+
+        # Estimated Hours
+        text.append("Estimated Time:\n", style="dim")
+        estimated_hours = self._data.get("estimated_hours")
+        if estimated_hours is not None:
+            text.append(f"  {format_hours(estimated_hours)}\n\n")
+        else:
+            text.append("  (not set)\n\n", style="dim italic")
 
         self._content.update(text)
 
@@ -736,6 +877,12 @@ class DataPanel(VerticalScroll):
 
         cleanup = self._data.get("cleanup_completion_rate", 1.0) * 100
         text.append(f"Cleanup rate:      {cleanup:.0f}%\n")
+
+        # Estimation accuracy (if available)
+        estimation = self._data.get("estimation_accuracy")
+        if estimation is not None:
+            estimation_pct = estimation * 100
+            text.append(f"Estimation acc:    {estimation_pct:.0f}%\n")
 
         streak = self._data.get("current_streak_weeks", 0)
         text.append(f"Current streak:    {streak} week{'s' if streak != 1 else ''}\n\n")

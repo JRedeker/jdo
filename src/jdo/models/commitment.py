@@ -56,6 +56,7 @@ class Commitment(SQLModel, table=True):
     completed_at: datetime | None = Field(default=None)
     notes: str | None = Field(default=None)
     marked_at_risk_at: datetime | None = Field(default=None)
+    at_risk_recovered: bool = Field(default=False)
     completed_on_time: bool | None = Field(default=None)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)

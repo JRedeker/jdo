@@ -17,10 +17,18 @@ from jdo.models.recurring_commitment import (
     TaskTemplate,
 )
 from jdo.models.stakeholder import Stakeholder, StakeholderType
-from jdo.models.task import SubTask, Task, TaskStatus
+from jdo.models.task import (
+    ActualHoursCategory,
+    EstimationConfidence,
+    SubTask,
+    Task,
+    TaskStatus,
+)
+from jdo.models.task_history import TaskEventType, TaskHistoryEntry
 from jdo.models.vision import Vision, VisionStatus
 
 __all__ = [
+    "ActualHoursCategory",
     "CleanupPlan",
     "CleanupPlanStatus",
     "Commitment",
@@ -28,6 +36,7 @@ __all__ = [
     "Draft",
     "EndType",
     "EntityType",
+    "EstimationConfidence",
     "Goal",
     "GoalStatus",
     "IntegrityMetrics",
@@ -41,6 +50,8 @@ __all__ = [
     "SubTask",
     "SubTaskTemplate",
     "Task",
+    "TaskEventType",
+    "TaskHistoryEntry",
     "TaskStatus",
     "TaskTemplate",
     "Vision",

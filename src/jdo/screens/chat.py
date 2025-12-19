@@ -10,6 +10,7 @@ The main chat interface with:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, ClassVar
 from uuid import UUID
@@ -62,6 +63,20 @@ _CONFIRMATION_WORDS = frozenset(
 _CANCELLATION_WORDS = frozenset(
     {"no", "n", "cancel", "nope", "nah", "nevermind", "never mind", "abort"}
 )
+
+
+@dataclass
+class ChatScreenConfig:
+    """Configuration for ChatScreen initialization.
+
+    Groups related initialization parameters for cleaner API.
+    """
+
+    draft_id: UUID | None = None
+    triage_mode: bool = False
+    initial_mode: str | None = None
+    initial_entity_type: str | None = None
+    initial_data: list[dict[str, Any]] | dict[str, Any] | None = None
 
 
 class ChatScreen(Screen[None]):
@@ -127,9 +142,8 @@ class ChatScreen(Screen[None]):
 
     def __init__(
         self,
+        config: ChatScreenConfig | None = None,
         *,
-        draft_id: UUID | None = None,
-        triage_mode: bool = False,
         name: str | None = None,
         id: str | None = None,
         classes: str | None = None,
@@ -137,16 +151,19 @@ class ChatScreen(Screen[None]):
         """Initialize the chat screen.
 
         Args:
-            draft_id: Optional draft ID to restore on mount.
-            triage_mode: If True, start in triage mode for captured items.
+            config: Configuration for screen initialization. Defaults to empty config.
             name: Widget name.
             id: Widget ID.
             classes: CSS classes.
         """
         super().__init__(name=name, id=id, classes=classes)
+        config = config or ChatScreenConfig()
         self._panel_visible = True
-        self._draft_id = draft_id
-        self._triage_mode = triage_mode
+        self._draft_id = config.draft_id
+        self._triage_mode = config.triage_mode
+        self._initial_mode = config.initial_mode
+        self._initial_entity_type = config.initial_entity_type
+        self._initial_data = config.initial_data
         # Conversation history for AI context
         self._conversation: list[dict[str, str]] = []
         # Track if AI is currently streaming
@@ -158,6 +175,8 @@ class ChatScreen(Screen[None]):
         self._proposed_entity_type: str | None = None
         # Session-scoped set of dismissed risk warning commitment IDs
         self._dismissed_risk_warnings: set[str] = set()
+        # Available hours remaining for time coaching
+        self._available_hours_remaining: float | None = None
 
     def compose(self) -> ComposeResult:
         """Compose the chat screen layout."""
@@ -173,8 +192,29 @@ class ChatScreen(Screen[None]):
         prompt = self.query_one("#prompt-input", PromptInput)
         prompt.focus()
 
+        # If initial data provided, display it in the panel
+        if self._initial_mode and self._initial_entity_type is not None:
+            self._display_initial_data()
+
         # Run risk detection asynchronously
         self.run_worker(self._detect_and_show_risks(), name="risk_detection")
+
+    def _display_initial_data(self) -> None:
+        """Display initial data in the panel if provided."""
+        if not self._initial_mode:
+            return
+
+        panel_update: dict[str, Any] = {
+            "mode": self._initial_mode,
+            "entity_type": self._initial_entity_type or "",
+        }
+
+        if isinstance(self._initial_data, list):
+            panel_update["items"] = self._initial_data
+        else:
+            panel_update["data"] = self._initial_data or {}
+
+        self._update_data_panel(panel_update)
 
     async def _detect_and_show_risks(self) -> None:
         """Detect at-risk commitments and display alerts.
@@ -584,6 +624,9 @@ class ChatScreen(Screen[None]):
             "available_commitments": [],
             "goals": [],
             "commitments": [],
+            # Time coaching context
+            "available_hours_remaining": self._available_hours_remaining,
+            "allocated_hours": 0.0,  # TODO: Calculate from active tasks
         }
 
         # Add current commitment context if viewing one
@@ -636,6 +679,14 @@ class ChatScreen(Screen[None]):
             data = panel_update.get("data", {})
             workflow_step = panel_update.get("workflow_step", "reason")
             self.data_panel.show_atrisk_workflow(data, workflow_step)
+        elif mode == "hours_set":
+            # Update available hours in session state
+            hours = panel_update.get("hours")
+            if hours is not None:
+                self._available_hours_remaining = float(hours)
+        elif mode == "hours":
+            # Just display, no state change
+            pass
 
     def _show_draft_in_panel(self, entity_type: str, data: dict[str, Any]) -> None:
         """Show a draft in the data panel.

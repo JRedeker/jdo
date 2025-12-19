@@ -208,3 +208,47 @@ if __name__ == "__main__":
             chat_screen_app,
             terminal_size=(100, 30),
         )
+
+
+class TestIntegritySnapshots:
+    """Snapshot tests for integrity protocol features."""
+
+    def test_integrity_dashboard_good_grade(self, snap_compare: object) -> None:
+        """Snapshot of integrity dashboard with A- grade."""
+        from pathlib import Path
+
+        app_path = Path(__file__).parent / "snapshot_apps" / "integrity_dashboard_app.py"
+        assert snap_compare(  # type: ignore[operator]
+            str(app_path),
+            terminal_size=(60, 30),
+        )
+
+    def test_integrity_dashboard_low_grade(self, snap_compare: object) -> None:
+        """Snapshot of integrity dashboard with C- grade."""
+        from pathlib import Path
+
+        app_path = Path(__file__).parent / "snapshot_apps" / "integrity_dashboard_low_app.py"
+        assert snap_compare(  # type: ignore[operator]
+            str(app_path),
+            terminal_size=(60, 30),
+        )
+
+    def test_cleanup_plan_display(self, snap_compare: object) -> None:
+        """Snapshot of cleanup plan in data panel."""
+        from pathlib import Path
+
+        app_path = Path(__file__).parent / "snapshot_apps" / "cleanup_plan_app.py"
+        assert snap_compare(  # type: ignore[operator]
+            str(app_path),
+            terminal_size=(60, 30),
+        )
+
+    def test_commitment_list_with_atrisk(self, snap_compare: object) -> None:
+        """Snapshot of commitment list with at-risk items."""
+        from pathlib import Path
+
+        app_path = Path(__file__).parent / "snapshot_apps" / "commitment_list_atrisk_app.py"
+        assert snap_compare(  # type: ignore[operator]
+            str(app_path),
+            terminal_size=(60, 25),
+        )

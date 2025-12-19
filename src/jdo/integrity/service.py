@@ -13,11 +13,17 @@ from jdo.models.commitment import Commitment, CommitmentStatus
 from jdo.models.integrity_metrics import IntegrityMetrics
 from jdo.models.stakeholder import Stakeholder
 from jdo.models.task import Task, TaskStatus
+from jdo.models.task_history import TaskEventType, TaskHistoryEntry
 
 # Constants for risk detection
 HOURS_24 = 24
 HOURS_48 = 48
 MAX_DISPLAY_ITEMS = 3  # Maximum items to show in risk summary message
+
+# Constants for estimation accuracy calculation
+MIN_TASKS_FOR_ACCURACY = 5  # Minimum tasks with estimates to calculate accuracy
+ACCURACY_DECAY_DAYS = 7  # Weight halves every 7 days
+ACCURACY_MAX_AGE_DAYS = 90  # Maximum age for history consideration
 
 
 @dataclass
@@ -296,6 +302,9 @@ Mark this task complete after you've sent the notification."""
         # Streak calculation: consecutive weeks with all on-time completions
         current_streak_weeks = self._calculate_streak_weeks(session)
 
+        # Calculate estimation accuracy
+        estimation_accuracy, tasks_with_estimates = self._calculate_estimation_accuracy(session)
+
         return IntegrityMetrics(
             on_time_rate=on_time_rate,
             notification_timeliness=notification_timeliness,
@@ -305,6 +314,8 @@ Mark this task complete after you've sent the notification."""
             total_on_time=total_on_time,
             total_at_risk=total_at_risk,
             total_abandoned=total_abandoned,
+            estimation_accuracy=estimation_accuracy,
+            tasks_with_estimates=tasks_with_estimates,
         )
 
     def detect_risks(self, session: Session) -> RiskSummary:
@@ -501,3 +512,70 @@ Mark this task complete after you've sent the notification."""
                     streak = new_streak
 
         return streak
+
+    def _calculate_estimation_accuracy(self, session: Session) -> tuple[float, int]:
+        """Calculate estimation accuracy from task history.
+
+        Uses exponential decay weighting: recent tasks count more than older ones.
+        Last 7 days = full weight, weight halves every 7 days, max 90 days.
+
+        Accuracy is based on how close actual hours category is to ON_TARGET:
+        - ON_TARGET = 1.0 accuracy
+        - SHORTER/LONGER = 0.75 accuracy
+        - MUCH_SHORTER/MUCH_LONGER = 0.25 accuracy
+
+        Args:
+            session: Database session
+
+        Returns:
+            Tuple of (accuracy score 0.0-1.0, count of tasks with estimates)
+        """
+        now = datetime.now(UTC)
+        cutoff = now - timedelta(days=ACCURACY_MAX_AGE_DAYS)
+
+        # Get completed task history entries with both estimate and actual
+        completed_entries = session.exec(
+            select(TaskHistoryEntry).where(
+                TaskHistoryEntry.event_type == TaskEventType.COMPLETED,
+                TaskHistoryEntry.estimated_hours.is_not(None),  # type: ignore[union-attr]
+                TaskHistoryEntry.actual_hours_category.is_not(None),  # type: ignore[union-attr]
+                TaskHistoryEntry.created_at >= cutoff,  # type: ignore[operator]
+            )
+        ).all()
+
+        tasks_with_estimates = len(completed_entries)
+
+        # Not enough history - return default
+        if tasks_with_estimates < MIN_TASKS_FOR_ACCURACY:
+            return 1.0, tasks_with_estimates
+
+        # Calculate weighted accuracy
+        total_weight = 0.0
+        weighted_accuracy = 0.0
+
+        for entry in completed_entries:
+            if entry.actual_hours_category is None:
+                continue
+
+            # Calculate age-based weight with exponential decay
+            # At 0 days weight=1.0, at 7 days weight=0.5, at 14 days weight=0.25
+            age_days = (now - entry.created_at.replace(tzinfo=UTC)).days
+            weight = 2.0 ** (-age_days / ACCURACY_DECAY_DAYS)
+
+            # Calculate accuracy based on category
+            # ON_TARGET = 1.0, SHORTER/LONGER = 0.75, MUCH_SHORTER/MUCH_LONGER = 0.25
+            multiplier = entry.actual_hours_category.multiplier
+            if 0.85 <= multiplier <= 1.15:  # ON_TARGET range
+                accuracy = 1.0
+            elif 0.5 <= multiplier < 0.85 or 1.15 < multiplier <= 1.5:  # SHORTER/LONGER
+                accuracy = 0.75
+            else:  # MUCH_SHORTER or MUCH_LONGER
+                accuracy = 0.25
+
+            weighted_accuracy += accuracy * weight
+            total_weight += weight
+
+        if total_weight == 0:
+            return 1.0, tasks_with_estimates
+
+        return weighted_accuracy / total_weight, tasks_with_estimates

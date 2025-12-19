@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
+from jdo.ai.time_parsing import format_hours, parse_time_input
 from jdo.commands.parser import CommandType, ParsedCommand
 from jdo.models.draft import EntityType
 
@@ -350,6 +351,7 @@ class TaskHandler(CommandHandler):
             "title": extracted.get("title", ""),
             "scope": extracted.get("scope", ""),
             "commitment_id": commitment_id,
+            "estimated_hours": extracted.get("estimated_hours"),
         }
 
         self._current_draft = draft_data
@@ -837,6 +839,17 @@ class HelpHandler(CommandHandler):
             "  - Allows override after showing warning\n\n"
             "Abandoning without notifying stakeholders affects your integrity score."
         ),
+        "hours": (
+            "/hours [amount] - Set available hours for time coaching\n\n"
+            "Set how many hours you have remaining today to work on tasks.\n"
+            "This enables AI coaching about time allocation.\n\n"
+            "Usage:\n"
+            "  /hours        - Show current hours and prompt for input\n"
+            "  /hours 4      - Set 4 hours available\n"
+            "  /hours 2.5    - Set 2.5 hours available\n"
+            "  /hours 90min  - Set 90 minutes (1.5 hours) available\n\n"
+            "The AI will warn you when task estimates exceed available time."
+        ),
     }
 
     def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:
@@ -878,6 +891,7 @@ class HelpHandler(CommandHandler):
             "  /atrisk     - Mark commitment as at-risk",
             "  /cleanup    - View/update cleanup plan",
             "  /integrity  - Show integrity dashboard",
+            "  /hours      - Set available hours for time coaching",
             "  /help       - Show this help",
             "",
             "Type /help <command> for more details on a specific command.",
@@ -961,7 +975,20 @@ class CancelHandler(CommandHandler):
 
 
 class CompleteHandler(CommandHandler):
-    """Handler for /complete command - marks items complete."""
+    """Handler for /complete command - marks items complete.
+
+    For tasks with time estimates, prompts for actual hours comparison
+    using a 5-point scale before completing.
+    """
+
+    # Actual hours category options for display
+    _HOURS_OPTIONS = [
+        ("1", "much_shorter", "Much shorter than estimated (<50%)"),
+        ("2", "shorter", "Shorter than estimated (50-85%)"),
+        ("3", "on_target", "On target (85-115%)"),
+        ("4", "longer", "Longer than estimated (115-150%)"),
+        ("5", "much_longer", "Much longer than estimated (>150%)"),
+    ]
 
     def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:
         """Execute /complete command.
@@ -971,7 +998,7 @@ class CompleteHandler(CommandHandler):
             context: Context with current object.
 
         Returns:
-            HandlerResult asking for confirmation.
+            HandlerResult asking for confirmation or hours input.
         """
         current_object = context.get("current_object")
 
@@ -986,6 +1013,10 @@ class CompleteHandler(CommandHandler):
         entity_type = current_object.get("entity_type", "item")
         title = current_object.get("deliverable") or current_object.get("title", "this item")
 
+        # For tasks with time estimates, prompt for actual hours comparison
+        if entity_type == "task" and current_object.get("estimated_hours") is not None:
+            return self._prompt_for_actual_hours(current_object, title)
+
         return HandlerResult(
             message=f"Mark '{title}' as completed?",
             panel_update={
@@ -995,6 +1026,49 @@ class CompleteHandler(CommandHandler):
             },
             draft_data=None,
             needs_confirmation=True,
+        )
+
+    def _prompt_for_actual_hours(self, task_data: dict[str, Any], title: str) -> HandlerResult:
+        """Prompt for actual hours comparison when completing a task.
+
+        Args:
+            task_data: The task data dict.
+            title: Task title for display.
+
+        Returns:
+            HandlerResult with hours prompt.
+        """
+        estimated = task_data.get("estimated_hours", 0)
+        estimated_str = format_hours(estimated) if estimated else "unknown"
+
+        lines = [
+            f"Completing: {title}",
+            f"Estimated: {estimated_str}",
+            "",
+            "How did actual time compare to your estimate?",
+            "",
+        ]
+
+        for num, _code, label in self._HOURS_OPTIONS:
+            lines.append(f"  [{num}] {label}")
+
+        lines.append("")
+        lines.append("Enter 1-5, or 'skip' to complete without recording:")
+
+        return HandlerResult(
+            message="\n".join(lines),
+            panel_update={
+                "mode": "complete_task",
+                "entity_type": "task",
+                "data": task_data,
+                "workflow_step": "actual_hours",
+            },
+            draft_data={
+                "task_id": task_data.get("id"),
+                "estimated_hours": estimated,
+                "actual_hours_category": None,
+            },
+            needs_confirmation=False,
         )
 
 
@@ -2003,6 +2077,113 @@ class TriageHandler(CommandHandler):
         )
 
 
+class HoursHandler(CommandHandler):
+    """Handler for /hours command - sets available hours for time coaching.
+
+    The available hours represent how many hours the user has remaining
+    to work on tasks today. This enables AI coaching about over-allocation.
+    """
+
+    def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:
+        """Execute /hours command.
+
+        Args:
+            cmd: The parsed command with optional hours argument.
+            context: Context with current available hours.
+
+        Returns:
+            HandlerResult with updated hours info.
+        """
+        args = cmd.args
+
+        # If hours provided as argument, set them directly
+        if args:
+            return self._set_hours(args[0], context)
+
+        # Otherwise, show current status and prompt for input
+        return self._show_hours_prompt(context)
+
+    def _show_hours_prompt(self, context: dict[str, Any]) -> HandlerResult:
+        """Show current hours and prompt for update."""
+        current_hours = context.get("available_hours_remaining")
+        allocated_hours = context.get("allocated_hours", 0.0)
+
+        lines = ["Available Hours"]
+        lines.append("=" * 40)
+        lines.append("")
+
+        if current_hours is not None:
+            lines.append(f"Current available: {current_hours:.1f} hours")
+            lines.append(f"Currently allocated: {allocated_hours:.1f} hours")
+            remaining = current_hours - allocated_hours
+            if remaining < 0:
+                lines.append(f"OVER-ALLOCATED by {abs(remaining):.1f} hours")
+            else:
+                lines.append(f"Remaining capacity: {remaining:.1f} hours")
+        else:
+            lines.append("Available hours not set.")
+            lines.append(f"Currently allocated: {allocated_hours:.1f} hours")
+
+        lines.append("")
+        lines.append("How many hours do you have remaining today?")
+        lines.append("Example: /hours 4 or just type a number like '3.5'")
+
+        return HandlerResult(
+            message="\n".join(lines),
+            panel_update={
+                "mode": "hours",
+                "entity_type": "time_context",
+                "data": {
+                    "available_hours": current_hours,
+                    "allocated_hours": allocated_hours,
+                },
+            },
+            draft_data=None,
+            needs_confirmation=False,
+        )
+
+    def _set_hours(self, hours_input: str, context: dict[str, Any]) -> HandlerResult:
+        """Parse and set available hours."""
+        parsed = parse_time_input(hours_input)
+
+        if parsed is None:
+            return HandlerResult(
+                message=f"Could not parse '{hours_input}' as a time. "
+                "Try formats like '4', '3.5', '2 hours', or '90 min'.",
+                panel_update=None,
+                draft_data=None,
+                needs_confirmation=False,
+            )
+
+        hours = parsed.hours
+        allocated = context.get("allocated_hours", 0.0)
+
+        lines = [f"Setting available hours to {format_hours(hours)}."]
+
+        if hours < allocated:
+            over_by = allocated - hours
+            lines.append("")
+            lines.append(f"Note: You're already allocated {format_hours(allocated)}, ")
+            lines.append(f"which is {format_hours(over_by)} over your available time.")
+            lines.append("Consider deferring some tasks or adjusting estimates.")
+
+        return HandlerResult(
+            message="\n".join(lines),
+            panel_update={
+                "mode": "hours_set",
+                "entity_type": "time_context",
+                "data": {
+                    "available_hours": hours,
+                    "allocated_hours": allocated,
+                },
+                "action": "set_hours",
+                "hours": hours,
+            },
+            draft_data={"available_hours": hours},
+            needs_confirmation=False,
+        )
+
+
 # Handler registry
 _HANDLERS: dict[CommandType, type[CommandHandler]] = {
     CommandType.COMMIT: CommitHandler,
@@ -2023,6 +2204,7 @@ _HANDLERS: dict[CommandType, type[CommandHandler]] = {
     CommandType.CLEANUP: CleanupHandler,
     CommandType.INTEGRITY: IntegrityHandler,
     CommandType.ABANDON: AbandonHandler,
+    CommandType.HOURS: HoursHandler,
 }
 
 # Cache handler instances

@@ -135,3 +135,90 @@ class TestJDODependencies:
         deps = JDODependencies(session=mock_session)
 
         assert deps.timezone == "America/New_York"
+
+    def test_available_hours_remaining_defaults_to_none(self) -> None:
+        """JDODependencies available_hours_remaining defaults to None."""
+        from jdo.ai.agent import JDODependencies
+
+        mock_session = MagicMock()
+        deps = JDODependencies(session=mock_session)
+
+        assert deps.available_hours_remaining is None
+
+    def test_set_available_hours(self) -> None:
+        """set_available_hours sets available_hours_remaining."""
+        from jdo.ai.agent import JDODependencies
+
+        mock_session = MagicMock()
+        deps = JDODependencies(session=mock_session)
+
+        deps.set_available_hours(4.5)
+
+        assert deps.available_hours_remaining == 4.5
+
+    def test_set_available_hours_zero(self) -> None:
+        """set_available_hours accepts zero."""
+        from jdo.ai.agent import JDODependencies
+
+        mock_session = MagicMock()
+        deps = JDODependencies(session=mock_session, available_hours_remaining=3.0)
+
+        deps.set_available_hours(0.0)
+
+        assert deps.available_hours_remaining == 0.0
+
+    def test_set_available_hours_negative_raises(self) -> None:
+        """set_available_hours raises ValueError for negative hours."""
+        from jdo.ai.agent import JDODependencies
+
+        mock_session = MagicMock()
+        deps = JDODependencies(session=mock_session)
+
+        with pytest.raises(ValueError, match="cannot be negative"):
+            deps.set_available_hours(-1.0)
+
+    def test_deduct_hours_subtracts_from_available(self) -> None:
+        """deduct_hours subtracts from available_hours_remaining."""
+        from jdo.ai.agent import JDODependencies
+
+        mock_session = MagicMock()
+        deps = JDODependencies(session=mock_session, available_hours_remaining=5.0)
+
+        deps.deduct_hours(1.5)
+
+        assert deps.available_hours_remaining == 3.5
+
+    def test_deduct_hours_does_nothing_when_none(self) -> None:
+        """deduct_hours does nothing when available_hours_remaining is None."""
+        from jdo.ai.agent import JDODependencies
+
+        mock_session = MagicMock()
+        deps = JDODependencies(session=mock_session)
+
+        deps.deduct_hours(1.0)
+
+        assert deps.available_hours_remaining is None
+
+    def test_deduct_hours_floors_at_zero(self) -> None:
+        """deduct_hours floors at zero, does not go negative."""
+        from jdo.ai.agent import JDODependencies
+
+        mock_session = MagicMock()
+        deps = JDODependencies(session=mock_session, available_hours_remaining=1.0)
+
+        deps.deduct_hours(2.5)
+
+        assert deps.available_hours_remaining == 0.0
+
+    def test_deduct_hours_ignores_negative_deduction(self) -> None:
+        """deduct_hours ignores negative or zero deduction values."""
+        from jdo.ai.agent import JDODependencies
+
+        mock_session = MagicMock()
+        deps = JDODependencies(session=mock_session, available_hours_remaining=5.0)
+
+        deps.deduct_hours(0.0)
+        assert deps.available_hours_remaining == 5.0
+
+        deps.deduct_hours(-1.0)
+        assert deps.available_hours_remaining == 5.0

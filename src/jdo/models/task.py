@@ -21,6 +21,42 @@ class TaskStatus(str, Enum):
     SKIPPED = "skipped"
 
 
+class ActualHoursCategory(str, Enum):
+    """Category for actual hours vs estimate comparison.
+
+    Used for 5-point scale to record how actual time compared to estimate.
+    """
+
+    MUCH_SHORTER = "much_shorter"  # <50% of estimate
+    SHORTER = "shorter"  # 50-85% of estimate
+    ON_TARGET = "on_target"  # 85-115% of estimate
+    LONGER = "longer"  # 115-150% of estimate
+    MUCH_LONGER = "much_longer"  # >150% of estimate
+
+    @property
+    def multiplier(self) -> float:
+        """Get the multiplier for accuracy calculation.
+
+        Returns midpoint of the range for variance calculation.
+        """
+        multipliers = {
+            ActualHoursCategory.MUCH_SHORTER: 0.25,  # Midpoint of 0-50%
+            ActualHoursCategory.SHORTER: 0.675,  # Midpoint of 50-85%
+            ActualHoursCategory.ON_TARGET: 1.0,  # Midpoint of 85-115%
+            ActualHoursCategory.LONGER: 1.325,  # Midpoint of 115-150%
+            ActualHoursCategory.MUCH_LONGER: 2.0,  # >150%, use 200%
+        }
+        return multipliers[self]
+
+
+class EstimationConfidence(str, Enum):
+    """Confidence level for time estimates."""
+
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
 def utc_now() -> datetime:
     """Get current UTC datetime."""
     return datetime.now(UTC)
@@ -57,6 +93,10 @@ class Task(SQLModel, table=True):
     sub_tasks: list[dict[str, Any]] = Field(default=[], sa_column=Column(JSON))
     order: int
     is_notification_task: bool = Field(default=False)
+    # Time estimation fields
+    estimated_hours: float | None = Field(default=None)
+    actual_hours_category: ActualHoursCategory | None = Field(default=None)
+    estimation_confidence: EstimationConfidence | None = Field(default=None)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 

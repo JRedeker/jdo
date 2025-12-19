@@ -37,6 +37,7 @@ class IntegrityMetrics:
     - Notification timeliness shows early warning behavior
     - Cleanup completion shows follow-through on recovery
     - Streak reflects sustained reliability
+    - Estimation accuracy shows calibrated time planning
     """
 
     # Primary metrics (0.0-1.0 scale)
@@ -51,24 +52,33 @@ class IntegrityMetrics:
     total_at_risk: int
     total_abandoned: int
 
+    # Estimation accuracy: 1.0 = perfect estimates, 0.0 = wildly inaccurate
+    # Defaults to 1.0 for users with insufficient history
+    estimation_accuracy: float = 1.0
+    # Number of completed tasks with both estimate and actual_hours_category
+    tasks_with_estimates: int = 0
+
     @property
     def composite_score(self) -> float:
         """Calculate composite integrity score (0-100).
 
-        Formula:
-        - on_time_rate: 40% weight
+        Formula (v2 with estimation accuracy):
+        - on_time_rate: 35% weight (was 40%)
         - notification_timeliness: 25% weight
         - cleanup_completion_rate: 25% weight
-        - streak_bonus: 10% weight (capped at 10%)
+        - estimation_accuracy: 10% weight (NEW)
+        - streak_bonus: 5% max (was 10%)
 
         Returns:
             Score from 0-100.
         """
-        streak_bonus = min(self.current_streak_weeks * 2, 10) / 100
+        # Streak bonus: max 5% (2% per week, capped at 5%)
+        streak_bonus = min(self.current_streak_weeks * 2, 5) / 100
         return (
-            self.on_time_rate * 0.40
+            self.on_time_rate * 0.35
             + self.notification_timeliness * 0.25
             + self.cleanup_completion_rate * 0.25
+            + self.estimation_accuracy * 0.10
             + streak_bonus
         ) * 100
 

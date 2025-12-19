@@ -10,6 +10,7 @@ from typing import ClassVar
 from uuid import UUID
 
 from loguru import logger
+from sqlmodel import select
 from textual.app import App, ComposeResult
 from textual.binding import BindingType
 from textual.widgets import Footer, Header
@@ -18,12 +19,13 @@ from jdo.auth.api import is_authenticated
 from jdo.config import get_settings
 from jdo.db import create_db_and_tables, get_session
 from jdo.db.session import get_pending_drafts, get_visions_due_for_review
+from jdo.integrity.service import IntegrityService
 from jdo.logging import configure_logging
+from jdo.models import Commitment, Goal, Milestone, Stakeholder, Vision
 from jdo.models.draft import Draft
-from jdo.models.vision import Vision
 from jdo.observability import init_sentry
 from jdo.screens.ai_required import AiRequiredScreen
-from jdo.screens.chat import ChatScreen
+from jdo.screens.chat import ChatScreen, ChatScreenConfig
 from jdo.screens.draft_restore import DraftRestoreScreen
 from jdo.screens.home import HomeScreen
 from jdo.screens.settings import SettingsScreen
@@ -88,6 +90,14 @@ class JdoApp(App[None]):
         await self.push_screen(HomeScreen())
 
         # If AI is not configured, block usage until configured.
+        # Run in a worker to allow push_screen_wait (required by Textual)
+        self.run_worker(self._startup_worker(), exclusive=True)
+
+    async def _startup_worker(self) -> None:
+        """Startup worker to handle AI configuration and draft checks.
+
+        This runs in a worker context to allow push_screen_wait to work properly.
+        """
         await self._ensure_ai_configured()
 
         # Check for pending drafts after ensuring AI config
@@ -167,7 +177,7 @@ class JdoApp(App[None]):
 
         if decision == "restore":
             # Navigate to chat with the draft
-            self.push_screen(ChatScreen(draft_id=draft_id))
+            self.push_screen(ChatScreen(ChatScreenConfig(draft_id=draft_id)))
         else:
             # Discard (or None/escape) - delete the draft
             self._delete_draft(draft_id)
@@ -239,7 +249,164 @@ class JdoApp(App[None]):
         """Handle triage request from HomeScreen."""
         logger.debug("Navigating to ChatScreen in triage mode")
         # Navigate to chat with triage mode
-        self.push_screen(ChatScreen(triage_mode=True))
+        self.push_screen(ChatScreen(ChatScreenConfig(triage_mode=True)))
+
+    def on_home_screen_show_goals(self, _message: HomeScreen.ShowGoals) -> None:
+        """Handle show goals request from HomeScreen."""
+        logger.debug("Navigating to ChatScreen with goals view")
+        with get_session() as session:
+            goals = list(session.exec(select(Goal)).all())
+            goal_items = [
+                {
+                    "id": str(g.id),
+                    "title": g.title,
+                    "problem_statement": g.problem_statement,
+                    "status": g.status.value,
+                }
+                for g in goals
+            ]
+        self.push_screen(
+            ChatScreen(
+                ChatScreenConfig(
+                    initial_mode="list", initial_entity_type="goal", initial_data=goal_items
+                )
+            )
+        )
+
+    def on_home_screen_show_commitments(self, _message: HomeScreen.ShowCommitments) -> None:
+        """Handle show commitments request from HomeScreen."""
+        logger.debug("Navigating to ChatScreen with commitments view")
+        with get_session() as session:
+            results = list(session.exec(select(Commitment, Stakeholder).join(Stakeholder)).all())
+            commitment_items = [
+                {
+                    "id": str(c.id),
+                    "deliverable": c.deliverable,
+                    "stakeholder_name": s.name,
+                    "due_date": c.due_date.isoformat(),
+                    "status": c.status.value,
+                }
+                for c, s in results
+            ]
+        self.push_screen(
+            ChatScreen(
+                ChatScreenConfig(
+                    initial_mode="list",
+                    initial_entity_type="commitment",
+                    initial_data=commitment_items,
+                )
+            )
+        )
+
+    def on_home_screen_show_visions(self, _message: HomeScreen.ShowVisions) -> None:
+        """Handle show visions request from HomeScreen."""
+        logger.debug("Navigating to ChatScreen with visions view")
+        with get_session() as session:
+            visions = list(session.exec(select(Vision)).all())
+            vision_items = [
+                {
+                    "id": str(v.id),
+                    "title": v.title,
+                    "timeframe": v.timeframe,
+                    "status": v.status.value,
+                }
+                for v in visions
+            ]
+        self.push_screen(
+            ChatScreen(
+                ChatScreenConfig(
+                    initial_mode="list", initial_entity_type="vision", initial_data=vision_items
+                )
+            )
+        )
+
+    def on_home_screen_show_milestones(self, _message: HomeScreen.ShowMilestones) -> None:
+        """Handle show milestones request from HomeScreen."""
+        logger.debug("Navigating to ChatScreen with milestones view")
+        with get_session() as session:
+            milestones = list(session.exec(select(Milestone)).all())
+            milestone_items = [
+                {
+                    "id": str(m.id),
+                    "description": m.description,
+                    "target_date": m.target_date.isoformat(),
+                    "status": m.status.value,
+                }
+                for m in milestones
+            ]
+        self.push_screen(
+            ChatScreen(
+                ChatScreenConfig(
+                    initial_mode="list",
+                    initial_entity_type="milestone",
+                    initial_data=milestone_items,
+                )
+            )
+        )
+
+    def on_home_screen_show_orphans(self, _message: HomeScreen.ShowOrphans) -> None:
+        """Handle show orphan commitments request from HomeScreen."""
+        logger.debug("Navigating to ChatScreen with orphan commitments view")
+        with get_session() as session:
+            # Orphan commitments have no goal_id
+            results = list(
+                session.exec(
+                    select(Commitment, Stakeholder)
+                    .join(Stakeholder)
+                    .where(Commitment.goal_id == None)  # noqa: E711
+                ).all()
+            )
+            orphan_items = [
+                {
+                    "id": str(c.id),
+                    "deliverable": c.deliverable,
+                    "stakeholder_name": s.name,
+                    "due_date": c.due_date.isoformat(),
+                    "status": c.status.value,
+                }
+                for c, s in results
+            ]
+        self.push_screen(
+            ChatScreen(
+                ChatScreenConfig(
+                    initial_mode="list",
+                    initial_entity_type="commitment",
+                    initial_data=orphan_items,
+                )
+            )
+        )
+
+    def on_home_screen_show_hierarchy(self, _message: HomeScreen.ShowHierarchy) -> None:
+        """Handle show hierarchy request from HomeScreen."""
+        logger.debug("Navigating to ChatScreen with hierarchy view")
+        # For now, just navigate to chat - hierarchy view can be built with /hierarchy command
+        self.push_screen(ChatScreen())
+
+    def on_home_screen_show_integrity(self, _message: HomeScreen.ShowIntegrity) -> None:
+        """Handle show integrity dashboard request from HomeScreen."""
+        logger.debug("Navigating to ChatScreen with integrity dashboard")
+        with get_session() as session:
+            service = IntegrityService()
+            metrics = service.calculate_integrity_metrics(session)
+            integrity_data = {
+                "composite_score": metrics.composite_score,
+                "letter_grade": metrics.letter_grade,
+                "on_time_rate": metrics.on_time_rate,
+                "notification_timeliness": metrics.notification_timeliness,
+                "cleanup_completion_rate": metrics.cleanup_completion_rate,
+                "current_streak_weeks": metrics.current_streak_weeks,
+                "total_completed": metrics.total_completed,
+                "total_on_time": metrics.total_on_time,
+                "total_at_risk": metrics.total_at_risk,
+                "total_abandoned": metrics.total_abandoned,
+            }
+        self.push_screen(
+            ChatScreen(
+                ChatScreenConfig(
+                    initial_mode="integrity", initial_entity_type="", initial_data=integrity_data
+                )
+            )
+        )
 
 
 def main() -> None:
