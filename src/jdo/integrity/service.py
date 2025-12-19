@@ -10,7 +10,11 @@ from sqlmodel import Session, func, select
 
 from jdo.models.cleanup_plan import CleanupPlan, CleanupPlanStatus
 from jdo.models.commitment import Commitment, CommitmentStatus
-from jdo.models.integrity_metrics import IntegrityMetrics
+from jdo.models.integrity_metrics import (
+    TREND_THRESHOLD,
+    IntegrityMetrics,
+    TrendDirection,
+)
 from jdo.models.stakeholder import Stakeholder
 from jdo.models.task import Task, TaskStatus
 from jdo.models.task_history import TaskEventType, TaskHistoryEntry
@@ -24,6 +28,11 @@ MAX_DISPLAY_ITEMS = 3  # Maximum items to show in risk summary message
 MIN_TASKS_FOR_ACCURACY = 5  # Minimum tasks with estimates to calculate accuracy
 ACCURACY_DECAY_DAYS = 7  # Weight halves every 7 days
 ACCURACY_MAX_AGE_DAYS = 90  # Maximum age for history consideration
+
+# Constants for trend calculation
+TREND_PERIOD_DAYS = 30  # Period for comparing metrics (30 days)
+AFFECTING_SCORE_DAYS = 30  # Days to look back for affecting commitments
+MAX_AFFECTING_COMMITMENTS = 5  # Maximum commitments to show in affecting list
 
 
 @dataclass
@@ -115,6 +124,14 @@ class RecoveryResult:
     cleanup_plan: CleanupPlan | None
     notification_task: Task | None
     notification_still_needed: bool
+
+
+@dataclass
+class AffectingCommitment:
+    """A commitment that negatively affected the integrity score."""
+
+    commitment: Commitment
+    reason: str  # Why it affected the score (e.g., "completed late", "abandoned")
 
 
 class IntegrityService:
@@ -668,3 +685,256 @@ Mark this task complete after you've sent the notification."""
             return 1.0, tasks_with_estimates
 
         return weighted_accuracy / total_weight, tasks_with_estimates
+
+    def calculate_integrity_metrics_with_trends(self, session: Session) -> IntegrityMetrics:
+        """Calculate integrity metrics including trend indicators.
+
+        Compares current 30-day period with previous 30-day period to
+        determine if metrics are improving, declining, or stable.
+
+        Args:
+            session: Database session
+
+        Returns:
+            IntegrityMetrics with trend fields populated
+        """
+        # Get current metrics
+        current = self.calculate_integrity_metrics(session)
+
+        # Calculate previous period metrics for comparison
+        now = datetime.now(UTC)
+        cutoff = now - timedelta(days=TREND_PERIOD_DAYS)
+        prev_cutoff = cutoff - timedelta(days=TREND_PERIOD_DAYS)
+
+        # Calculate on-time rate for previous period
+        prev_on_time_rate = self._calculate_period_on_time_rate(session, prev_cutoff, cutoff)
+
+        # Calculate cleanup rate for previous period
+        prev_cleanup_rate = self._calculate_period_cleanup_rate(session, prev_cutoff, cutoff)
+
+        # Calculate notification timeliness for previous period
+        prev_notification = self._calculate_period_notification_timeliness(
+            session, prev_cutoff, cutoff
+        )
+
+        # Determine trends
+        on_time_trend = self._determine_trend(prev_on_time_rate, current.on_time_rate)
+        notification_trend = self._determine_trend(
+            prev_notification, current.notification_timeliness
+        )
+        cleanup_trend = self._determine_trend(prev_cleanup_rate, current.cleanup_completion_rate)
+
+        # Calculate overall trend from composite score
+        prev_composite = (
+            prev_on_time_rate * 0.35
+            + prev_notification * 0.25
+            + prev_cleanup_rate * 0.25
+            + current.estimation_accuracy * 0.10  # Use current, no history
+            + min(current.current_streak_weeks * 2, 5) / 100
+        ) * 100
+        overall_trend = self._determine_trend(prev_composite, current.composite_score)
+
+        # Return metrics with trends
+        return IntegrityMetrics(
+            on_time_rate=current.on_time_rate,
+            notification_timeliness=current.notification_timeliness,
+            cleanup_completion_rate=current.cleanup_completion_rate,
+            current_streak_weeks=current.current_streak_weeks,
+            total_completed=current.total_completed,
+            total_on_time=current.total_on_time,
+            total_at_risk=current.total_at_risk,
+            total_abandoned=current.total_abandoned,
+            estimation_accuracy=current.estimation_accuracy,
+            tasks_with_estimates=current.tasks_with_estimates,
+            on_time_trend=on_time_trend,
+            notification_trend=notification_trend,
+            cleanup_trend=cleanup_trend,
+            overall_trend=overall_trend,
+        )
+
+    def _determine_trend(self, prev_value: float, curr_value: float) -> TrendDirection:
+        """Determine trend direction between two values.
+
+        Args:
+            prev_value: Previous period value
+            curr_value: Current period value
+
+        Returns:
+            TrendDirection indicating if value is improving, declining, or stable
+        """
+        diff = curr_value - prev_value
+        if diff > TREND_THRESHOLD:
+            return TrendDirection.UP
+        if diff < -TREND_THRESHOLD:
+            return TrendDirection.DOWN
+        return TrendDirection.STABLE
+
+    def _calculate_period_on_time_rate(
+        self, session: Session, start: datetime, end: datetime
+    ) -> float:
+        """Calculate on-time rate for a specific period.
+
+        Args:
+            session: Database session
+            start: Period start datetime
+            end: Period end datetime
+
+        Returns:
+            On-time rate (0.0-1.0), defaults to 1.0 if no data
+        """
+        # Get completed commitments in period
+        period_completed = session.exec(
+            select(func.count())
+            .select_from(Commitment)
+            .where(
+                Commitment.status == CommitmentStatus.COMPLETED,
+                Commitment.completed_at >= start,  # type: ignore[operator]
+                Commitment.completed_at < end,  # type: ignore[operator]
+            )
+        ).one()
+
+        if period_completed == 0:
+            return 1.0  # Clean slate for period
+
+        period_on_time = session.exec(
+            select(func.count())
+            .select_from(Commitment)
+            .where(
+                Commitment.status == CommitmentStatus.COMPLETED,
+                Commitment.completed_at >= start,  # type: ignore[operator]
+                Commitment.completed_at < end,  # type: ignore[operator]
+                Commitment.completed_on_time == True,  # noqa: E712
+            )
+        ).one()
+
+        return period_on_time / period_completed
+
+    def _calculate_period_cleanup_rate(
+        self, session: Session, start: datetime, end: datetime
+    ) -> float:
+        """Calculate cleanup completion rate for a specific period.
+
+        Args:
+            session: Database session
+            start: Period start datetime
+            end: Period end datetime
+
+        Returns:
+            Cleanup rate (0.0-1.0), defaults to 1.0 if no data
+        """
+        period_plans = session.exec(
+            select(func.count())
+            .select_from(CleanupPlan)
+            .where(
+                CleanupPlan.created_at >= start,  # type: ignore[operator]
+                CleanupPlan.created_at < end,  # type: ignore[operator]
+            )
+        ).one()
+
+        if period_plans == 0:
+            return 1.0  # Clean slate for period
+
+        period_completed = session.exec(
+            select(func.count())
+            .select_from(CleanupPlan)
+            .where(
+                CleanupPlan.status == CleanupPlanStatus.COMPLETED,
+                CleanupPlan.created_at >= start,  # type: ignore[operator]
+                CleanupPlan.created_at < end,  # type: ignore[operator]
+            )
+        ).one()
+
+        return period_completed / period_plans
+
+    def _calculate_period_notification_timeliness(
+        self, session: Session, start: datetime, end: datetime
+    ) -> float:
+        """Calculate notification timeliness for a specific period.
+
+        Args:
+            session: Database session
+            start: Period start datetime
+            end: Period end datetime
+
+        Returns:
+            Timeliness score (0.0-1.0), defaults to 1.0 if no data
+        """
+        # Get commitments marked at-risk in period
+        at_risk_in_period = session.exec(
+            select(Commitment).where(
+                Commitment.marked_at_risk_at.is_not(None),  # type: ignore[union-attr]
+                Commitment.marked_at_risk_at >= start,  # type: ignore[operator]
+                Commitment.marked_at_risk_at < end,  # type: ignore[operator]
+            )
+        ).all()
+
+        if not at_risk_in_period:
+            return 1.0  # Clean slate for period
+
+        total_score = 0.0
+        for commitment in at_risk_in_period:
+            if commitment.marked_at_risk_at is None or commitment.due_date is None:
+                continue
+
+            marked_date = commitment.marked_at_risk_at.date()
+            days_before_due = (commitment.due_date - marked_date).days
+
+            if days_before_due >= 7:
+                score = 1.0
+            elif days_before_due <= 0:
+                score = 0.0
+            else:
+                score = days_before_due / 7.0
+
+            total_score += score
+
+        return total_score / len(at_risk_in_period) if at_risk_in_period else 1.0
+
+    def get_affecting_commitments(self, session: Session) -> list[AffectingCommitment]:
+        """Get recent commitments that negatively affected the integrity score.
+
+        Returns commitments from the last 30 days where:
+        - completed_on_time = False (late completion)
+        - status = abandoned
+
+        Args:
+            session: Database session
+
+        Returns:
+            List of AffectingCommitment with reason for each
+        """
+        now = datetime.now(UTC)
+        cutoff = now - timedelta(days=AFFECTING_SCORE_DAYS)
+
+        # Get late completions
+        late_completions = session.exec(
+            select(Commitment)
+            .where(
+                Commitment.status == CommitmentStatus.COMPLETED,
+                Commitment.completed_on_time == False,  # noqa: E712
+                Commitment.completed_at >= cutoff,  # type: ignore[operator]
+            )
+            .order_by(Commitment.completed_at.desc())  # type: ignore[union-attr]
+            .limit(MAX_AFFECTING_COMMITMENTS)
+        ).all()
+
+        result: list[AffectingCommitment] = [
+            AffectingCommitment(commitment=c, reason="completed late") for c in late_completions
+        ]
+
+        # Get abandoned commitments
+        remaining_slots = MAX_AFFECTING_COMMITMENTS - len(result)
+        if remaining_slots > 0:
+            abandoned = session.exec(
+                select(Commitment)
+                .where(
+                    Commitment.status == CommitmentStatus.ABANDONED,
+                    Commitment.updated_at >= cutoff,  # type: ignore[operator]
+                )
+                .order_by(Commitment.updated_at.desc())  # type: ignore[arg-type]
+                .limit(remaining_slots)
+            ).all()
+
+            result.extend(AffectingCommitment(commitment=c, reason="abandoned") for c in abandoned)
+
+        return result

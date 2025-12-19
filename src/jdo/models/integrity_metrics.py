@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 
 # Grade thresholds: (min_score, grade)
 # Ordered from highest to lowest for efficient lookup
@@ -20,6 +21,17 @@ GRADE_THRESHOLDS: list[tuple[int, str]] = [
     (63, "D"),
     (60, "D-"),
 ]
+
+# Threshold for determining trend direction (5% change is significant)
+TREND_THRESHOLD = 0.05
+
+
+class TrendDirection(str, Enum):
+    """Direction of metric change compared to previous period."""
+
+    UP = "up"  # Improving
+    DOWN = "down"  # Declining
+    STABLE = "stable"  # No significant change
 
 
 @dataclass
@@ -57,6 +69,12 @@ class IntegrityMetrics:
     estimation_accuracy: float = 1.0
     # Number of completed tasks with both estimate and actual_hours_category
     tasks_with_estimates: int = 0
+
+    # Trend indicators (compared to previous 30-day period)
+    on_time_trend: TrendDirection | None = None
+    notification_trend: TrendDirection | None = None
+    cleanup_trend: TrendDirection | None = None
+    overall_trend: TrendDirection | None = None
 
     @property
     def composite_score(self) -> float:
@@ -109,3 +127,22 @@ class IntegrityMetrics:
             if score >= threshold:
                 return grade
         return "F"
+
+    @staticmethod
+    def trend_indicator(trend: TrendDirection | None) -> str:
+        """Get display indicator for a trend direction.
+
+        Args:
+            trend: The trend direction or None.
+
+        Returns:
+            Arrow symbol: ↑ for up, ↓ for down, → for stable, empty for None.
+        """
+        if trend is None:
+            return ""
+        indicators = {
+            TrendDirection.UP: "↑",
+            TrendDirection.DOWN: "↓",
+            TrendDirection.STABLE: "→",
+        }
+        return indicators.get(trend, "")

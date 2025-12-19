@@ -11,7 +11,12 @@ import pytest
 from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.pool import StaticPool
 
-from jdo.integrity.service import IntegrityService, RecoveryResult, RiskSummary
+from jdo.integrity.service import (
+    AffectingCommitment,
+    IntegrityService,
+    RecoveryResult,
+    RiskSummary,
+)
 from jdo.models.cleanup_plan import CleanupPlan, CleanupPlanStatus
 from jdo.models.commitment import Commitment, CommitmentStatus
 from jdo.models.stakeholder import Stakeholder, StakeholderType
@@ -1493,3 +1498,279 @@ class TestRecoverCommitment:
         assert result.cleanup_plan is None
         assert result.notification_task is None
         assert result.notification_still_needed is False
+
+
+class TestTrendCalculation:
+    """Tests for metric trend calculation."""
+
+    def test_determine_trend_up(self, session: Session) -> None:
+        """Trend is UP when current exceeds previous by threshold."""
+        from jdo.models.integrity_metrics import TrendDirection
+
+        service = IntegrityService()
+        result = service._determine_trend(0.70, 0.80)  # 10% increase
+        assert result == TrendDirection.UP
+
+    def test_determine_trend_down(self, session: Session) -> None:
+        """Trend is DOWN when current is below previous by threshold."""
+        from jdo.models.integrity_metrics import TrendDirection
+
+        service = IntegrityService()
+        result = service._determine_trend(0.80, 0.70)  # 10% decrease
+        assert result == TrendDirection.DOWN
+
+    def test_determine_trend_stable(self, session: Session) -> None:
+        """Trend is STABLE when change is within threshold."""
+        from jdo.models.integrity_metrics import TrendDirection
+
+        service = IntegrityService()
+        result = service._determine_trend(0.80, 0.82)  # 2% change < 5% threshold
+        assert result == TrendDirection.STABLE
+
+    def test_determine_trend_at_threshold(self, session: Session) -> None:
+        """Trend is STABLE when change equals threshold."""
+        from jdo.models.integrity_metrics import TrendDirection
+
+        service = IntegrityService()
+        result = service._determine_trend(0.80, 0.85)  # Exactly 5%
+        assert result == TrendDirection.STABLE
+
+    def test_metrics_with_trends_returns_all_trends(self, session: Session) -> None:
+        """calculate_integrity_metrics_with_trends returns metrics with trend fields."""
+        # Setup: Create some commitments
+        stakeholder = Stakeholder(name="Bob", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        # Create a completed commitment
+        now = datetime.now(UTC)
+        commitment = Commitment(
+            deliverable="Test task",
+            stakeholder_id=stakeholder.id,
+            due_date=now.date(),
+            status=CommitmentStatus.COMPLETED,
+            completed_at=now,
+            completed_on_time=True,
+        )
+        session.add(commitment)
+        session.commit()
+
+        # Act
+        service = IntegrityService()
+        metrics = service.calculate_integrity_metrics_with_trends(session)
+
+        # Assert - should have trend fields (all stable/None for minimal data)
+        assert metrics.on_time_trend is not None
+        assert metrics.notification_trend is not None
+        assert metrics.cleanup_trend is not None
+        assert metrics.overall_trend is not None
+
+    def test_period_on_time_rate_no_data(self, session: Session) -> None:
+        """Period on-time rate defaults to 1.0 for periods with no data."""
+        service = IntegrityService()
+        now = datetime.now(UTC)
+        start = now - timedelta(days=60)
+        end = now - timedelta(days=30)
+
+        result = service._calculate_period_on_time_rate(session, start, end)
+        assert result == 1.0  # Clean slate
+
+    def test_period_on_time_rate_with_data(self, session: Session) -> None:
+        """Period on-time rate calculates correctly for period with data."""
+        # Setup
+        stakeholder = Stakeholder(name="Carol", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        now = datetime.now(UTC)
+
+        # Create commitments completed in the period
+        for i, on_time in enumerate([True, True, False]):  # 2/3 = 66.7%
+            commitment = Commitment(
+                deliverable=f"Task {i}",
+                stakeholder_id=stakeholder.id,
+                due_date=now.date(),
+                status=CommitmentStatus.COMPLETED,
+                completed_at=now - timedelta(days=15),  # In period
+                completed_on_time=on_time,
+            )
+            session.add(commitment)
+        session.commit()
+
+        # Act
+        service = IntegrityService()
+        start = now - timedelta(days=30)
+        end = now
+        result = service._calculate_period_on_time_rate(session, start, end)
+
+        # Assert
+        assert result == pytest.approx(2 / 3)  # 66.7%
+
+    def test_period_cleanup_rate_no_data(self, session: Session) -> None:
+        """Period cleanup rate defaults to 1.0 for periods with no data."""
+        service = IntegrityService()
+        now = datetime.now(UTC)
+        start = now - timedelta(days=60)
+        end = now - timedelta(days=30)
+
+        result = service._calculate_period_cleanup_rate(session, start, end)
+        assert result == 1.0  # Clean slate
+
+
+class TestAffectingCommitments:
+    """Tests for get_affecting_commitments method."""
+
+    def test_returns_empty_list_when_no_issues(self, session: Session) -> None:
+        """Returns empty list when no commitments negatively affected score."""
+        service = IntegrityService()
+        result = service.get_affecting_commitments(session)
+        assert result == []
+
+    def test_returns_late_completions(self, session: Session) -> None:
+        """Returns commitments that were completed late."""
+        # Setup
+        stakeholder = Stakeholder(name="Dave", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        now = datetime.now(UTC)
+
+        # Create a late completion
+        commitment = Commitment(
+            deliverable="Late report",
+            stakeholder_id=stakeholder.id,
+            due_date=(now - timedelta(days=10)).date(),
+            status=CommitmentStatus.COMPLETED,
+            completed_at=now - timedelta(days=5),  # Within last 30 days
+            completed_on_time=False,
+        )
+        session.add(commitment)
+        session.commit()
+
+        # Act
+        service = IntegrityService()
+        result = service.get_affecting_commitments(session)
+
+        # Assert
+        assert len(result) == 1
+        assert result[0].commitment.deliverable == "Late report"
+        assert result[0].reason == "completed late"
+
+    def test_returns_abandoned_commitments(self, session: Session) -> None:
+        """Returns commitments that were abandoned."""
+        # Setup
+        stakeholder = Stakeholder(name="Eve", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        now = datetime.now(UTC)
+
+        # Create an abandoned commitment
+        commitment = Commitment(
+            deliverable="Abandoned task",
+            stakeholder_id=stakeholder.id,
+            due_date=now.date(),
+            status=CommitmentStatus.ABANDONED,
+            updated_at=now - timedelta(days=5),  # Within last 30 days
+        )
+        session.add(commitment)
+        session.commit()
+
+        # Act
+        service = IntegrityService()
+        result = service.get_affecting_commitments(session)
+
+        # Assert
+        assert len(result) == 1
+        assert result[0].commitment.deliverable == "Abandoned task"
+        assert result[0].reason == "abandoned"
+
+    def test_excludes_old_issues(self, session: Session) -> None:
+        """Excludes issues older than 30 days."""
+        # Setup
+        stakeholder = Stakeholder(name="Frank", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        now = datetime.now(UTC)
+
+        # Create an old late completion (45 days ago)
+        commitment = Commitment(
+            deliverable="Old late report",
+            stakeholder_id=stakeholder.id,
+            due_date=(now - timedelta(days=50)).date(),
+            status=CommitmentStatus.COMPLETED,
+            completed_at=now - timedelta(days=45),  # Outside 30 day window
+            completed_on_time=False,
+        )
+        session.add(commitment)
+        session.commit()
+
+        # Act
+        service = IntegrityService()
+        result = service.get_affecting_commitments(session)
+
+        # Assert
+        assert len(result) == 0
+
+    def test_limits_to_max_commitments(self, session: Session) -> None:
+        """Limits results to MAX_AFFECTING_COMMITMENTS (5)."""
+        # Setup
+        stakeholder = Stakeholder(name="Grace", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        now = datetime.now(UTC)
+
+        # Create 7 late completions
+        for i in range(7):
+            commitment = Commitment(
+                deliverable=f"Late report {i}",
+                stakeholder_id=stakeholder.id,
+                due_date=(now - timedelta(days=10)).date(),
+                status=CommitmentStatus.COMPLETED,
+                completed_at=now - timedelta(days=5 + i),  # Spread out
+                completed_on_time=False,
+            )
+            session.add(commitment)
+        session.commit()
+
+        # Act
+        service = IntegrityService()
+        result = service.get_affecting_commitments(session)
+
+        # Assert - should be limited to 5
+        assert len(result) == 5
+
+    def test_affecting_commitment_dataclass(self, session: Session) -> None:
+        """AffectingCommitment dataclass has expected fields."""
+        # Setup
+        stakeholder = Stakeholder(name="Heidi", type=StakeholderType.PERSON)
+        session.add(stakeholder)
+        session.commit()
+        session.refresh(stakeholder)
+
+        commitment = Commitment(
+            deliverable="Test commitment",
+            stakeholder_id=stakeholder.id,
+            due_date=date.today(),
+            status=CommitmentStatus.IN_PROGRESS,
+        )
+        session.add(commitment)
+        session.commit()
+
+        # Create dataclass directly
+        affecting = AffectingCommitment(
+            commitment=commitment,
+            reason="test reason",
+        )
+
+        # Assert
+        assert affecting.commitment.deliverable == "Test commitment"
+        assert affecting.reason == "test reason"

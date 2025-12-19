@@ -1685,6 +1685,9 @@ class IntegrityHandler(CommandHandler):
         total_at_risk = metrics.get("total_at_risk", 0)
         total_abandoned = metrics.get("total_abandoned", 0)
 
+        # Affecting commitments
+        affecting = metrics.get("affecting_commitments", [])
+
         lines = [
             "Integrity Dashboard",
             "=" * 40,
@@ -1707,6 +1710,15 @@ class IntegrityHandler(CommandHandler):
                 lines.append(f"  Marked at-risk: {total_at_risk}")
             if total_abandoned > 0:
                 lines.append(f"  Abandoned: {total_abandoned}")
+            lines.append("")
+
+        # Add affecting commitments
+        if affecting:
+            lines.append("Recent issues affecting score:")
+            for item in affecting:
+                deliverable = item.get("deliverable", "Untitled")[:40]
+                reason = item.get("reason", "unknown")
+                lines.append(f"  • {deliverable} ({reason})")
             lines.append("")
 
         # Grade color hint for TUI
@@ -1734,6 +1746,7 @@ class IntegrityHandler(CommandHandler):
                 "data": {
                     **metrics,
                     "grade_color": grade_colors.get(grade, "white"),
+                    "affecting_commitments": affecting,
                 },
             },
             draft_data=None,

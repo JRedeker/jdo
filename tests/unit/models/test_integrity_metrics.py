@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from jdo.models.integrity_metrics import IntegrityMetrics
+from jdo.models.integrity_metrics import IntegrityMetrics, TrendDirection
 
 
 class TestIntegrityMetricsDataclass:
@@ -524,3 +524,69 @@ class TestLetterGrade:
         )
         # 0.35 + 0.25 + 0.25 + 0.10 + 0.05 = 1.0 * 100 = 100 = A+
         assert metrics.letter_grade == "A+"
+
+
+class TestTrendDirection:
+    """Tests for TrendDirection enum and trend fields."""
+
+    def test_trend_direction_enum_values(self) -> None:
+        """TrendDirection has up, down, stable values."""
+        assert TrendDirection.UP.value == "up"
+        assert TrendDirection.DOWN.value == "down"
+        assert TrendDirection.STABLE.value == "stable"
+
+    def test_metrics_with_trends(self) -> None:
+        """IntegrityMetrics can store trend fields."""
+        metrics = IntegrityMetrics(
+            on_time_rate=0.85,
+            notification_timeliness=0.75,
+            cleanup_completion_rate=0.90,
+            current_streak_weeks=3,
+            total_completed=20,
+            total_on_time=17,
+            total_at_risk=5,
+            total_abandoned=2,
+            on_time_trend=TrendDirection.UP,
+            notification_trend=TrendDirection.DOWN,
+            cleanup_trend=TrendDirection.STABLE,
+            overall_trend=TrendDirection.UP,
+        )
+
+        assert metrics.on_time_trend == TrendDirection.UP
+        assert metrics.notification_trend == TrendDirection.DOWN
+        assert metrics.cleanup_trend == TrendDirection.STABLE
+        assert metrics.overall_trend == TrendDirection.UP
+
+    def test_metrics_trends_default_to_none(self) -> None:
+        """Trend fields default to None when not provided."""
+        metrics = IntegrityMetrics(
+            on_time_rate=0.85,
+            notification_timeliness=0.75,
+            cleanup_completion_rate=0.90,
+            current_streak_weeks=3,
+            total_completed=20,
+            total_on_time=17,
+            total_at_risk=5,
+            total_abandoned=2,
+        )
+
+        assert metrics.on_time_trend is None
+        assert metrics.notification_trend is None
+        assert metrics.cleanup_trend is None
+        assert metrics.overall_trend is None
+
+    def test_trend_indicator_up(self) -> None:
+        """trend_indicator returns ↑ for UP direction."""
+        assert IntegrityMetrics.trend_indicator(TrendDirection.UP) == "↑"
+
+    def test_trend_indicator_down(self) -> None:
+        """trend_indicator returns ↓ for DOWN direction."""
+        assert IntegrityMetrics.trend_indicator(TrendDirection.DOWN) == "↓"
+
+    def test_trend_indicator_stable(self) -> None:
+        """trend_indicator returns → for STABLE direction."""
+        assert IntegrityMetrics.trend_indicator(TrendDirection.STABLE) == "→"
+
+    def test_trend_indicator_none(self) -> None:
+        """trend_indicator returns empty string for None."""
+        assert IntegrityMetrics.trend_indicator(None) == ""

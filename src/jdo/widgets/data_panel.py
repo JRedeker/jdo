@@ -892,52 +892,138 @@ class DataPanel(VerticalScroll):
         text.append("INTEGRITY DASHBOARD\n", style="bold")
         text.append("=" * 30 + "\n\n")
 
-        # Letter grade (large and prominent)
+        self._render_integrity_grade(text)
+        self._render_integrity_metrics(text)
+        self._render_integrity_history(text)
+        self._render_affecting_commitments(text)
+
+        self._content.update(text)
+
+    def _render_integrity_grade(self, text: Text) -> None:
+        """Render letter grade section with trend indicator."""
         grade = self._data.get("letter_grade") or "A+"
         grade_style = self._get_grade_style(grade)
-        text.append("Overall Grade: ", style="dim")
-        text.append(f"{grade}\n\n", style=f"bold {grade_style}")
+        overall_trend = self._data.get("overall_trend")
+        trend_indicator = self._get_trend_indicator(overall_trend)
 
-        # Composite score
+        text.append("Overall Grade: ", style="dim")
+        text.append(f"{grade}", style=f"bold {grade_style}")
+        if trend_indicator:
+            trend_style = self._get_trend_style(overall_trend)
+            text.append(f" {trend_indicator}", style=trend_style)
+        text.append("\n\n")
+
         score = self._data.get("composite_score", 100.0)
         text.append(f"Score: {score:.1f}%\n\n", style="dim")
 
-        # Individual metrics
+    def _render_integrity_metrics(self, text: Text) -> None:
+        """Render individual metrics with trends."""
         text.append("METRICS\n", style="bold")
         text.append("-" * 20 + "\n")
 
         on_time = self._data.get("on_time_rate", 1.0) * 100
-        text.append(f"On-time rate:      {on_time:.0f}%\n")
+        self._append_metric_with_trend(
+            text, "On-time rate:", on_time, self._data.get("on_time_trend")
+        )
 
         notification = self._data.get("notification_timeliness", 1.0) * 100
-        text.append(f"Notification:      {notification:.0f}%\n")
+        self._append_metric_with_trend(
+            text, "Notification:", notification, self._data.get("notification_trend")
+        )
 
         cleanup = self._data.get("cleanup_completion_rate", 1.0) * 100
-        text.append(f"Cleanup rate:      {cleanup:.0f}%\n")
+        self._append_metric_with_trend(
+            text, "Cleanup rate:", cleanup, self._data.get("cleanup_trend")
+        )
 
-        # Estimation accuracy (if available)
         estimation = self._data.get("estimation_accuracy")
         if estimation is not None:
-            estimation_pct = estimation * 100
-            text.append(f"Estimation acc:    {estimation_pct:.0f}%\n")
+            text.append(f"Estimation acc:    {estimation * 100:.0f}%\n")
 
         streak = self._data.get("current_streak_weeks", 0)
         text.append(f"Current streak:    {streak} week{'s' if streak != 1 else ''}\n\n")
 
-        # Stats
+    def _render_integrity_history(self, text: Text) -> None:
+        """Render history statistics."""
         text.append("HISTORY\n", style="bold")
         text.append("-" * 20 + "\n")
-        total = self._data.get("total_completed", 0)
-        on_time_count = self._data.get("total_on_time", 0)
-        at_risk = self._data.get("total_at_risk", 0)
-        abandoned = self._data.get("total_abandoned", 0)
 
-        text.append(f"Completed:         {total}\n")
-        text.append(f"On-time:           {on_time_count}\n")
-        text.append(f"Marked at-risk:    {at_risk}\n")
-        text.append(f"Abandoned:         {abandoned}\n")
+        text.append(f"Completed:         {self._data.get('total_completed', 0)}\n")
+        text.append(f"On-time:           {self._data.get('total_on_time', 0)}\n")
+        text.append(f"Marked at-risk:    {self._data.get('total_at_risk', 0)}\n")
+        text.append(f"Abandoned:         {self._data.get('total_abandoned', 0)}\n\n")
 
-        self._content.update(text)
+    def _render_affecting_commitments(self, text: Text) -> None:
+        """Render list of commitments that hurt the score."""
+        affecting = self._data.get("affecting_commitments", [])
+        if not affecting:
+            return
+
+        text.append("AFFECTING SCORE\n", style="bold")
+        text.append("-" * 20 + "\n")
+        for item in affecting:
+            deliverable = item.get("deliverable", "Untitled")[:35]
+            reason = item.get("reason", "unknown")
+            style = "red" if reason == "abandoned" else "yellow"
+            text.append(f"  • {deliverable}\n", style=style)
+            text.append(f"    ({reason})\n", style="dim")
+
+    def _append_metric_with_trend(
+        self, text: Text, label: str, value: float, trend: str | None
+    ) -> None:
+        """Append a metric line with optional trend indicator.
+
+        Args:
+            text: Rich Text object to append to.
+            label: Metric label (e.g., "On-time rate:").
+            value: Metric value as percentage.
+            trend: Trend direction string or None.
+        """
+        # Pad label to 17 chars for alignment
+        padded_label = f"{label:<17}"
+        text.append(padded_label)
+        text.append(f"{value:.0f}%")
+        if trend:
+            indicator = self._get_trend_indicator(trend)
+            style = self._get_trend_style(trend)
+            text.append(f" {indicator}", style=style)
+        text.append("\n")
+
+    def _get_trend_indicator(self, trend: str | None) -> str:
+        """Get display indicator for a trend direction.
+
+        Args:
+            trend: Trend direction string (up/down/stable) or None.
+
+        Returns:
+            Arrow symbol: ↑ for up, ↓ for down, → for stable, empty for None.
+        """
+        if not trend:
+            return ""
+        indicators = {
+            "up": "↑",
+            "down": "↓",
+            "stable": "→",
+        }
+        return indicators.get(trend, "")
+
+    def _get_trend_style(self, trend: str | None) -> str:
+        """Get Rich style for a trend indicator.
+
+        Args:
+            trend: Trend direction string.
+
+        Returns:
+            Rich style string (green for up, red for down, dim for stable).
+        """
+        if not trend:
+            return ""
+        styles = {
+            "up": "green",
+            "down": "red",
+            "stable": "dim",
+        }
+        return styles.get(trend, "")
 
     def _get_grade_style(self, grade: str) -> str:
         """Get Rich style for a letter grade.
