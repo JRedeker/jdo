@@ -110,7 +110,7 @@ class TestNavSidebarBasics:
             assert app.selected_items[0] == "chat"
 
     async def test_number_keys_select_items_directly(self) -> None:
-        """Number keys (1-9) select items directly by position."""
+        """Number keys (1-9, 0) select items directly by position."""
         app = NavSidebarTestApp()
         async with app.run_test() as pilot:
             await pilot.pause()
@@ -135,6 +135,16 @@ class TestNavSidebarBasics:
             await pilot.pause()
             assert len(app.selected_items) >= 3
             assert app.selected_items[-1] == "commitments"
+
+            # Press 9 to select triage
+            await pilot.press("9")
+            await pilot.pause()
+            assert app.selected_items[-1] == "triage"
+
+            # Press 0 to select settings (10th item)
+            await pilot.press("0")
+            await pilot.pause()
+            assert app.selected_items[-1] == "settings"
 
 
 class TestNavSidebarCollapse:
@@ -315,6 +325,28 @@ class TestNavSidebarActiveState:
 
             # Check that goals is now the highlighted item
             assert sidebar.active_item == "goals"
+
+    async def test_set_active_item_uses_correct_option_list_index(self) -> None:
+        """set_active_item highlights correct OptionList index for selectable options."""
+        app = NavSidebarTestApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            sidebar = app.query_one(NavSidebar)
+            option_list = sidebar.query_one(OptionList)
+
+            # OptionList.highlighted uses selectable option indices (excludes separators)
+            # So the index matches _nav_items index directly
+            sidebar.set_active_item("goals")
+            await pilot.pause()
+            assert option_list.highlighted == 1  # goals is index 1 in _nav_items
+
+            sidebar.set_active_item("hierarchy")
+            await pilot.pause()
+            assert option_list.highlighted == 5  # hierarchy is index 5 in _nav_items
+
+            sidebar.set_active_item("settings")
+            await pilot.pause()
+            assert option_list.highlighted == 9  # settings is index 9 in _nav_items
 
     async def test_active_item_persists_after_selection(self) -> None:
         """Active item updates after selection."""

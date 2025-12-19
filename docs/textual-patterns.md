@@ -349,6 +349,59 @@ def action_back(self) -> None:
 
 ---
 
+## OptionList Widget Patterns
+
+### OptionList.highlighted Index Behavior
+
+**Important**: `OptionList.highlighted` uses **selectable option indices only**, excluding separators.
+
+When you add options with separators (using `None`), the `highlighted` property does NOT include separators in its index count:
+
+```python
+# Adding items with separators
+option_list.add_option(Option("Chat", id="chat"))      # highlighted=0
+option_list.add_option(None)                            # Separator (not counted)
+option_list.add_option(Option("Goals", id="goals"))    # highlighted=1 (not 2!)
+option_list.add_option(Option("Settings", id="settings"))  # highlighted=2
+
+# To highlight "goals":
+option_list.highlighted = 1  # NOT 2!
+```
+
+### ✅ Correct Pattern for NavSidebar
+
+Pre-compute the mapping at initialization using the filtered items list:
+
+```python
+class NavSidebar(Widget):
+    def __init__(self, ...):
+        # Filter out separators for the item list
+        self._nav_items = [item for item in NAV_ITEMS if item is not None]
+        
+        # Build item_id -> highlighted index mapping
+        # OptionList.highlighted uses selectable indices (excludes separators)
+        self._item_to_option_index: dict[str, int] = {
+            item.id: idx for idx, item in enumerate(self._nav_items)
+        }
+    
+    def set_active_item(self, item_id: str) -> None:
+        """Set the active (highlighted) navigation item."""
+        self.active_item = item_id
+        if self._option_list is not None and item_id in self._item_to_option_index:
+            self._option_list.highlighted = self._item_to_option_index[item_id]
+```
+
+### OptionList Methods Summary
+
+| Property/Method | Behavior |
+|-----------------|----------|
+| `highlighted` | Index in selectable options only (excludes separators) |
+| `option_count` | Count of selectable options only (excludes separators) |
+| `get_option_at_index(i)` | Returns option at selectable index `i` |
+| `add_option(None)` | Adds a visual separator (not selectable, not indexed) |
+
+---
+
 ## Common Pitfalls
 
 ### 1. NoActiveWorker Exception

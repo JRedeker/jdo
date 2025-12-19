@@ -110,7 +110,8 @@ class NavSidebar(Widget):
         Binding("6", "select_item_6", "Hierarchy", show=False),
         Binding("7", "select_item_7", "Integrity", show=False),
         Binding("8", "select_item_8", "Orphans", show=False),
-        Binding("9", "select_item_9", "Settings", show=False),
+        Binding("9", "select_item_9", "Triage", show=False),
+        Binding("0", "select_item_10", "Settings", show=False),
     ]
 
     collapsed: reactive[bool] = reactive(default=False)
@@ -150,6 +151,11 @@ class NavSidebar(Widget):
         super().__init__(name=name, id=id, classes=classes)
         self._option_list: OptionList | None = None
         self._nav_items = [item for item in NAV_ITEMS if item is not None]
+        # Build item_id -> OptionList highlighted index mapping
+        # Note: OptionList.highlighted uses selectable option indices only (excludes separators)
+        self._item_to_option_index: dict[str, int] = {
+            item.id: idx for idx, item in enumerate(self._nav_items)
+        }
 
     def compose(self) -> ComposeResult:
         """Compose the sidebar layout."""
@@ -242,9 +248,7 @@ class NavSidebar(Widget):
             self.remove_class("-collapsed")
 
         # Re-render labels
-        refresh = getattr(self, "_refresh_options", None)
-        if refresh:
-            refresh()
+        self._refresh_options()
 
     def set_active_item(self, item_id: str) -> None:
         """Set the active (highlighted) navigation item.
@@ -254,12 +258,9 @@ class NavSidebar(Widget):
         """
         self.active_item = item_id
 
-        # Find and highlight the option
-        if self._option_list is not None:
-            for i, item in enumerate(self._nav_items):
-                if item.id == item_id:
-                    self._option_list.highlighted = i
-                    break
+        # Highlight the option using the pre-computed index mapping
+        if self._option_list is not None and item_id in self._item_to_option_index:
+            self._option_list.highlighted = self._item_to_option_index[item_id]
 
     def set_triage_count(self, count: int) -> None:
         """Set the triage badge count.
@@ -269,9 +270,7 @@ class NavSidebar(Widget):
         """
         self.triage_count = count
         # Re-render to update badge
-        refresh = getattr(self, "_refresh_options", None)
-        if refresh:
-            refresh()
+        self._refresh_options()
 
     def _select_by_index(self, index: int) -> None:
         """Select a navigation item by its 1-based index.
@@ -320,6 +319,10 @@ class NavSidebar(Widget):
     def action_select_item_9(self) -> None:
         """Select item at position 9."""
         self._select_by_index(9)
+
+    def action_select_item_10(self) -> None:
+        """Select item at position 10."""
+        self._select_by_index(10)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         """Handle selection from the OptionList.
