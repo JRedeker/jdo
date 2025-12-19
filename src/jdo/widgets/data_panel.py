@@ -12,7 +12,9 @@ from typing import Any
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
+from textual.content import Content
 from textual.reactive import reactive
+from textual.selection import Selection
 from textual.widgets import Static
 
 from jdo.ai.time_parsing import format_hours
@@ -32,6 +34,38 @@ LAST_WEEK_VALUES = {5, -1}
 # Ordinal suffix constants
 ORDINAL_TEEN_MIN = 11
 ORDINAL_TEEN_MAX = 13
+
+
+class _SelectableStatic(Static):
+    """Static widget with safe selection handling.
+
+    Works around a Textual bug where selection coordinates may be
+    screen-relative rather than widget-relative, causing IndexError.
+    """
+
+    def get_selection(self, selection: Selection) -> tuple[str, str] | None:
+        """Get the text under the selection safely.
+
+        Args:
+            selection: Selection information.
+
+        Returns:
+            Tuple of extracted text and ending, or None if extraction fails.
+        """
+        visual = self._render()
+        if isinstance(visual, (Text, Content)):
+            text = str(visual)
+        else:
+            return None
+
+        try:
+            extracted = selection.extract(text)
+        except IndexError:
+            # Selection coordinates out of range for this widget's text
+            return None
+        else:
+            return extracted, "\n"
+
 
 # Empty state messages for each entity type
 _EMPTY_STATE_MESSAGES: dict[str, str] = {
@@ -83,6 +117,8 @@ def get_empty_state_message(entity_type: str) -> str:
     Returns:
         Guidance message with instructions on how to create the first item.
     """
+    if not entity_type:
+        return "No items yet.\n\nUse /help to see available commands."
     return _EMPTY_STATE_MESSAGES.get(
         entity_type.lower(),
         f"No {entity_type}s yet.\n\nUse /{entity_type} to create one.",
@@ -240,7 +276,7 @@ class DataPanel(VerticalScroll):
             classes: CSS classes.
         """
         super().__init__(name=name, id=id, classes=classes)
-        self._content = Static("")
+        self._content = _SelectableStatic("")
         self._entity_type: str = ""
         self._data: dict[str, Any] = {}
         self._list_items: list[dict[str, Any]] = []
@@ -289,7 +325,8 @@ class DataPanel(VerticalScroll):
     def _render_list(self) -> None:
         """Render list mode content."""
         text = Text()
-        text.append(f"{self._entity_type.upper()} LIST\n", style="bold")
+        title = self._entity_type.upper() if self._entity_type else "ITEMS"
+        text.append(f"{title} LIST\n", style="bold")
         text.append("-" * 30 + "\n\n")
 
         if not self._list_items:
@@ -399,7 +436,7 @@ class DataPanel(VerticalScroll):
             return
 
         text = Text()
-        entity_name = self._entity_type.upper()
+        entity_name = self._entity_type.upper() if self._entity_type else "ITEM"
         text.append(f"{entity_name}\n", style="bold")
         text.append("-" * 30 + "\n\n")
 
@@ -638,7 +675,7 @@ class DataPanel(VerticalScroll):
             return
 
         text = Text()
-        entity_name = self._entity_type.upper()
+        entity_name = self._entity_type.upper() if self._entity_type else "ITEM"
         text.append(f"{entity_name} (draft)\n", style="bold yellow")
         text.append("-" * 30 + "\n\n")
 
@@ -856,7 +893,7 @@ class DataPanel(VerticalScroll):
         text.append("=" * 30 + "\n\n")
 
         # Letter grade (large and prominent)
-        grade = self._data.get("letter_grade", "A+")
+        grade = self._data.get("letter_grade") or "A+"
         grade_style = self._get_grade_style(grade)
         text.append("Overall Grade: ", style="dim")
         text.append(f"{grade}\n\n", style=f"bold {grade_style}")
@@ -926,7 +963,7 @@ class DataPanel(VerticalScroll):
         text.append("=" * 30 + "\n\n")
 
         # Status
-        status = self._data.get("status", "planned")
+        status = self._data.get("status") or "planned"
         status_style = {
             "planned": "yellow",
             "in_progress": "blue",

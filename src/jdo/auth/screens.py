@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-import webbrowser
+from typing import ClassVar
+from urllib.parse import parse_qs, urlparse
 
 from textual.app import ComposeResult
-from textual.containers import Container
+from textual.binding import Binding
+from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, Static
 
@@ -16,6 +18,35 @@ from jdo.auth.oauth import (
     build_authorization_url,
     exchange_code,
 )
+
+
+def _extract_auth_code(value: str) -> str:
+    """Extract authorization code from user input.
+
+    Handles both raw codes and full callback URLs like:
+    https://console.anthropic.com/oauth/code/callback?code=XXX&state=YYY
+
+    Args:
+        value: User input (raw code or URL)
+
+    Returns:
+        The extracted authorization code
+    """
+    value = value.strip()
+    if not value:
+        return ""
+
+    # Check if it looks like a URL
+    if value.startswith(("http://", "https://")):
+        parsed = urlparse(value)
+        query_params = parse_qs(parsed.query)
+        if "code" in query_params:
+            return query_params["code"][0]
+        # If no code param found, return as-is and let the API error
+        return value
+
+    return value
+
 
 # Provider info for display
 PROVIDER_INFO = {
@@ -46,9 +77,9 @@ class OAuthScreen(ModalScreen[bool]):
     }
 
     OAuthScreen > Container {
-        width: 80;
+        width: 100;
         height: auto;
-        max-height: 24;
+        max-height: 28;
         border: thick $background 80%;
         background: $surface;
         padding: 1 2;
@@ -65,7 +96,6 @@ class OAuthScreen(ModalScreen[bool]):
 
     OAuthScreen #auth-url {
         margin-bottom: 1;
-        color: $secondary;
     }
 
     OAuthScreen #code-input {
@@ -80,6 +110,7 @@ class OAuthScreen(ModalScreen[bool]):
 
     OAuthScreen #buttons {
         height: auto;
+        width: 100%;
         align: right middle;
     }
 
@@ -88,8 +119,8 @@ class OAuthScreen(ModalScreen[bool]):
     }
     """
 
-    BINDINGS = [
-        ("escape", "cancel", "Cancel"),
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "cancel", "Cancel"),
     ]
 
     def __init__(self) -> None:
@@ -99,22 +130,25 @@ class OAuthScreen(ModalScreen[bool]):
 
     def compose(self) -> ComposeResult:
         """Compose the OAuth screen."""
+        # Create a clickable hyperlink using Rich markup
+        # URL must be quoted to handle special characters like = and &
+        link_markup = f'[link="{self.auth_url}"]{self.auth_url}[/link]'
+
         with Container():
             yield Static("Claude OAuth Authentication", id="title")
             yield Static(
-                "1. Click 'Open Browser' or copy the URL below\n"
+                "1. Click the link below (or copy it to your browser)\n"
                 "2. Sign in to your Claude account\n"
                 "3. Copy the authorization code and paste it below",
                 id="instructions",
             )
-            yield Static(self.auth_url, id="auth-url")
+            yield Static(link_markup, id="auth-url", markup=True)
             yield Input(
                 placeholder="Paste authorization code here",
                 id="code-input",
             )
             yield Label("", id="error-label")
-            with Container(id="buttons"):
-                yield Button("Open Browser", id="browser-btn", variant="default")
+            with Horizontal(id="buttons"):
                 yield Button("Submit", id="submit-btn", variant="primary")
                 yield Button("Cancel", id="cancel-btn", variant="default")
 
@@ -126,8 +160,6 @@ class OAuthScreen(ModalScreen[bool]):
         """Handle button presses."""
         if event.button.id == "cancel-btn":
             self.dismiss(False)
-        elif event.button.id == "browser-btn":
-            webbrowser.open(self.auth_url)
         elif event.button.id == "submit-btn":
             await self._submit_code()
 
@@ -141,7 +173,7 @@ class OAuthScreen(ModalScreen[bool]):
         code_input = self.query_one("#code-input", Input)
         error_label = self.query_one("#error-label", Label)
 
-        code = code_input.value.strip()
+        code = _extract_auth_code(code_input.value)
         if not code:
             error_label.update("Please enter the authorization code")
             error_label.display = True
@@ -171,7 +203,7 @@ class ApiKeyScreen(ModalScreen[bool]):
     }
 
     ApiKeyScreen > Container {
-        width: 70;
+        width: 80;
         height: auto;
         max-height: 18;
         border: thick $background 80%;
@@ -200,6 +232,7 @@ class ApiKeyScreen(ModalScreen[bool]):
 
     ApiKeyScreen #buttons {
         height: auto;
+        width: 100%;
         align: right middle;
     }
 
@@ -208,8 +241,8 @@ class ApiKeyScreen(ModalScreen[bool]):
     }
     """
 
-    BINDINGS = [
-        ("escape", "cancel", "Cancel"),
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "cancel", "Cancel"),
     ]
 
     def __init__(self, provider_id: str) -> None:
@@ -226,20 +259,24 @@ class ApiKeyScreen(ModalScreen[bool]):
 
     def compose(self) -> ComposeResult:
         """Compose the API key screen."""
+        # Create clickable hyperlink for the API key URL (quoted for special chars)
+        if self.api_key_url:
+            url_markup = (
+                f'Get your API key from: [link="{self.api_key_url}"]{self.api_key_url}[/link]'
+            )
+        else:
+            url_markup = "Get your API key from your provider's console."
+
         with Container():
             yield Static(f"Enter API Key for {self.provider_name}", id="provider-title")
-            yield Static(
-                f"Get your API key from:\n{self.api_key_url}",
-                id="instructions",
-            )
+            yield Static(url_markup, id="instructions", markup=True)
             yield Input(
                 placeholder="Paste your API key here",
                 password=True,
                 id="api-key-input",
             )
             yield Label("", id="error-label")
-            with Container(id="buttons"):
-                yield Button("Open URL", id="url-btn", variant="default")
+            with Horizontal(id="buttons"):
                 yield Button("Save", id="save-btn", variant="primary")
                 yield Button("Cancel", id="cancel-btn", variant="default")
 
@@ -251,9 +288,6 @@ class ApiKeyScreen(ModalScreen[bool]):
         """Handle button presses."""
         if event.button.id == "cancel-btn":
             self.dismiss(False)
-        elif event.button.id == "url-btn":
-            if self.api_key_url:
-                webbrowser.open(self.api_key_url)
         elif event.button.id == "save-btn":
             self._save_key()
 

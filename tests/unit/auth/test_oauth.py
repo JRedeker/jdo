@@ -182,6 +182,8 @@ class TestTokenExchange:
     @pytest.mark.asyncio
     async def test_exchange_code_includes_code_and_verifier(self, httpx_mock, mock_token_response):
         """exchange_code includes code and verifier in request."""
+        import json
+
         from jdo.auth.oauth import exchange_code
 
         httpx_mock.add_response(
@@ -193,11 +195,11 @@ class TestTokenExchange:
         await exchange_code("auth_code_123", "verifier_abc")
 
         request = httpx_mock.get_requests()[0]
-        # Request body is form-encoded
-        body = request.content.decode()
-        assert "code=auth_code_123" in body
-        assert "code_verifier=verifier_abc" in body
-        assert "grant_type=authorization_code" in body
+        # Request body is JSON
+        body = json.loads(request.content.decode())
+        assert body["code"] == "auth_code_123"
+        assert body["code_verifier"] == "verifier_abc"
+        assert body["grant_type"] == "authorization_code"
 
     @pytest.mark.asyncio
     async def test_exchange_code_returns_oauth_credentials(self, httpx_mock, mock_token_response):
@@ -244,6 +246,50 @@ class TestTokenExchange:
         with pytest.raises(AuthenticationError):
             await exchange_code("code", "verifier")
 
+    @pytest.mark.asyncio
+    async def test_exchange_code_handles_code_with_state(self, httpx_mock, mock_token_response):
+        """exchange_code correctly parses code#state format."""
+        import json
+
+        from jdo.auth.oauth import exchange_code
+
+        httpx_mock.add_response(
+            url="https://console.anthropic.com/v1/oauth/token",
+            method="POST",
+            json=mock_token_response,
+        )
+
+        # Code with state appended after '#'
+        await exchange_code("auth_code_123#state_value_xyz", "verifier_abc")
+
+        request = httpx_mock.get_requests()[0]
+        body = json.loads(request.content.decode())
+        # Should extract code before '#' and include state
+        assert body["code"] == "auth_code_123"
+        assert body["state"] == "state_value_xyz"
+        assert body["code_verifier"] == "verifier_abc"
+
+    @pytest.mark.asyncio
+    async def test_exchange_code_without_state(self, httpx_mock, mock_token_response):
+        """exchange_code works with code that has no state."""
+        import json
+
+        from jdo.auth.oauth import exchange_code
+
+        httpx_mock.add_response(
+            url="https://console.anthropic.com/v1/oauth/token",
+            method="POST",
+            json=mock_token_response,
+        )
+
+        # Code without state
+        await exchange_code("auth_code_123", "verifier_abc")
+
+        request = httpx_mock.get_requests()[0]
+        body = json.loads(request.content.decode())
+        assert body["code"] == "auth_code_123"
+        assert "state" not in body  # No state should be included
+
 
 class TestTokenRefresh:
     """Tests for OAuth token refresh."""
@@ -263,6 +309,8 @@ class TestTokenRefresh:
         self, httpx_mock, mock_refresh_response
     ):
         """refresh_tokens sends POST with refresh_token grant."""
+        import json
+
         from jdo.auth.oauth import refresh_tokens
 
         httpx_mock.add_response(
@@ -274,9 +322,10 @@ class TestTokenRefresh:
         await refresh_tokens("old_refresh_token")
 
         request = httpx_mock.get_requests()[0]
-        body = request.content.decode()
-        assert "grant_type=refresh_token" in body
-        assert "refresh_token=old_refresh_token" in body
+        # Request body is JSON
+        body = json.loads(request.content.decode())
+        assert body["grant_type"] == "refresh_token"
+        assert body["refresh_token"] == "old_refresh_token"
 
     @pytest.mark.asyncio
     async def test_refresh_tokens_returns_updated_credentials(

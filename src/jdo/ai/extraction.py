@@ -13,6 +13,7 @@ from pydantic_ai import Agent
 from pydantic_ai.models import Model
 
 from jdo.ai.context import get_system_prompt
+from jdo.ai.timeout import AI_TIMEOUT_SECONDS, with_ai_timeout
 
 # Extraction prompts
 COMMITMENT_EXTRACTION_PROMPT = """\
@@ -315,11 +316,14 @@ async def extract_commitment(
 
     Returns:
         ExtractedCommitment with populated fields.
+
+    Raises:
+        TimeoutError: If AI call exceeds timeout.
     """
     agent = create_extraction_agent(model, ExtractedCommitment, COMMITMENT_EXTRACTION_PROMPT)
     conversation = _format_conversation_for_extraction(messages)
 
-    result = await agent.run(conversation)
+    result = await with_ai_timeout(agent.run(conversation), AI_TIMEOUT_SECONDS)
     return result.output  # type: ignore[return-value]
 
 
@@ -335,11 +339,14 @@ async def extract_goal(
 
     Returns:
         ExtractedGoal with populated fields.
+
+    Raises:
+        TimeoutError: If AI call exceeds timeout.
     """
     agent = create_extraction_agent(model, ExtractedGoal, GOAL_EXTRACTION_PROMPT)
     conversation = _format_conversation_for_extraction(messages)
 
-    result = await agent.run(conversation)
+    result = await with_ai_timeout(agent.run(conversation), AI_TIMEOUT_SECONDS)
     return result.output  # type: ignore[return-value]
 
 
@@ -355,11 +362,14 @@ async def extract_task(
 
     Returns:
         ExtractedTask with populated fields.
+
+    Raises:
+        TimeoutError: If AI call exceeds timeout.
     """
     agent = create_extraction_agent(model, ExtractedTask, TASK_EXTRACTION_PROMPT)
     conversation = _format_conversation_for_extraction(messages)
 
-    result = await agent.run(conversation)
+    result = await with_ai_timeout(agent.run(conversation), AI_TIMEOUT_SECONDS)
     return result.output  # type: ignore[return-value]
 
 
@@ -375,11 +385,14 @@ async def extract_vision(
 
     Returns:
         ExtractedVision with populated fields.
+
+    Raises:
+        TimeoutError: If AI call exceeds timeout.
     """
     agent = create_extraction_agent(model, ExtractedVision, VISION_EXTRACTION_PROMPT)
     conversation = _format_conversation_for_extraction(messages)
 
-    result = await agent.run(conversation)
+    result = await with_ai_timeout(agent.run(conversation), AI_TIMEOUT_SECONDS)
     return result.output  # type: ignore[return-value]
 
 
@@ -395,11 +408,14 @@ async def extract_milestone(
 
     Returns:
         ExtractedMilestone with populated fields.
+
+    Raises:
+        TimeoutError: If AI call exceeds timeout.
     """
     agent = create_extraction_agent(model, ExtractedMilestone, MILESTONE_EXTRACTION_PROMPT)
     conversation = _format_conversation_for_extraction(messages)
 
-    result = await agent.run(conversation)
+    result = await with_ai_timeout(agent.run(conversation), AI_TIMEOUT_SECONDS)
     return result.output  # type: ignore[return-value]
 
 
@@ -415,13 +431,16 @@ async def extract_recurring_commitment(
 
     Returns:
         ExtractedRecurringCommitment with populated fields.
+
+    Raises:
+        TimeoutError: If AI call exceeds timeout.
     """
     agent = create_extraction_agent(
         model, ExtractedRecurringCommitment, RECURRING_COMMITMENT_EXTRACTION_PROMPT
     )
     conversation = _format_conversation_for_extraction(messages)
 
-    result = await agent.run(conversation)
+    result = await with_ai_timeout(agent.run(conversation), AI_TIMEOUT_SECONDS)
     return result.output  # type: ignore[return-value]
 
 

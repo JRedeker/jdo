@@ -25,6 +25,7 @@ from textual.worker import get_current_worker
 
 from jdo.ai.agent import JDODependencies, create_agent
 from jdo.ai.context import stream_response
+from jdo.ai.time_context import calculate_allocated_hours
 from jdo.auth.api import is_authenticated
 from jdo.commands.draft_patch import apply_patch, parse_entity_type
 from jdo.commands.handlers import HandlerResult, get_handler
@@ -193,7 +194,7 @@ class ChatScreen(Screen[None]):
         prompt.focus()
 
         # If initial data provided, display it in the panel
-        if self._initial_mode and self._initial_entity_type is not None:
+        if self._initial_mode and self._initial_entity_type:
             self._display_initial_data()
 
         # Run risk detection asynchronously
@@ -611,6 +612,23 @@ class ChatScreen(Screen[None]):
             "Confirm the updated draft? (y/n)",
         )
 
+    def _get_allocated_hours(self) -> float:
+        """Calculate total allocated hours from active tasks.
+
+        Queries the database for pending/in_progress tasks in active
+        commitments and sums their estimated_hours.
+
+        Returns:
+            Total allocated hours from active tasks.
+        """
+        try:
+            with get_session() as session:
+                allocated, _task_count, _without_estimates = calculate_allocated_hours(session)
+                return allocated
+        except Exception as e:
+            logger.warning(f"Failed to calculate allocated hours: {e}")
+            return 0.0
+
     def _build_handler_context(self) -> dict[str, Any]:
         """Build context dict for command handlers.
 
@@ -626,7 +644,7 @@ class ChatScreen(Screen[None]):
             "commitments": [],
             # Time coaching context
             "available_hours_remaining": self._available_hours_remaining,
-            "allocated_hours": 0.0,  # TODO: Calculate from active tasks
+            "allocated_hours": self._get_allocated_hours(),
         }
 
         # Add current commitment context if viewing one

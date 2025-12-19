@@ -1,0 +1,22 @@
+name: planning_hierarchy
+description: Test viewing and navigating the planning hierarchy
+goal: |
+  View the planning hierarchy by pressing 'h' from the home screen.
+  The hierarchy view should show visions, goals, milestones, and commitments
+  in a tree structure. Navigate around the hierarchy if items exist.
+  Return to home when done exploring.
+
+preconditions: []
+
+success_criteria:
+  - screen:HomeScreen
+  - no_errors
+  - completed
+
+max_steps: 20
+timeout_seconds: 60
+
+tags:
+  - hierarchy
+  - planning
+  - navigation

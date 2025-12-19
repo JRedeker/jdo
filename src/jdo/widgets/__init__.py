@@ -18,6 +18,7 @@ from jdo.widgets.data_panel import (
     get_quick_stats_message,
 )
 from jdo.widgets.hierarchy_view import HierarchyView
+from jdo.widgets.nav_sidebar import NavItem, NavSidebar
 from jdo.widgets.prompt_input import PromptInput
 
 __all__ = [
@@ -26,6 +27,8 @@ __all__ = [
     "DataPanel",
     "HierarchyView",
     "MessageRole",
+    "NavItem",
+    "NavSidebar",
     "PanelMode",
     "PromptInput",
     "create_connection_error_message",

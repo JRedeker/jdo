@@ -2,13 +2,56 @@
 
 from collections.abc import Generator
 from pathlib import Path
+from typing import TypeVar
 from unittest.mock import patch
 
 import pytest
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
+from textual.app import App, ComposeResult
+from textual.screen import Screen
 
 from jdo.app import JdoApp
+
+# Type variable for screen types
+ScreenT = TypeVar("ScreenT", bound=Screen)
+
+
+def create_test_app_for_screen(screen: Screen) -> App:
+    """Create a test app that properly pushes a screen via on_mount.
+
+    This follows the production pattern of pushing screens in on_mount()
+    rather than yielding them in compose(), which avoids focus tracking issues.
+
+    Args:
+        screen: The screen instance to push.
+
+    Returns:
+        An App instance configured to push the screen on mount.
+
+    Example:
+        ```python
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()  # Wait for screen to mount
+            screen = pilot.app.screen
+            # ... test assertions
+        ```
+    """
+
+    class _TestApp(App):
+        def __init__(self, screen_to_push: Screen) -> None:
+            super().__init__()
+            self._screen_to_push = screen_to_push
+
+        def compose(self) -> ComposeResult:
+            return
+            yield  # Empty generator
+
+        async def on_mount(self) -> None:
+            await self.push_screen(self._screen_to_push)
+
+    return _TestApp(screen)
 
 
 @pytest.fixture

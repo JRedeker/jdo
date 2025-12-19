@@ -17,6 +17,7 @@ from jdo.db.task_history_service import TaskHistoryService
 from jdo.exceptions import JDOError
 from jdo.models import (
     Commitment,
+    CommitmentStatus,
     Goal,
     Milestone,
     RecurringCommitment,
@@ -425,6 +426,39 @@ class PersistenceService:
             f"Saved recurring commitment: {recurring.deliverable_template} (id={recurring.id})"
         )
         return recurring
+
+    def get_commitment_velocity(self, days: int = 7) -> tuple[int, int]:
+        """Get commitment creation and completion velocity over a time window.
+
+        Tracks how many commitments were created vs completed in the specified
+        number of days. Useful for detecting overcommitment patterns.
+
+        Args:
+            days: Number of days to look back (default: 7 for weekly velocity).
+
+        Returns:
+            Tuple of (created_count, completed_count) for the time window.
+        """
+        cutoff = datetime.now(UTC) - timedelta(days=days)
+
+        # Count created commitments
+        created_statement = (
+            select(func.count()).select_from(Commitment).where(Commitment.created_at >= cutoff)
+        )
+        created_count = self.session.exec(created_statement).one()
+
+        # Count completed commitments
+        completed_statement = (
+            select(func.count())
+            .select_from(Commitment)
+            .where(
+                Commitment.completed_at >= cutoff,
+                Commitment.status == CommitmentStatus.COMPLETED,
+            )
+        )
+        completed_count = self.session.exec(completed_statement).one()
+
+        return (created_count, completed_count)
 
     def _require_fields(self, draft_data: dict[str, Any], required: list[str]) -> None:
         """Validate that required fields are present and non-empty.

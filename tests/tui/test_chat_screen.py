@@ -16,6 +16,7 @@ from textual.containers import Horizontal
 
 from jdo.integrity import RiskSummary
 from jdo.models.commitment import Commitment, CommitmentStatus
+from tests.tui.conftest import create_test_app_for_screen
 
 
 class TestChatScreen:
@@ -25,13 +26,11 @@ class TestChatScreen:
         """ChatScreen has Horizontal with ChatPanel and DataPanel."""
         from jdo.screens.chat import ChatScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(ChatScreen)
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             # Should have a Horizontal container
             horizontal = screen.query_one(Horizontal)
             assert horizontal is not None
@@ -41,13 +40,11 @@ class TestChatScreen:
         from jdo.screens.chat import ChatScreen
         from jdo.widgets.chat_container import ChatContainer
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(ChatScreen)
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             chat_container = screen.query_one(ChatContainer)
             assert chat_container is not None
 
@@ -56,13 +53,11 @@ class TestChatScreen:
         from jdo.screens.chat import ChatScreen
         from jdo.widgets.data_panel import DataPanel
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(ChatScreen)
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             data_panel = screen.query_one(DataPanel)
             assert data_panel is not None
 
@@ -71,13 +66,11 @@ class TestChatScreen:
         from jdo.screens.chat import ChatScreen
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(ChatScreen)
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             prompt = screen.query_one(PromptInput)
             assert prompt is not None
 
@@ -87,13 +80,11 @@ class TestChatScreen:
         from jdo.widgets.data_panel import DataPanel
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
-            screen = app.query_one(ChatScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             prompt = screen.query_one(PromptInput)
             data_panel = screen.query_one(DataPanel)
 
@@ -111,13 +102,11 @@ class TestChatScreen:
         from jdo.screens.chat import ChatScreen
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
-            screen = app.query_one(ChatScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             prompt = screen.query_one(PromptInput)
 
             # Focus somewhere else then press escape
@@ -139,13 +128,11 @@ class TestChatScreenResponsive:
         from jdo.screens.chat import ChatScreen
         from jdo.widgets.data_panel import DataPanel
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(ChatScreen)
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             data_panel = screen.query_one(DataPanel)
             assert data_panel.display is True
 
@@ -154,13 +141,11 @@ class TestChatScreenResponsive:
         from jdo.screens.chat import ChatScreen
         from jdo.widgets.data_panel import DataPanel
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
-            screen = app.query_one(ChatScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             data_panel = screen.query_one(DataPanel)
 
             assert data_panel.display is True
@@ -193,11 +178,17 @@ class TestChatScreenLayout:
             """
 
             def compose(self) -> ComposeResult:
-                yield ChatScreen()
+                return
+                yield  # Empty generator
+
+            def on_mount(self) -> None:
+                self.push_screen(ChatScreen())
 
         app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(ChatScreen)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             # The chat panel should have width styling
             # We verify the CSS is applied correctly
             assert "60%" in ChatScreen.DEFAULT_CSS or "fr" in ChatScreen.DEFAULT_CSS
@@ -207,13 +198,11 @@ class TestChatScreenLayout:
         from jdo.screens.chat import ChatScreen
         from jdo.widgets.data_panel import DataPanel
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(ChatScreen)
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             data_panel = screen.query_one(DataPanel)
             # DataPanel should exist and have width styling
             assert data_panel is not None
@@ -229,13 +218,11 @@ class TestChatScreenCommandRouting:
         from jdo.widgets.chat_message import ChatMessage, MessageRole
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
-            screen = app.query_one(ChatScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             prompt = screen.query_one(PromptInput)
             container = screen.query_one(ChatContainer)
 
@@ -262,13 +249,11 @@ class TestChatScreenCommandRouting:
         from jdo.widgets.chat_message import ChatMessage, MessageRole
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
-            screen = app.query_one(ChatScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             prompt = screen.query_one(PromptInput)
             container = screen.query_one(ChatContainer)
 
@@ -291,13 +276,11 @@ class TestChatScreenCommandRouting:
         from jdo.widgets.data_panel import DataPanel
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
-            screen = app.query_one(ChatScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             prompt = screen.query_one(PromptInput)
             data_panel = screen.query_one(DataPanel)
 
@@ -320,13 +303,11 @@ class TestChatScreenConfirmationState:
         from jdo.screens.chat import ChatScreen, ConfirmationState
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
-            screen = app.query_one(ChatScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             prompt = screen.query_one(PromptInput)
 
             # Directly set up a handler result that needs confirmation
@@ -360,13 +341,11 @@ class TestChatScreenConfirmationState:
         from jdo.screens.chat import ChatScreen, ConfirmationState
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
-            screen = app.query_one(ChatScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             prompt = screen.query_one(PromptInput)
 
             # Set up confirmation state manually
@@ -408,13 +387,11 @@ class TestChatScreenConfirmationState:
         from jdo.screens.chat import ChatScreen, ConfirmationState
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
-            screen = app.query_one(ChatScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             prompt = screen.query_one(PromptInput)
 
             # Set up confirmation state
@@ -442,13 +419,11 @@ class TestChatScreenModificationRequests:
         from jdo.screens.chat import ChatScreen, ConfirmationState
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
-            screen = app.query_one(ChatScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             prompt = screen.query_one(PromptInput)
 
             screen._confirmation_state = ConfirmationState.AWAITING_CONFIRMATION
@@ -474,13 +449,11 @@ class TestChatScreenModificationRequests:
         from jdo.screens.chat import ChatScreen, ConfirmationState
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
-            screen = app.query_one(ChatScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             prompt = screen.query_one(PromptInput)
 
             screen._confirmation_state = ConfirmationState.AWAITING_CONFIRMATION
@@ -506,13 +479,11 @@ class TestChatScreenModificationRequests:
         from jdo.screens.chat import ChatScreen, ConfirmationState
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
-            screen = app.query_one(ChatScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             prompt = screen.query_one(PromptInput)
 
             screen._confirmation_state = ConfirmationState.AWAITING_CONFIRMATION
@@ -541,13 +512,11 @@ class TestChatScreenConfirmationDetection:
         """_is_confirmation detects various affirmative responses."""
         from jdo.screens.chat import ChatScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(ChatScreen)
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
 
             # Test various confirmations
             assert screen._is_confirmation("yes") is True
@@ -566,13 +535,11 @@ class TestChatScreenConfirmationDetection:
         """_is_cancellation detects various negative responses."""
         from jdo.screens.chat import ChatScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(ChatScreen)
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
 
             # Test various cancellations
             assert screen._is_cancellation("no") is True
@@ -597,13 +564,11 @@ class TestChatScreenMessageHandling:
         from jdo.widgets.chat_message import ChatMessage, MessageRole
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
-            screen = app.query_one(ChatScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             prompt = screen.query_one(PromptInput)
             container = screen.query_one(ChatContainer)
 
@@ -628,13 +593,11 @@ class TestChatScreenMessageHandling:
         from jdo.screens.chat import ChatScreen
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
-            screen = app.query_one(ChatScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             prompt = screen.query_one(PromptInput)
 
             # Mock AI credentials
@@ -656,13 +619,11 @@ class TestChatScreenMessageHandling:
         from jdo.screens.chat import ChatScreen
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
-            screen = app.query_one(ChatScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             prompt = screen.query_one(PromptInput)
 
             # Submit a command
@@ -684,13 +645,11 @@ class TestChatScreenCredentials:
         """_has_ai_credentials checks the configured provider."""
         from jdo.screens.chat import ChatScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(ChatScreen)
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
 
             # Mock is_authenticated to return False
             with patch("jdo.screens.chat.is_authenticated", return_value=False):
@@ -707,13 +666,11 @@ class TestChatScreenCredentials:
         from jdo.widgets.chat_message import ChatMessage, MessageRole
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
-            screen = app.query_one(ChatScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             prompt = screen.query_one(PromptInput)
             container = screen.query_one(ChatContainer)
 
@@ -741,13 +698,11 @@ class TestChatScreenErrorHandling:
         """Rate limit error returns appropriate message."""
         from jdo.screens.chat import ChatScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(ChatScreen)
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
 
             # Test rate limit error
             error = Exception("Rate limit exceeded")
@@ -758,13 +713,11 @@ class TestChatScreenErrorHandling:
         """Auth error returns appropriate message."""
         from jdo.screens.chat import ChatScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(ChatScreen)
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
 
             # Test auth error
             error = Exception("401 Unauthorized")
@@ -775,13 +728,11 @@ class TestChatScreenErrorHandling:
         """Network error returns appropriate message."""
         from jdo.screens.chat import ChatScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(ChatScreen)
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
 
             # Test network error
             error = Exception("Connection refused")
@@ -792,13 +743,11 @@ class TestChatScreenErrorHandling:
         """Unknown error returns generic message."""
         from jdo.screens.chat import ChatScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(ChatScreen)
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
 
             # Test generic error
             error = Exception("Something weird happened")
@@ -815,12 +764,11 @@ class TestChatScreenRiskDetection:
         from jdo.widgets.chat_container import ChatContainer
         from jdo.widgets.chat_message import ChatMessage, MessageRole
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             # Mock detect_risks to return empty summary
             with patch("jdo.screens.chat.get_session") as mock_session:
                 mock_ctx = MagicMock()
@@ -838,7 +786,7 @@ class TestChatScreenRiskDetection:
                     await pilot.pause()
                     await pilot.pause()
 
-                    container = app.query_one(ChatContainer)
+                    container = screen.query_one(ChatContainer)
                     messages = container.query(ChatMessage)
                     system_msgs = [m for m in messages if m.role == MessageRole.SYSTEM]
                     assert len(system_msgs) == 0
@@ -851,7 +799,11 @@ class TestChatScreenRiskDetection:
 
         class TestApp(App):
             def compose(self) -> ComposeResult:
-                yield ChatScreen()
+                return
+                yield  # Empty generator
+
+            def on_mount(self) -> None:
+                self.push_screen(ChatScreen())
 
         # Create a mock commitment
         mock_commitment = MagicMock(spec=Commitment)
@@ -880,7 +832,8 @@ class TestChatScreenRiskDetection:
                     await pilot.pause()
                     await pilot.pause()
 
-                    container = app.query_one(ChatContainer)
+                    screen = pilot.app.screen
+                    container = screen.query_one(ChatContainer)
                     messages = container.query(ChatMessage)
                     system_msgs = [m for m in messages if m.role == MessageRole.SYSTEM]
                     assert len(system_msgs) >= 1
@@ -895,7 +848,11 @@ class TestChatScreenRiskDetection:
 
         class TestApp(App):
             def compose(self) -> ComposeResult:
-                yield ChatScreen()
+                return
+                yield  # Empty generator
+
+            def on_mount(self) -> None:
+                self.push_screen(ChatScreen())
 
         mock_commitment = MagicMock(spec=Commitment)
         mock_commitment.deliverable = "Review PR"
@@ -923,7 +880,8 @@ class TestChatScreenRiskDetection:
                     await pilot.pause()
                     await pilot.pause()
 
-                    container = app.query_one(ChatContainer)
+                    screen = pilot.app.screen
+                    container = screen.query_one(ChatContainer)
                     messages = container.query(ChatMessage)
                     system_msgs = [m for m in messages if m.role == MessageRole.SYSTEM]
                     assert len(system_msgs) >= 1
@@ -938,7 +896,11 @@ class TestChatScreenRiskDetection:
 
         class TestApp(App):
             def compose(self) -> ComposeResult:
-                yield ChatScreen()
+                return
+                yield  # Empty generator
+
+            def on_mount(self) -> None:
+                self.push_screen(ChatScreen())
 
         mock_commitment = MagicMock(spec=Commitment)
         mock_commitment.deliverable = "Fix bug"
@@ -966,7 +928,8 @@ class TestChatScreenRiskDetection:
                     await pilot.pause()
                     await pilot.pause()
 
-                    container = app.query_one(ChatContainer)
+                    screen = pilot.app.screen
+                    container = screen.query_one(ChatContainer)
                     messages = container.query(ChatMessage)
                     system_msgs = [m for m in messages if m.role == MessageRole.SYSTEM]
                     assert len(system_msgs) >= 1
@@ -976,15 +939,13 @@ class TestChatScreenRiskDetection:
     async def test_risk_detection_failure_does_not_block_chat(self) -> None:
         """Risk detection failure doesn't prevent chat from working."""
         from jdo.screens.chat import ChatScreen
-        from jdo.widgets.chat_container import ChatContainer
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(ChatScreen())
         async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             # Mock detect_risks to raise an exception
             with patch("jdo.screens.chat.get_session") as mock_session:
                 mock_session.return_value.__enter__.side_effect = Exception("DB error")
@@ -993,7 +954,6 @@ class TestChatScreenRiskDetection:
                 await pilot.pause()
 
                 # Chat should still be usable
-                screen = app.query_one(ChatScreen)
                 prompt = screen.query_one(PromptInput)
                 assert prompt is not None
                 assert prompt.disabled is False
@@ -1004,15 +964,21 @@ class TestChatScreenRiskDetection:
 
         class TestApp(App):
             def compose(self) -> ComposeResult:
-                yield ChatScreen()
+                return
+                yield  # Empty generator
+
+            def on_mount(self) -> None:
+                self.push_screen(ChatScreen())
 
         mock_commitment = MagicMock(spec=Commitment)
         mock_commitment.deliverable = "Test"
         mock_commitment.due_date = datetime.now(UTC).date()
 
         app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(ChatScreen)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
             summary = RiskSummary(
                 overdue_commitments=[mock_commitment],
                 due_soon_commitments=[],
@@ -1034,7 +1000,11 @@ class TestChatScreenAtRiskShortcut:
 
         class TestApp(App):
             def compose(self) -> ComposeResult:
-                yield ChatScreen()
+                return
+                yield  # Empty generator
+
+            def on_mount(self) -> None:
+                self.push_screen(ChatScreen())
 
         app = TestApp()
 
@@ -1060,7 +1030,8 @@ class TestChatScreenAtRiskShortcut:
                     await pilot.pause()
                     await pilot.pause()
 
-                    container = app.query_one(ChatContainer)
+                    screen = pilot.app.screen
+                    container = screen.query_one(ChatContainer)
                     messages = container.query(ChatMessage)
                     assistant_msgs = [m for m in messages if m.role == MessageRole.ASSISTANT]
                     assert len(assistant_msgs) >= 1
@@ -1075,7 +1046,11 @@ class TestChatScreenAtRiskShortcut:
 
         class TestApp(App):
             def compose(self) -> ComposeResult:
-                yield ChatScreen()
+                return
+                yield  # Empty generator
+
+            def on_mount(self) -> None:
+                self.push_screen(ChatScreen())
 
         app = TestApp()
 
@@ -1095,7 +1070,8 @@ class TestChatScreenAtRiskShortcut:
                 async with app.run_test() as pilot:
                     await pilot.pause()
 
-                    screen = app.query_one(ChatScreen)
+                    screen = pilot.app.screen
+                    assert isinstance(screen, ChatScreen)
                     panel = screen.data_panel
 
                     # Simulate viewing an at-risk commitment
@@ -1108,7 +1084,7 @@ class TestChatScreenAtRiskShortcut:
                     await pilot.pause()
                     await pilot.pause()
 
-                    container = app.query_one(ChatContainer)
+                    container = screen.query_one(ChatContainer)
                     messages = container.query(ChatMessage)
                     assistant_msgs = [m for m in messages if m.role == MessageRole.ASSISTANT]
                     assert len(assistant_msgs) >= 1
@@ -1124,7 +1100,11 @@ class TestChatScreenAtRiskShortcut:
 
         class TestApp(App):
             def compose(self) -> ComposeResult:
-                yield ChatScreen()
+                return
+                yield  # Empty generator
+
+            def on_mount(self) -> None:
+                self.push_screen(ChatScreen())
 
         app = TestApp()
 
@@ -1144,7 +1124,8 @@ class TestChatScreenAtRiskShortcut:
                 async with app.run_test() as pilot:
                     await pilot.pause()
 
-                    screen = app.query_one(ChatScreen)
+                    screen = pilot.app.screen
+                    assert isinstance(screen, ChatScreen)
                     panel = screen.data_panel
 
                     # Simulate viewing a pending commitment
@@ -1157,7 +1138,7 @@ class TestChatScreenAtRiskShortcut:
                     await pilot.pause()
                     await pilot.pause()
 
-                    container = app.query_one(ChatContainer)
+                    container = screen.query_one(ChatContainer)
                     messages = container.query(ChatMessage)
                     # Should show /atrisk command was executed (user message)
                     user_msgs = [m for m in messages if m.role == MessageRole.USER]
@@ -1169,7 +1150,11 @@ class TestChatScreenAtRiskShortcut:
 
         class TestApp(App):
             def compose(self) -> ComposeResult:
-                yield ChatScreen()
+                return
+                yield  # Empty generator
+
+            def on_mount(self) -> None:
+                self.push_screen(ChatScreen())
 
         app = TestApp()
 
@@ -1177,8 +1162,10 @@ class TestChatScreenAtRiskShortcut:
             patch("jdo.screens.chat.get_session"),
             patch("jdo.screens.chat.IntegrityService"),
         ):
-            async with app.run_test():
-                screen = app.query_one(ChatScreen)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                screen = pilot.app.screen
+                assert isinstance(screen, ChatScreen)
 
                 # Check that 'r' binding exists and is shown
                 bindings = screen.BINDINGS
@@ -1200,7 +1187,11 @@ class TestChatScreenRiskDismissal:
 
         class TestApp(App):
             def compose(self) -> ComposeResult:
-                yield ChatScreen()
+                return
+                yield  # Empty generator
+
+            def on_mount(self) -> None:
+                self.push_screen(ChatScreen())
 
         mock_commitment = MagicMock(spec=Commitment)
         mock_commitment.id = "commit-123"
@@ -1224,7 +1215,8 @@ class TestChatScreenRiskDismissal:
 
                 async with app.run_test() as pilot:
                     await pilot.pause()
-                    screen = app.query_one(ChatScreen)
+                    screen = pilot.app.screen
+                    assert isinstance(screen, ChatScreen)
 
                     # Dismiss the risk for this commitment
                     screen.dismiss_risk_warning("commit-123")
@@ -1246,7 +1238,11 @@ class TestChatScreenRiskDismissal:
 
         class TestApp(App):
             def compose(self) -> ComposeResult:
-                yield ChatScreen()
+                return
+                yield  # Empty generator
+
+            def on_mount(self) -> None:
+                self.push_screen(ChatScreen())
 
         app = TestApp()
 
@@ -1254,8 +1250,10 @@ class TestChatScreenRiskDismissal:
             patch("jdo.screens.chat.get_session"),
             patch("jdo.screens.chat.IntegrityService"),
         ):
-            async with app.run_test():
-                screen = app.query_one(ChatScreen)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                screen = pilot.app.screen
+                assert isinstance(screen, ChatScreen)
 
                 assert "commit-456" not in screen._dismissed_risk_warnings
                 screen.dismiss_risk_warning("commit-456")
@@ -1267,7 +1265,11 @@ class TestChatScreenRiskDismissal:
 
         class TestApp(App):
             def compose(self) -> ComposeResult:
-                yield ChatScreen()
+                return
+                yield  # Empty generator
+
+            def on_mount(self) -> None:
+                self.push_screen(ChatScreen())
 
         app = TestApp()
 
@@ -1275,8 +1277,10 @@ class TestChatScreenRiskDismissal:
             patch("jdo.screens.chat.get_session"),
             patch("jdo.screens.chat.IntegrityService"),
         ):
-            async with app.run_test():
-                screen = app.query_one(ChatScreen)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                screen = pilot.app.screen
+                assert isinstance(screen, ChatScreen)
 
                 screen.dismiss_risk_warning("commit-1")
                 screen.dismiss_risk_warning("commit-2")
@@ -1293,7 +1297,11 @@ class TestChatScreenRiskDismissal:
 
         class TestApp(App):
             def compose(self) -> ComposeResult:
-                yield ChatScreen()
+                return
+                yield  # Empty generator
+
+            def on_mount(self) -> None:
+                self.push_screen(ChatScreen())
 
         # Create mock commitments
         dismissed_commit = MagicMock(spec=Commitment)
@@ -1310,8 +1318,10 @@ class TestChatScreenRiskDismissal:
             patch("jdo.screens.chat.get_session"),
             patch("jdo.screens.chat.IntegrityService"),
         ):
-            async with app.run_test():
-                screen = app.query_one(ChatScreen)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                screen = pilot.app.screen
+                assert isinstance(screen, ChatScreen)
 
                 # Dismiss only one
                 screen.dismiss_risk_warning("dismissed-123")

@@ -106,15 +106,21 @@ def update_overdue_milestones(session: Session) -> int:
 
 
 def get_pending_drafts(session: Session) -> list[Draft]:
-    """Get all pending drafts.
+    """Get all pending drafts (excluding triage items).
+
+    Triage items (EntityType.UNKNOWN) are handled separately via get_triage_items().
 
     Args:
         session: Database session.
 
     Returns:
-        List of pending drafts, ordered by creation date.
+        List of pending drafts, ordered by creation date (newest first).
     """
-    statement = select(Draft).order_by(Draft.created_at.desc())
+    statement = (
+        select(Draft)
+        .where(Draft.entity_type != EntityType.UNKNOWN)
+        .order_by(Draft.created_at.desc())
+    )
     return list(session.exec(statement).all())
 
 

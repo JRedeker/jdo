@@ -9,6 +9,8 @@ from datetime import UTC, datetime
 from enum import Enum
 
 from rich.text import Text
+from textual.content import Content
+from textual.selection import Selection
 from textual.widgets import Static
 
 
@@ -49,7 +51,7 @@ class ChatMessage(Static):
     }
 
     ChatMessage.-assistant {
-        background: $surface-darken-1;
+        background: $surface 90%;
     }
 
     ChatMessage.-system {
@@ -86,6 +88,8 @@ class ChatMessage(Static):
         self.role = role
         self.content = content
         self.timestamp = timestamp or datetime.now(UTC)
+        self._is_thinking = False
+        self._recoverable = True
         # Add role-based CSS class
         self.add_class(f"-{role.value}")
 
@@ -159,6 +163,35 @@ class ChatMessage(Static):
     def recoverable(self, value: bool) -> None:
         """Set whether this error is recoverable."""
         self._recoverable = value
+
+    def get_selection(self, selection: Selection) -> tuple[str, str] | None:
+        """Get the text under the selection.
+
+        Overrides the parent method to handle out-of-range selection coordinates
+        gracefully. This works around a Textual bug where selection coordinates
+        may be screen-relative rather than widget-relative.
+
+        Args:
+            selection: Selection information.
+
+        Returns:
+            Tuple of extracted text and ending, or None if no text could be extracted.
+        """
+        visual = self._render()
+        if isinstance(visual, (Text, Content)):
+            text = str(visual)
+        else:
+            return None
+
+        # Handle out-of-range selection coordinates gracefully
+        try:
+            extracted = selection.extract(text)
+        except IndexError:
+            # Selection coordinates are out of range for this widget's text
+            # This can happen when selection coordinates are screen-relative
+            return None
+        else:
+            return extracted, "\n"
 
 
 def create_error_message(

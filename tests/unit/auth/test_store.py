@@ -230,3 +230,101 @@ class TestAuthStoreOAuthCredentials:
         assert loaded.access_token == "access_xyz"
         assert loaded.refresh_token == "refresh_abc"
         assert loaded.expires_at == expires
+
+
+class TestAuthStoreAtomicWrite:
+    """Tests for atomic write operations (P10 idempotence)."""
+
+    def test_atomic_write_no_partial_file_on_success(self, tmp_path):
+        """Successful write produces valid JSON file without temp files."""
+        from jdo.auth.models import ApiKeyCredentials
+        from jdo.auth.store import AuthStore
+
+        auth_file = tmp_path / "auth.json"
+        store = AuthStore(auth_file)
+
+        store.save("openai", ApiKeyCredentials(api_key="sk-test"))
+
+        # File should exist and be valid JSON
+        assert auth_file.exists()
+        data = json.loads(auth_file.read_text())
+        assert "openai" in data
+
+        # No temp files should remain
+        temp_files = list(tmp_path.glob(".auth_*.tmp"))
+        assert len(temp_files) == 0
+
+    def test_atomic_write_cleans_up_on_failure(self, tmp_path, monkeypatch):
+        """Failed write cleans up temp file."""
+        from jdo.auth.models import ApiKeyCredentials
+        from jdo.auth.store import AuthStore
+
+        auth_file = tmp_path / "auth.json"
+        store = AuthStore(auth_file)
+
+        # Make Path.replace raise an error after temp file is created
+        original_replace = Path.replace
+
+        def failing_replace(self, target):
+            msg = "Simulated failure"
+            raise OSError(msg)
+
+        monkeypatch.setattr(Path, "replace", failing_replace)
+
+        with pytest.raises(OSError, match="Simulated failure"):
+            store.save("openai", ApiKeyCredentials(api_key="sk-test"))
+
+        # No temp files should remain after failure
+        temp_files = list(tmp_path.glob(".auth_*.tmp"))
+        assert len(temp_files) == 0
+
+    def test_atomic_write_preserves_existing_on_failure(self, tmp_path, monkeypatch):
+        """Failed write preserves existing file content."""
+        from jdo.auth.models import ApiKeyCredentials
+        from jdo.auth.store import AuthStore
+
+        auth_file = tmp_path / "auth.json"
+        store = AuthStore(auth_file)
+
+        # First, save initial data successfully
+        store.save("openai", ApiKeyCredentials(api_key="sk-original"))
+
+        # Now make the replace fail
+        original_replace = Path.replace
+
+        def failing_replace(self, target):
+            msg = "Simulated failure"
+            raise OSError(msg)
+
+        monkeypatch.setattr(Path, "replace", failing_replace)
+
+        # Try to update - should fail
+        with pytest.raises(OSError, match="Simulated failure"):
+            store.save("openai", ApiKeyCredentials(api_key="sk-new"))
+
+        # Restore original replace for reading
+        monkeypatch.undo()
+
+        # Original data should still be intact
+        loaded = store.get("openai")
+        assert loaded is not None
+        assert loaded.api_key == "sk-original"
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="Unix file permissions")
+    def test_atomic_write_preserves_permissions(self, tmp_path):
+        """Atomic write preserves 0600 permissions on Unix."""
+        from jdo.auth.models import ApiKeyCredentials
+        from jdo.auth.store import AuthStore
+
+        auth_file = tmp_path / "auth.json"
+        store = AuthStore(auth_file)
+
+        # Save initial
+        store.save("openai", ApiKeyCredentials(api_key="sk-test"))
+        initial_mode = stat.S_IMODE(auth_file.stat().st_mode)
+        assert initial_mode == 0o600
+
+        # Update
+        store.save("openai", ApiKeyCredentials(api_key="sk-updated"))
+        updated_mode = stat.S_IMODE(auth_file.stat().st_mode)
+        assert updated_mode == 0o600

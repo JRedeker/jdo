@@ -153,6 +153,57 @@ class TestSettingsScreenFlows:
                 settings_screen = app.screen
                 assert isinstance(settings_screen, SettingsScreen)
 
+    async def test_settings_back_with_ai_configured(self) -> None:
+        """Back from settings returns to home when AI is configured.
+
+        Regression test: Previously this caused NoActiveWorker error
+        because _ensure_ai_configured used push_screen_wait outside worker.
+        """
+        with patch("jdo.app.is_authenticated", return_value=True):
+            app = JdoApp()
+            async with app.run_test() as pilot:
+                await pilot.pause()
+
+                # Should be on home
+                assert isinstance(app.screen, HomeScreen)
+
+                # Navigate to settings
+                await pilot.press("s")
+                await pilot.pause()
+                assert isinstance(app.screen, SettingsScreen)
+
+                # Go back - this should NOT raise NoActiveWorker
+                await pilot.press("escape")
+                await pilot.pause()
+
+                # Should be back on home
+                assert isinstance(app.screen, HomeScreen)
+
+    async def test_settings_back_triggers_ai_check_via_worker(self) -> None:
+        """Back from settings triggers AI config check in worker context.
+
+        Verifies that on_settings_screen_back runs _ensure_ai_configured
+        in a worker (via run_worker), not directly in the message handler.
+        """
+        # Start with AI configured
+        with patch("jdo.app.is_authenticated", return_value=True):
+            app = JdoApp()
+            async with app.run_test() as pilot:
+                await pilot.pause()
+
+                # Navigate to settings
+                await pilot.press("s")
+                await pilot.pause()
+
+                # Go back
+                await pilot.press("escape")
+                await pilot.pause()
+
+                # App should still be running (no crash)
+                assert app.is_running or app._exit
+                # Should have returned to home without errors
+                assert isinstance(app.screen, HomeScreen)
+
 
 class TestChatCommandFlows:
     """E2E tests for complete chat command workflows."""

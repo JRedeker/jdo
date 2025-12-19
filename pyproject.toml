@@ -18,6 +18,7 @@ dependencies = [
     "loguru>=0.7.0",
     "sentry-sdk>=2.0.0",
     "alembic>=1.13.0",
+    "tenacity>=8.2.0",
 ]
 
 [project.scripts]
@@ -75,6 +76,7 @@ ignore = [
     "S101",    # assert is the pytest way
     "S105",    # Fake tokens in tests
     "S106",    # Fake credentials in tests
+    "S108",    # /tmp paths OK in tests (test isolation)
     "ARG",     # Fixtures appear unused
     "PLR2004", # Magic values OK in tests
     "D",       # No docstrings needed
@@ -128,6 +130,7 @@ ignore = [
     "ARG002",  # Unused cmd/context args - handlers implement common interface
     "ANN401",  # Any for goal_id - accepts UUID or other ID types from context
     "RUF012",  # ClassVar for _ENTITY_MAP, _COMMAND_HELP - immutable at runtime
+    "BLE001",  # Catch Exception for database errors in guardrail queries
 ]
 "src/jdo/ai/agent.py" = [
     "PLC0415", # Late import of tools to avoid circular dependency
@@ -225,6 +228,13 @@ matches = "src/jdo/db/session.py"
 missing-attribute = false
 unsupported-operation = false
 bad-argument-type = false
+
+[[tool.pyrefly.sub-config]]
+# SQLAlchemy column comparisons (.in_(), >=) - pyrefly doesn't understand SQLModel column descriptors
+matches = "src/jdo/db/persistence.py"
+[tool.pyrefly.sub-config.errors]
+missing-attribute = false
+unsupported-operation = false
 
 # ------------------------------------------------------------------------------
 # Pytest

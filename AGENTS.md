@@ -170,5 +170,83 @@ src/jdo/
 tests/
 ├── unit/         # Fast isolated tests
 ├── integration/  # Database tests
-└── tui/          # Textual Pilot tests
+├── tui/          # Textual Pilot tests
+└── uat/          # AI-driven UAT tests
+```
+
+## AI-Driven UAT Testing
+
+The `tests/uat/` directory contains AI-driven User Acceptance Testing infrastructure.
+
+### Running UAT Tests
+
+```bash
+# Run all UAT tests with mock AI (fast, free)
+uv run pytest tests/uat/ -v
+
+# Run only live AI tests (requires credentials)
+uv run pytest tests/uat/ -v -m live_ai
+
+# Skip live AI tests
+uv run pytest tests/uat/ -v -m "not live_ai"
+```
+
+### UAT Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `models.py` | tests/uat/ | Pydantic models for actions, scenarios, results |
+| `observer.py` | tests/uat/ | Captures UI state for AI consumption |
+| `driver.py` | tests/uat/ | Orchestrates AI-driven test execution |
+| `loader.py` | tests/uat/ | Loads scenarios from YAML files |
+| `mocks.py` | tests/uat/ | Mock AI responses for deterministic tests |
+| `scenarios/` | tests/uat/ | YAML scenario definitions |
+
+### Writing New Scenarios
+
+Create a YAML file in `tests/uat/scenarios/`:
+
+```yaml
+name: my_scenario
+description: What this scenario tests
+goal: |
+  Natural language description of what the AI should accomplish.
+  Be specific about the expected end state.
+
+preconditions:
+  - press:n   # Navigate to chat first
+
+success_criteria:
+  - screen:HomeScreen  # Must end on home screen
+  - no_errors          # No step failures
+  - completed          # AI signaled "done"
+
+max_steps: 30
+timeout_seconds: 90
+
+tags:
+  - smoke
+  - my_feature
+```
+
+### Adding Mock Responses
+
+For deterministic CI tests, add a mock in `tests/uat/mocks.py`:
+
+```python
+def create_my_scenario_mock() -> FunctionModel:
+    step = 0
+    def model_fn(messages, info):
+        nonlocal step
+        step += 1
+        actions = [
+            UATAction(action_type=ActionType.PRESS, target="n", reason="..."),
+            UATAction(action_type=ActionType.DONE, reason="..."),
+        ]
+        action = actions[min(step - 1, len(actions) - 1)]
+        return ModelResponse(parts=[TextPart(content=action.model_dump_json())])
+    return FunctionModel(model_fn)
+
+# Add to SCENARIO_MOCKS dict
+SCENARIO_MOCKS["my_scenario"] = create_my_scenario_mock
 ```

@@ -147,6 +147,73 @@ class TestCommitHandler:
         )
         assert cancel_result.draft_data is None
 
+    def test_no_velocity_warning_when_balanced(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test that no warning appears when velocity is balanced."""
+        from pathlib import Path
+        from unittest.mock import Mock, patch
+
+        from jdo.commands.handlers import CommitHandler
+
+        # Mock database to return balanced velocity
+        mock_service = Mock()
+        mock_service.get_commitment_velocity.return_value = (3, 3)
+
+        with (
+            patch("jdo.commands.handlers.get_session"),
+            patch("jdo.commands.handlers.PersistenceService", return_value=mock_service),
+            patch("jdo.config.settings.get_database_path", return_value=Path("/tmp/test.db")),
+        ):
+            handler = CommitHandler()
+            cmd = ParsedCommand(CommandType.COMMIT, [], "/commit")
+
+            context = {
+                "conversation": [
+                    {"role": "user", "content": "Send the report to Finance by Jan 15"}
+                ]
+            }
+            result = handler.execute(cmd, context)
+
+        # Should not contain warning
+        assert "**Note**" not in result.message
+        assert "overcommitting" not in result.message
+
+    def test_velocity_warning(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test that velocity warning appears when creating more than completing."""
+        from datetime import date as date_cls
+        from pathlib import Path
+        from unittest.mock import Mock, patch
+
+        from jdo.commands.handlers import CommitHandler
+
+        # Mock database to show high creation velocity
+        mock_service = Mock()
+        mock_service.count_active_commitments.return_value = 5
+        mock_service.get_commitment_velocity.return_value = (8, 2)  # 8 created, 2 completed
+
+        with (
+            patch("jdo.commands.handlers.get_session"),
+            patch("jdo.commands.handlers.PersistenceService", return_value=mock_service),
+            patch("jdo.config.settings.get_database_path", return_value=Path("/tmp/test.db")),
+        ):
+            handler = CommitHandler()
+            cmd = ParsedCommand(CommandType.COMMIT, [], "/commit")
+
+            # Provide complete extracted data in context
+            context = {
+                "conversation": [],
+                "extracted": {
+                    "deliverable": "Send the report",
+                    "stakeholder": "Finance",
+                    "due_date": date_cls(2026, 1, 15),
+                },
+            }
+            result = handler.execute(cmd, context)
+
+        # Should contain velocity warning
+        assert "**Note**: You've created 8 commitments this week" in result.message
+        assert "but only completed 2" in result.message
+        assert "Are you overcommitting?" in result.message
+
 
 # ============================================================
 # Phase 6.3: /goal Command Tests

@@ -147,7 +147,8 @@ class HierarchyView(Tree[HierarchyItem | None]):
             "missed": "❌",
         }
         icon = status_icons.get(milestone.status.value, "⏳")
-        label = f"{icon} {milestone.title}"
+        title = milestone.title or "(untitled)"
+        label = f"{icon} {title}"
 
         if milestone.goal_id in self._goal_nodes:
             parent = self._goal_nodes[milestone.goal_id]
@@ -178,7 +179,8 @@ class HierarchyView(Tree[HierarchyItem | None]):
             The created tree node.
         """
         icon = self._COMMITMENT_STATUS_ICONS.get(commitment.status.value, "⏳")
-        label = f"{icon} {commitment.deliverable}"
+        deliverable = commitment.deliverable or "(no deliverable)"
+        label = f"{icon} {deliverable}"
 
         if commitment.milestone_id and commitment.milestone_id in self._milestone_nodes:
             parent = self._milestone_nodes[commitment.milestone_id]
@@ -197,7 +199,8 @@ class HierarchyView(Tree[HierarchyItem | None]):
             The created tree node.
         """
         icon = self._COMMITMENT_STATUS_ICONS.get(commitment.status.value, "⏳")
-        label = f"{icon} {commitment.deliverable}"
+        deliverable = commitment.deliverable or "(no deliverable)"
+        label = f"{icon} {deliverable}"
 
         parent = self._get_or_create_orphan_commitments_node()
         return parent.add(label, data=commitment)

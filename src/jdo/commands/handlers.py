@@ -12,6 +12,8 @@ from typing import Any
 
 from jdo.ai.time_parsing import format_hours, parse_time_input
 from jdo.commands.parser import CommandType, ParsedCommand
+from jdo.db.persistence import PersistenceService
+from jdo.db.session import get_session
 from jdo.models.draft import EntityType
 
 
@@ -98,7 +100,17 @@ class CommitHandler(CommandHandler):
             message = self._build_prompt_message(missing_fields, draft_data)
             needs_confirmation = False
         else:
-            message = self._build_confirmation_message(draft_data)
+            # Get velocity for confirmation message
+            try:
+                with get_session() as session:
+                    service = PersistenceService(session)
+                    created, completed = service.get_commitment_velocity()
+            except Exception:
+                # If database queries fail, proceed without guardrails
+                created = 0
+                completed = 0
+
+            message = self._build_confirmation_message(draft_data, created, completed)
             needs_confirmation = True
 
         return HandlerResult(
@@ -171,19 +183,39 @@ class CommitHandler(CommandHandler):
 
         return "I need a bit more information to create this commitment. " + " ".join(prompts)
 
-    def _build_confirmation_message(self, draft_data: dict[str, Any]) -> str:
-        """Build a confirmation message with draft summary.
+    def _build_confirmation_message(
+        self,
+        draft_data: dict[str, Any],
+        velocity_created: int,
+        velocity_completed: int,
+    ) -> str:
+        """Build confirmation message with optional velocity coaching.
 
         Args:
-            draft_data: The draft data to summarize.
+            draft_data: The draft commitment data.
+            velocity_created: Commitments created in past week.
+            velocity_completed: Commitments completed in past week.
 
         Returns:
-            Message asking for confirmation.
+            Message asking for confirmation with optional coaching notes.
         """
         lines = ["Here's the commitment I'll create:", ""]
         lines.append(f"  Deliverable: {draft_data['deliverable']}")
         lines.append(f"  Stakeholder: {draft_data['stakeholder']}")
-        lines.append(f"  Due: {draft_data['due_date']} {draft_data.get('due_time', '')}")
+        due_time = draft_data.get("due_time")
+        due_str = f"  Due: {draft_data['due_date']}"
+        if due_time:
+            due_str += f" {due_time}"
+        lines.append(due_str)
+
+        # Add velocity warning if creating faster than completing
+        if velocity_created > velocity_completed:
+            lines.append("")
+            lines.append(
+                f"**Note**: You've created {velocity_created} commitments this week "
+                f"but only completed {velocity_completed}. Are you overcommitting?"
+            )
+
         lines.append("")
         lines.append("Does this look right? (yes to confirm, or tell me what to change)")
 
@@ -291,7 +323,7 @@ class GoalHandler(CommandHandler):
             "",
         ]
         for i, vision in enumerate(available_visions, 1):
-            lines.append(f"  {i}. {vision.get('title', 'Untitled')}")
+            lines.append(f"  {i}. {vision.get('title') or 'Untitled'}")
         lines.append("")
         lines.append("Enter a number to select, or 'skip' to create without a vision link.")
         return "\n".join(lines)
@@ -379,7 +411,7 @@ class TaskHandler(CommandHandler):
         """Prompt user to select a commitment."""
         lines = ["Which commitment would you like to add a task to?", ""]
         for i, c in enumerate(commitments, 1):
-            lines.append(f"  {i}. {c.get('deliverable', 'Untitled')}")
+            lines.append(f"  {i}. {c.get('deliverable') or 'Untitled'}")
         lines.append("")
         lines.append("Enter a number to select a commitment.")
         return HandlerResult(
@@ -927,7 +959,7 @@ class ViewHandler(CommandHandler):
                 needs_confirmation=False,
             )
 
-        entity_type = object_data.get("entity_type", "item")
+        entity_type = object_data.get("entity_type") or "item"
 
         return HandlerResult(
             message=f"Viewing {entity_type} details.",
@@ -957,7 +989,7 @@ class CancelHandler(CommandHandler):
         current_draft = context.get("current_draft")
 
         if current_draft:
-            entity_type = current_draft.get("entity_type", "draft")
+            entity_type = current_draft.get("entity_type") or "draft"
             message = f"Cancelled {entity_type} draft. What would you like to do next?"
         else:
             message = "No active draft to cancel."
@@ -1010,8 +1042,8 @@ class CompleteHandler(CommandHandler):
                 needs_confirmation=False,
             )
 
-        entity_type = current_object.get("entity_type", "item")
-        title = current_object.get("deliverable") or current_object.get("title", "this item")
+        entity_type = current_object.get("entity_type") or "item"
+        title = current_object.get("deliverable") or current_object.get("title") or "this item"
 
         # For tasks with time estimates, prompt for actual hours comparison
         if entity_type == "task" and current_object.get("estimated_hours") is not None:
@@ -1329,7 +1361,7 @@ class EditHandler(CommandHandler):
                 needs_confirmation=False,
             )
 
-        entity_type = current_object.get("entity_type", "item")
+        entity_type = current_object.get("entity_type") or "item"
 
         return HandlerResult(
             message=f"Editing {entity_type}. What would you like to change?",
@@ -1400,8 +1432,8 @@ class AtRiskHandler(CommandHandler):
             )
 
         # Start at-risk workflow - prompt for reason
-        deliverable = current_commitment.get("deliverable", "this commitment")
-        stakeholder = current_commitment.get("stakeholder_name", "the stakeholder")
+        deliverable = current_commitment.get("deliverable") or "this commitment"
+        stakeholder = current_commitment.get("stakeholder_name") or "the stakeholder"
 
         return HandlerResult(
             message=f"You're about to mark '{deliverable}' as at-risk.\n\n"
@@ -1439,8 +1471,8 @@ class AtRiskHandler(CommandHandler):
 
         lines = ["Which commitment is at risk?", ""]
         for i, c in enumerate(active, 1):
-            deliverable = c.get("deliverable", "Untitled")[:50]
-            due = c.get("due_date", "No date")
+            deliverable = (c.get("deliverable") or "Untitled")[:50]
+            due = c.get("due_date") or "No date"
             lines.append(f"  {i}. {deliverable} (due: {due})")
         lines.append("")
         lines.append("Enter a number to select, or describe the commitment.")
@@ -1725,9 +1757,9 @@ class AbandonHandler(CommandHandler):
         if validation_result:
             return validation_result
 
-        status = current_commitment.get("status", "")
-        deliverable = current_commitment.get("deliverable", "this commitment")
-        stakeholder = current_commitment.get("stakeholder_name", "")
+        status = current_commitment.get("status") or ""
+        deliverable = current_commitment.get("deliverable") or "this commitment"
+        stakeholder = current_commitment.get("stakeholder_name") or ""
 
         # D3: Soft enforcement for at-risk commitments
         if status == "at_risk":
@@ -1789,8 +1821,8 @@ class AbandonHandler(CommandHandler):
         Checks if notification task is completed. If not, warns the user
         that abandoning without notification will affect their integrity score.
         """
-        deliverable = commitment.get("deliverable", "this commitment")
-        stakeholder = commitment.get("stakeholder_name", "the stakeholder")
+        deliverable = commitment.get("deliverable") or "this commitment"
+        stakeholder = commitment.get("stakeholder_name") or "the stakeholder"
         cleanup_plan = context.get("cleanup_plan")
         notification_task = context.get("notification_task")
 
@@ -1849,8 +1881,8 @@ class AbandonHandler(CommandHandler):
         When a commitment has a stakeholder but isn't at-risk yet,
         encourage the user to go through proper notification workflow.
         """
-        deliverable = commitment.get("deliverable", "this commitment")
-        stakeholder = commitment.get("stakeholder_name", "the stakeholder")
+        deliverable = commitment.get("deliverable") or "this commitment"
+        stakeholder = commitment.get("stakeholder_name") or "the stakeholder"
 
         return HandlerResult(
             message=f"'{deliverable}' has a stakeholder ({stakeholder}).\n\n"
@@ -1889,8 +1921,8 @@ class AbandonHandler(CommandHandler):
 
         lines = ["Which commitment do you want to abandon?", ""]
         for i, c in enumerate(active, 1):
-            deliverable = c.get("deliverable", "Untitled")[:50]
-            status = c.get("status", "unknown")
+            deliverable = (c.get("deliverable") or "Untitled")[:50]
+            status = c.get("status") or "unknown"
             status_indicator = " ⚠️" if status == "at_risk" else ""
             lines.append(f"  {i}. {deliverable} [{status}]{status_indicator}")
         lines.append("")
@@ -1977,7 +2009,7 @@ class TriageHandler(CommandHandler):
         Returns:
             HandlerResult indicating analysis is needed.
         """
-        raw_text = item.get("raw_text", "Unknown")
+        raw_text = item.get("raw_text") or "Unknown"
 
         lines = [
             f"Triage item {index + 1} of {total}:",
@@ -2018,7 +2050,7 @@ class TriageHandler(CommandHandler):
         Returns:
             HandlerResult with analysis and options.
         """
-        raw_text = item.get("raw_text", "Unknown")
+        raw_text = item.get("raw_text") or "Unknown"
 
         lines = [
             f"Triage item {index + 1} of {total}:",
@@ -2029,10 +2061,10 @@ class TriageHandler(CommandHandler):
 
         # Check if we have a confident classification
         if analysis.get("is_confident"):
-            classification = analysis.get("classification", {})
-            suggested_type = classification.get("suggested_type", "unknown")
-            confidence = classification.get("confidence", 0)
-            reasoning = classification.get("reasoning", "")
+            classification = analysis.get("classification") or {}
+            suggested_type = classification.get("suggested_type") or "unknown"
+            confidence = classification.get("confidence") or 0
+            reasoning = classification.get("reasoning") or ""
             stakeholder = classification.get("detected_stakeholder")
             date_info = classification.get("detected_date")
 
@@ -2053,8 +2085,8 @@ class TriageHandler(CommandHandler):
             lines.append("  [q] Quit - exit triage")
         else:
             # Low confidence or question
-            question = analysis.get("question", {})
-            question_text = question.get("question", "What type of item is this?")
+            question = analysis.get("question") or {}
+            question_text = question.get("question") or "What type of item is this?"
 
             lines.append(f"Question: {question_text}")
             lines.append("")

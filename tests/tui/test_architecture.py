@@ -9,6 +9,8 @@ This module verifies that:
 from textual.screen import Screen
 from textual.widget import Widget
 
+from tests.tui.conftest import create_test_app_for_screen
+
 
 class TestScreenSubclasses:
     """Verify navigation targets are Screen subclasses."""
@@ -109,61 +111,51 @@ class TestScreenComposition:
 
     async def test_home_screen_compose_yields_widgets(self) -> None:
         """HomeScreen.compose() yields expected widget structure."""
-        from textual.app import App, ComposeResult
         from textual.containers import Container, Vertical
         from textual.widgets import Static
 
         from jdo.screens.home import HomeScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield HomeScreen()
-
-        app = TestApp()
-        async with app.run_test():
+        app = create_test_app_for_screen(HomeScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
             # Should have welcome container and box
-            assert app.query_one("#welcome-container", Container) is not None
-            assert app.query_one("#welcome-box", Vertical) is not None
+            assert screen.query_one("#welcome-container", Container) is not None
+            assert screen.query_one("#welcome-box", Vertical) is not None
             # Should have static content
-            statics = app.query(Static)
+            statics = screen.query(Static)
             assert len(statics) > 0, "HomeScreen should have Static widgets"
 
     async def test_chat_screen_compose_yields_widgets(self) -> None:
         """ChatScreen.compose() yields ChatContainer, PromptInput, DataPanel."""
-        from textual.app import App, ComposeResult
-
         from jdo.screens.chat import ChatScreen
         from jdo.widgets.chat_container import ChatContainer
         from jdo.widgets.data_panel import DataPanel
         from jdo.widgets.prompt_input import PromptInput
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield ChatScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            assert app.query_one(ChatContainer) is not None
-            assert app.query_one(PromptInput) is not None
-            assert app.query_one(DataPanel) is not None
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert screen.query_one(ChatContainer) is not None
+            assert screen.query_one(PromptInput) is not None
+            assert screen.query_one(DataPanel) is not None
 
     async def test_settings_screen_compose_yields_widgets(self) -> None:
         """SettingsScreen.compose() yields expected widget structure."""
-        from textual.app import App, ComposeResult
         from textual.containers import Container, Vertical
         from textual.widgets import Static
 
         from jdo.screens.settings import SettingsScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield SettingsScreen()
-
-        app = TestApp()
-        async with app.run_test():
+        app = create_test_app_for_screen(SettingsScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
             # Should have settings container and box
-            assert app.query_one("#settings-container", Container) is not None
-            assert app.query_one("#settings-box", Vertical) is not None
+            assert screen.query_one("#settings-container", Container) is not None
+            assert screen.query_one("#settings-box", Vertical) is not None
             # Should have static content
-            statics = app.query(Static)
+            statics = screen.query(Static)
             assert len(statics) > 0, "SettingsScreen should have Static widgets"

@@ -38,8 +38,9 @@ metadata:
 # - wire-ai-to-chat: PydanticAI agent connected to ChatScreen (2025-12-19)
 # - persist-handler-results: Command handlers persist to database (2025-12-19)
 # - fix-navigation-and-review-textual: All navigation shortcuts working (2025-12-19)
+# - add-commitment-guardrails: Overcommitment warnings in /commit flow (2025-12-19)
 #
-# TEST STATUS: 1,268 passed, 11 snapshots
+# TEST STATUS: 1,279 passed, 11 snapshots (+13 tests from commitment-guardrails)
 # LINT STATUS: All checks passed (ruff, pyrefly)
 
 features:
@@ -295,33 +296,31 @@ features:
     title: "Make Fewer Promises Guardrails"
     priority: high
     complexity: low
-    status: proposed
+    status: completed
     category: integrity
-    phase: next
+    phase: now
+    change_spec: "add-commitment-guardrails"
     
     description: |
-      MPI principle: "make fewer, keep them all." Currently nothing prevents 
-      commitment overload. Add guardrails that nudge toward quality over quantity.
+      MPI principle: "make fewer, keep them all." Tracks commitment velocity
+      (created vs completed per week) to warn users when they're overcommitting.
+      No ceiling on active commitments - focuses on sustainable velocity instead.
     
     proposed_changes:
-      overcommitment_warning:
-        description: "Warn when user has too many active commitments"
-        threshold: "Configurable (default: 7 active commitments)"
-        message: "You have 8 active commitments. Are you sure you want to add another?"
-      
       commitment_velocity:
         description: "Track commitments made vs completed per week"
-        alert: "You're making commitments faster than completing them"
+        alert: "You're creating commitments faster than completing them"
+        window: "7-day rolling window"
       
       ai_coaching:
         prompts:
-          - "Before adding: 'What would you need to drop to take this on?'"
-          - "When overloaded: 'Which of these could be renegotiated?'"
+          - "When velocity is high: 'You've created X but only completed Y. Are you overcommitting?'"
+          - "Coaching tone, not blocking - user can always proceed"
     
     acceptance_criteria:
-      - "Warning appears when adding commitment above threshold"
-      - "User can override warning but it's logged"
-      - "Velocity metrics visible in integrity dashboard"
+      - "Velocity warning appears when created > completed in past 7 days"
+      - "User can proceed despite warning (autonomy preserved)"
+      - "Graceful degradation if database queries fail"
 
   complete_recurring_tui:
     title: "Complete Recurring Commitments TUI"

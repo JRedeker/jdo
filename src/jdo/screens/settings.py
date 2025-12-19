@@ -10,7 +10,8 @@ from typing import ClassVar
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Vertical
+from textual.containers import Container, Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.message import Message
 from textual.screen import Screen
 from textual.widgets import Button, Static
@@ -66,15 +67,18 @@ class SettingsScreen(Screen[None]):
 
     SettingsScreen .provider-row {
         height: auto;
+        width: 100%;
         margin-bottom: 1;
     }
 
     SettingsScreen .provider-name {
         width: 20;
+        height: auto;
     }
 
     SettingsScreen .auth-status {
-        width: 15;
+        width: 18;
+        height: auto;
     }
 
     SettingsScreen .auth-status.authenticated {
@@ -153,9 +157,13 @@ class SettingsScreen(Screen[None]):
                 status_text = "Authenticated" if authenticated else "Not authenticated"
                 status_class = "authenticated" if authenticated else "not-authenticated"
 
-                with Container(classes="provider-row"):
+                with Horizontal(classes="provider-row"):
                     yield Static(provider_name, classes="provider-name")
-                    yield Static(status_text, classes=f"auth-status {status_class}")
+                    yield Static(
+                        status_text,
+                        id=f"auth-status-{provider_id}",
+                        classes=f"auth-status {status_class}",
+                    )
                     yield Button(
                         "Configure",
                         id=f"configure-{provider_id}",
@@ -211,10 +219,35 @@ class SettingsScreen(Screen[None]):
         Args:
             success: Whether authentication succeeded, or None if dismissed.
         """
+        # Always refresh auth statuses and restore focus after modal dismiss
+        self._refresh_auth_statuses()
+        self.focus()  # Fix: Restore focus after modal dismiss to fix Back binding
+
         if success:
-            # Refresh the screen to show updated auth status
-            self.refresh()
             self.post_message(self.AuthStatusChanged())
+
+    def _refresh_auth_statuses(self) -> None:
+        """Refresh auth status widgets to reflect current state.
+
+        Queries each provider's authentication status and updates the
+        corresponding status widget text and classes.
+        """
+        for provider_id in list_providers():
+            try:
+                status_widget = self.query_one(f"#auth-status-{provider_id}", Static)
+            except NoMatches:
+                # Widget not found, skip
+                continue
+
+            authenticated = is_authenticated(provider_id)
+            status_text = "Authenticated" if authenticated else "Not authenticated"
+
+            # Update widget text
+            status_widget.update(status_text)
+
+            # Update widget classes
+            status_widget.remove_class("authenticated", "not-authenticated")
+            status_widget.add_class("authenticated" if authenticated else "not-authenticated")
 
     def action_back(self) -> None:
         """Go back to the previous screen."""
@@ -224,17 +257,5 @@ class SettingsScreen(Screen[None]):
     class Back(Message):
         """Message to go back to previous screen."""
 
-    class ProviderChanged(Message):
-        """Message when AI provider is changed."""
-
-        def __init__(self, provider_id: str) -> None:
-            """Initialize the message.
-
-            Args:
-                provider_id: The new provider ID.
-            """
-            super().__init__()
-            self.provider_id = provider_id
-
     class AuthStatusChanged(Message):
-        """Message when auth status changes."""
+        """Message when auth status changes (e.g., successful authentication)."""

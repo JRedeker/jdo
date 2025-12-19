@@ -232,7 +232,7 @@ class HomeScreen(Screen[None]):
             indicator.remove_class(cls)
 
         # Add appropriate grade class for color
-        grade_letter = grade[0].lower()  # Get first letter (A, B, C, D, F)
+        grade_letter = grade[0].lower() if grade else "a"  # Get first letter (A, B, C, D, F)
         if grade_letter in ("a", "b", "c", "d", "f"):
             indicator.add_class(f"grade-{grade_letter}")
 

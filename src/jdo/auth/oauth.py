@@ -10,8 +10,10 @@ from urllib.parse import urlencode
 
 import httpx
 
+from jdo.ai.timeout import HTTP_TIMEOUT_SECONDS
 from jdo.auth.models import OAuthCredentials
 from jdo.exceptions import AuthError
+from jdo.retry import http_retry
 
 # OAuth Configuration (matching OpenCode's implementation)
 CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
@@ -72,11 +74,13 @@ def build_authorization_url() -> tuple[str, str]:
     return url, verifier
 
 
+@http_retry()
 async def exchange_code(code: str, verifier: str) -> OAuthCredentials:
     """Exchange an authorization code for access tokens.
 
     Args:
         code: The authorization code from the OAuth callback.
+              May contain state appended after '#' (e.g., "code#state").
         verifier: The PKCE verifier used when building the auth URL.
 
     Returns:
@@ -85,26 +89,39 @@ async def exchange_code(code: str, verifier: str) -> OAuthCredentials:
     Raises:
         AuthenticationError: If the exchange fails.
     """
-    data = {
+    # Authorization code may have state appended after '#' separator
+    code_parts = code.split("#")
+    actual_code = code_parts[0]
+    state = code_parts[1] if len(code_parts) > 1 else None
+
+    # Build the request payload - using JSON format (not form-urlencoded)
+    payload: dict[str, str] = {
         "grant_type": "authorization_code",
-        "code": code,
+        "code": actual_code,
         "redirect_uri": REDIRECT_URI,
         "client_id": CLIENT_ID,
         "code_verifier": verifier,
     }
+    if state:
+        payload["state"] = state
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
             response = await client.post(
                 TOKEN_URL,
-                data=data,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                json=payload,  # Use JSON, not form-urlencoded
+                headers={"Content-Type": "application/json"},
             )
 
             if response.status_code == 401:
                 raise AuthenticationError("Invalid authorization code")
 
-            response.raise_for_status()
+            if not response.is_success:
+                # Include response body for debugging OAuth errors
+                error_detail = response.text
+                raise AuthenticationError(
+                    f"Token exchange failed (HTTP {response.status_code}): {error_detail}"
+                )
 
             token_data = response.json()
             expires_at = int(time.time() * 1000) + (token_data["expires_in"] * 1000)
@@ -116,11 +133,16 @@ async def exchange_code(code: str, verifier: str) -> OAuthCredentials:
             )
 
     except httpx.HTTPStatusError as e:
-        raise AuthenticationError(f"Token exchange failed: {e}") from e
+        # Include response body for debugging OAuth errors
+        error_detail = getattr(e.response, "text", "")
+        if error_detail:
+            error_detail = f" - {error_detail}"
+        raise AuthenticationError(f"Token exchange failed: {e}{error_detail}") from e
     except httpx.ConnectError as e:
         raise AuthenticationError(f"Network error during token exchange: {e}") from e
 
 
+@http_retry()
 async def refresh_tokens(refresh_token: str) -> OAuthCredentials:
     """Refresh OAuth tokens using a refresh token.
 
@@ -134,24 +156,28 @@ async def refresh_tokens(refresh_token: str) -> OAuthCredentials:
         TokenRevokedError: If the refresh token has been revoked.
         AuthenticationError: If refresh fails for other reasons.
     """
-    data = {
+    payload = {
         "grant_type": "refresh_token",
         "refresh_token": refresh_token,
         "client_id": CLIENT_ID,
     }
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
             response = await client.post(
                 TOKEN_URL,
-                data=data,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                json=payload,  # Use JSON, not form-urlencoded
+                headers={"Content-Type": "application/json"},
             )
 
             if response.status_code == 401:
                 raise TokenRevokedError("Refresh token has been revoked")
 
-            response.raise_for_status()
+            if not response.is_success:
+                error_detail = response.text
+                raise AuthenticationError(
+                    f"Token refresh failed (HTTP {response.status_code}): {error_detail}"
+                )
 
             token_data = response.json()
             expires_at = int(time.time() * 1000) + (token_data["expires_in"] * 1000)

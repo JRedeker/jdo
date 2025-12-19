@@ -29,6 +29,7 @@ from jdo.screens.chat import ChatScreen, ChatScreenConfig
 from jdo.screens.draft_restore import DraftRestoreScreen
 from jdo.screens.home import HomeScreen
 from jdo.screens.settings import SettingsScreen
+from jdo.widgets.hierarchy_view import HierarchyView
 
 
 class JdoApp(App[None]):
@@ -164,12 +165,15 @@ class JdoApp(App[None]):
 
         Args:
             decision: "restore" or "discard", or None if dismissed.
+
+        Note: The DraftRestoreScreen is a ModalScreen that auto-pops on dismiss.
+        HomeScreen is already on the stack, so we only push if navigating to ChatScreen.
         """
         # Get the draft ID from the stored pending draft
         pending = self._check_pending_drafts()
         if not pending:
             # Draft was already deleted or doesn't exist
-            self.push_screen(HomeScreen())
+            # HomeScreen is already showing, just check vision reviews
             self._check_vision_reviews()
             return
 
@@ -181,7 +185,7 @@ class JdoApp(App[None]):
         else:
             # Discard (or None/escape) - delete the draft
             self._delete_draft(draft_id)
-            self.push_screen(HomeScreen())
+            # HomeScreen is already showing, just check vision reviews
             self._check_vision_reviews()
 
     def _delete_draft(self, draft_id: UUID) -> None:
@@ -236,10 +240,11 @@ class JdoApp(App[None]):
         logger.debug("Navigating to SettingsScreen")
         self.push_screen(SettingsScreen())
 
-    async def on_settings_screen_back(self, _message: SettingsScreen.Back) -> None:
+    def on_settings_screen_back(self, _message: SettingsScreen.Back) -> None:
         """Handle back request from SettingsScreen."""
         self.pop_screen()
-        await self._ensure_ai_configured()
+        # Run in worker since _ensure_ai_configured uses push_screen_wait
+        self.run_worker(self._ensure_ai_configured(), exclusive=True)
 
     def on_chat_screen_back(self, _message: ChatScreen.Back) -> None:
         """Handle back request from ChatScreen."""
@@ -404,6 +409,79 @@ class JdoApp(App[None]):
             ChatScreen(
                 ChatScreenConfig(
                     initial_mode="integrity", initial_entity_type="", initial_data=integrity_data
+                )
+            )
+        )
+
+    def on_settings_screen_auth_status_changed(
+        self, _message: SettingsScreen.AuthStatusChanged
+    ) -> None:
+        """Handle auth status change from SettingsScreen.
+
+        This is informational - the actual AI config check happens when
+        returning from settings via on_settings_screen_back.
+        """
+        logger.info("Authentication status changed")
+
+    def on_hierarchy_view_item_selected(self, message: HierarchyView.ItemSelected) -> None:
+        """Handle item selection from HierarchyView widget.
+
+        Shows the selected item's details in a ChatScreen view.
+        """
+        item = message.item
+        logger.debug(f"Hierarchy item selected: {type(item).__name__}")
+
+        # Determine entity type and build data dict
+        if isinstance(item, Vision):
+            entity_type = "vision"
+            data = {
+                "id": str(item.id),
+                "title": item.title,
+                "timeframe": item.timeframe,
+                "status": item.status.value,
+            }
+        elif isinstance(item, Goal):
+            entity_type = "goal"
+            data = {
+                "id": str(item.id),
+                "title": item.title,
+                "problem_statement": item.problem_statement,
+                "status": item.status.value,
+            }
+        elif isinstance(item, Milestone):
+            entity_type = "milestone"
+            data = {
+                "id": str(item.id),
+                "title": item.title,
+                "description": item.description,
+                "target_date": item.target_date.isoformat() if item.target_date else None,
+                "status": item.status.value,
+            }
+        elif isinstance(item, Commitment):
+            entity_type = "commitment"
+            # Get stakeholder name
+            stakeholder_name = ""
+            with get_session() as session:
+                stakeholder = session.get(Stakeholder, item.stakeholder_id)
+                if stakeholder:
+                    stakeholder_name = stakeholder.name
+            data = {
+                "id": str(item.id),
+                "deliverable": item.deliverable,
+                "stakeholder_name": stakeholder_name,
+                "due_date": item.due_date.isoformat() if item.due_date else None,
+                "status": item.status.value,
+            }
+        else:
+            # Unknown type, ignore
+            return
+
+        self.push_screen(
+            ChatScreen(
+                ChatScreenConfig(
+                    initial_mode="view",
+                    initial_entity_type=entity_type,
+                    initial_data=data,
                 )
             )
         )

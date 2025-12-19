@@ -12,7 +12,6 @@ from uuid import UUID
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical
-from textual.message import Message
 from textual.screen import ModalScreen
 from textual.widgets import Button, Static
 
@@ -149,28 +148,3 @@ class DraftRestoreScreen(ModalScreen[str]):
     def action_discard_draft(self) -> None:
         """Discard the draft."""
         self.dismiss("discard")
-
-    # Messages for external handling
-    class Restore(Message):
-        """Message to restore the draft."""
-
-        def __init__(self, draft_id: UUID) -> None:
-            """Initialize the message.
-
-            Args:
-                draft_id: ID of the draft to restore.
-            """
-            super().__init__()
-            self.draft_id = draft_id
-
-    class Discard(Message):
-        """Message to discard the draft."""
-
-        def __init__(self, draft_id: UUID) -> None:
-            """Initialize the message.
-
-            Args:
-                draft_id: ID of the draft to discard.
-            """
-            super().__init__()
-            self.draft_id = draft_id

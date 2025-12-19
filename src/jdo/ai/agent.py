@@ -4,10 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import anthropic
 from pydantic_ai import Agent
 from pydantic_ai.models import Model
+from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.providers.anthropic import AnthropicProvider
 from sqlmodel import Session
 
+from jdo.auth.api import get_credentials
+from jdo.auth.models import ApiKeyCredentials, OAuthCredentials
 from jdo.config import get_settings
 
 # System prompt for the commitment integrity coach
@@ -112,6 +117,43 @@ def get_model_identifier() -> str:
     return f"{settings.ai_provider}:{settings.ai_model}"
 
 
+def _create_anthropic_model(model_name: str) -> AnthropicModel:
+    """Create an AnthropicModel with proper authentication.
+
+    Supports both OAuth (Claude Code) and API key authentication.
+    OAuth credentials use the auth_token parameter which adds the
+    required 'anthropic-beta: oauth-2025-04-20' header automatically.
+
+    Args:
+        model_name: The Anthropic model name (e.g., 'claude-sonnet-4-20250514').
+
+    Returns:
+        Configured AnthropicModel instance.
+
+    Raises:
+        ValueError: If no valid credentials are found.
+    """
+    creds = get_credentials("anthropic")
+
+    if creds is None:
+        msg = "No Anthropic credentials found. Please configure via settings."
+        raise ValueError(msg)
+
+    if isinstance(creds, OAuthCredentials):
+        # Use auth_token for OAuth (Claude Code) credentials
+        # The anthropic SDK handles the Bearer token and beta header automatically
+        client = anthropic.AsyncAnthropic(auth_token=creds.access_token)
+        provider = AnthropicProvider(anthropic_client=client)
+    elif isinstance(creds, ApiKeyCredentials):
+        # Use api_key for standard API key credentials
+        provider = AnthropicProvider(api_key=creds.api_key)
+    else:
+        msg = f"Unsupported credential type: {type(creds)}"
+        raise TypeError(msg)
+
+    return AnthropicModel(model_name, provider=provider)
+
+
 def create_agent_with_model(
     model: Model | str,
     *,
@@ -142,9 +184,18 @@ def create_agent_with_model(
 def create_agent() -> Agent[JDODependencies, str]:
     """Create a PydanticAI agent configured for commitment tracking.
 
-    Uses the model specified in settings.
+    Uses the model specified in settings with proper authentication.
+    For Anthropic, this handles both OAuth and API key credentials.
 
     Returns:
         A configured Agent instance.
     """
+    settings = get_settings()
+
+    # For Anthropic, use our custom model creation with proper auth
+    if settings.ai_provider == "anthropic":
+        model = _create_anthropic_model(settings.ai_model)
+        return create_agent_with_model(model)
+
+    # For other providers, use the string identifier (default pydantic-ai behavior)
     return create_agent_with_model(get_model_identifier())

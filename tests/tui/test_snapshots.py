@@ -191,7 +191,11 @@ from jdo.screens.chat import ChatScreen
 
 class ChatScreenApp(App):
     def compose(self) -> ComposeResult:
-        yield ChatScreen()
+        return
+        yield  # Empty generator
+
+    async def on_mount(self) -> None:
+        await self.push_screen(ChatScreen())
 
 if __name__ == "__main__":
     ChatScreenApp().run()

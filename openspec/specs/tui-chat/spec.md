@@ -472,3 +472,27 @@ The system SHALL enhance risk warnings with time-based analysis.
 - **WHEN** user's allocated hours exceed available hours
 - **THEN** home screen shows warning: "Over-committed today: X hours allocated, Y hours available"
 
+### Requirement: Commitment Guardrail Warnings
+
+The system SHALL display velocity-based coaching warnings when users create commitments faster than they complete them.
+
+#### Scenario: Velocity warning for overcommitting
+- **WHEN** user confirms a commitment draft
+- **AND** commitments created > commitments completed in the past 7 days
+- **THEN** a coaching note is displayed: "You've created X commitments this week but only completed Y. Are you overcommitting?"
+
+#### Scenario: No velocity warning when balanced
+- **WHEN** user confirms a commitment draft
+- **AND** commitments created <= commitments completed in the past 7 days
+- **THEN** no velocity warning is displayed
+
+#### Scenario: User can proceed despite warning
+- **WHEN** velocity warning is displayed
+- **THEN** the confirmation flow continues normally (no hard block)
+- **AND** user can confirm to create the commitment
+
+#### Scenario: Graceful degradation if database unavailable
+- **WHEN** velocity query fails
+- **THEN** no warning is displayed
+- **AND** commitment creation proceeds normally
+

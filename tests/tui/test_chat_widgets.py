@@ -263,3 +263,54 @@ class TestMessageRole:
         assert MessageRole.USER.value == "user"
         assert MessageRole.ASSISTANT.value == "assistant"
         assert MessageRole.SYSTEM.value == "system"
+
+
+class TestChatMessageSelection:
+    """Tests for ChatMessage selection handling."""
+
+    async def test_get_selection_handles_out_of_range_coordinates(self) -> None:
+        """get_selection handles out-of-range selection coordinates gracefully.
+
+        This tests a workaround for a Textual bug where selection coordinates
+        may be screen-relative rather than widget-relative, causing IndexError.
+        """
+        from textual.geometry import Offset
+        from textual.selection import Selection
+
+        app = ChatMessageTestApp()
+        async with app.run_test():
+            messages = app.query(ChatMessage)
+            msg = messages[0]  # A short message
+
+            # Create a selection with coordinates that would be out of range
+            # for the widget's text content (simulating the Textual bug)
+            out_of_range_selection = Selection(
+                start=Offset(x=0, y=100),  # y=100 is way beyond the text
+                end=None,
+            )
+
+            # This should return None instead of raising IndexError
+            result = msg.get_selection(out_of_range_selection)
+            assert result is None
+
+    async def test_get_selection_works_for_valid_coordinates(self) -> None:
+        """get_selection works correctly for valid selection coordinates."""
+        from textual.geometry import Offset
+        from textual.selection import Selection
+
+        app = ChatMessageTestApp()
+        async with app.run_test():
+            messages = app.query(ChatMessage)
+            msg = messages[0]  # "Hello" message
+
+            # Create a valid selection for the first line
+            valid_selection = Selection(
+                start=Offset(x=0, y=0),
+                end=Offset(x=4, y=0),  # Select "USER"
+            )
+
+            result = msg.get_selection(valid_selection)
+            assert result is not None
+            extracted_text, separator = result
+            assert extracted_text == "USER"
+            assert separator == "\n"

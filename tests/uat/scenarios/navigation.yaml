@@ -1,0 +1,20 @@
+name: navigation
+description: Test basic screen navigation through the app
+goal: |
+  Navigate through the main screens of the app to verify navigation works correctly.
+  Start from the home screen, go to chat, return home, go to settings, and return home again.
+  End with a "done" action when you've successfully navigated through all screens.
+
+preconditions: []
+
+success_criteria:
+  - screen:HomeScreen
+  - no_errors
+  - completed
+
+max_steps: 20
+timeout_seconds: 60
+
+tags:
+  - smoke
+  - navigation

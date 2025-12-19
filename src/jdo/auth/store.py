@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 import stat
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -50,7 +53,10 @@ class AuthStore:
             return {}
 
     def _write_store(self, data: dict[str, dict[str, Any]]) -> None:
-        """Write the auth store to disk with secure permissions.
+        """Write the auth store to disk atomically with secure permissions.
+
+        Uses write-to-temp-file + atomic rename to prevent data corruption
+        if the process is interrupted during write (P10 idempotence).
 
         Args:
             data: Dictionary of provider_id -> credentials dict.
@@ -58,12 +64,30 @@ class AuthStore:
         # Ensure parent directory exists
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Write the file
-        self.path.write_text(json.dumps(data, indent=2))
+        # Write to a temporary file first, then atomically rename
+        # This ensures we never have a partially written auth file
+        fd, tmp_path = tempfile.mkstemp(
+            dir=self.path.parent,
+            prefix=".auth_",
+            suffix=".tmp",
+        )
+        tmp_file = Path(tmp_path)
+        try:
+            # Write content to temp file
+            with os.fdopen(fd, "w") as f:
+                json.dump(data, f, indent=2)
 
-        # Set secure permissions on Unix
-        if sys.platform != "win32":
-            self.path.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 0600
+            # Set secure permissions on Unix before rename
+            if sys.platform != "win32":
+                tmp_file.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 0600
+
+            # Atomic rename (POSIX guarantees atomicity for rename on same filesystem)
+            tmp_file.replace(self.path)
+        except Exception:
+            # Clean up temp file on failure
+            with contextlib.suppress(OSError):
+                tmp_file.unlink()
+            raise
 
     def get(self, provider_id: str) -> OAuthCredentials | ApiKeyCredentials | None:
         """Get credentials for a provider.

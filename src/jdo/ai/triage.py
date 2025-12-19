@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
+from jdo.ai.timeout import AI_TIMEOUT_SECONDS, run_sync_with_timeout, with_ai_timeout
 from jdo.config import get_settings
 from jdo.models.draft import EntityType
 
@@ -157,12 +158,16 @@ def classify_triage_item(text: str) -> TriageAnalysis:
 
     Returns:
         TriageAnalysis with classification or clarifying question.
+
+    Raises:
+        TimeoutError: If AI call exceeds timeout.
     """
     agent = _get_triage_agent()
 
     prompt = f"Classify this captured text:\n\n{text}"
 
-    result = agent.run_sync(prompt)
+    # Wrap sync AI call with timeout via ThreadPoolExecutor
+    result = run_sync_with_timeout(agent.run_sync, prompt, timeout=AI_TIMEOUT_SECONDS)
     output = result.output
 
     if isinstance(output, TriageClassification):
@@ -198,12 +203,16 @@ async def classify_triage_item_async(text: str) -> TriageAnalysis:
 
     Returns:
         TriageAnalysis with classification or clarifying question.
+
+    Raises:
+        TimeoutError: If AI call exceeds timeout.
     """
     agent = _get_triage_agent()
 
     prompt = f"Classify this captured text:\n\n{text}"
 
-    result = await agent.run(prompt)
+    # Wrap async AI call with timeout
+    result = await with_ai_timeout(agent.run(prompt))
     output = result.output
 
     if isinstance(output, TriageClassification):

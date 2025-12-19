@@ -7,6 +7,8 @@ providing quick access to views and shortcuts.
 import pytest
 from textual.app import App, ComposeResult
 
+from tests.tui.conftest import create_test_app_for_screen
+
 
 class TestHomeScreen:
     """Tests for HomeScreen functionality."""
@@ -15,112 +17,127 @@ class TestHomeScreen:
         """HomeScreen renders without error."""
         from jdo.screens.home import HomeScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield HomeScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(HomeScreen)
-            assert screen is not None
+        app = create_test_app_for_screen(HomeScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, HomeScreen)
 
     async def test_home_screen_shows_welcome_message(self) -> None:
         """HomeScreen shows a welcome or prompt message."""
         from jdo.screens.home import HomeScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield HomeScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(HomeScreen)
-            # Should have some welcome content
-            assert screen is not None
+        app = create_test_app_for_screen(HomeScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, HomeScreen)
 
 
 class TestHomeScreenKeyBindings:
     """Tests for HomeScreen keyboard shortcuts."""
 
     async def test_g_key_shows_goals(self) -> None:
-        """'g' key shows goals in the panel."""
+        """'g' key posts ShowGoals message."""
         from jdo.screens.home import HomeScreen
 
+        message_received = False
+
         class TestApp(App):
-            BINDINGS = [("g", "show_goals", "Goals")]
-            goals_shown = False
-
             def compose(self) -> ComposeResult:
-                yield HomeScreen()
+                return
+                yield
 
-            def action_show_goals(self) -> None:
-                self.goals_shown = True
+            async def on_mount(self) -> None:
+                await self.push_screen(HomeScreen())
+
+            def on_home_screen_show_goals(self, message: HomeScreen.ShowGoals) -> None:
+                nonlocal message_received
+                message_received = True
 
         app = TestApp()
         async with app.run_test() as pilot:
+            await pilot.pause()
             await pilot.press("g")
             await pilot.pause()
-            assert app.goals_shown
+            assert message_received
 
     async def test_c_key_shows_commitments(self) -> None:
-        """'c' key shows commitments in the panel."""
+        """'c' key posts ShowCommitments message."""
         from jdo.screens.home import HomeScreen
 
+        message_received = False
+
         class TestApp(App):
-            BINDINGS = [("c", "show_commitments", "Commitments")]
-            commitments_shown = False
-
             def compose(self) -> ComposeResult:
-                yield HomeScreen()
+                return
+                yield
 
-            def action_show_commitments(self) -> None:
-                self.commitments_shown = True
+            async def on_mount(self) -> None:
+                await self.push_screen(HomeScreen())
+
+            def on_home_screen_show_commitments(self, message: HomeScreen.ShowCommitments) -> None:
+                nonlocal message_received
+                message_received = True
 
         app = TestApp()
         async with app.run_test() as pilot:
+            await pilot.pause()
             await pilot.press("c")
             await pilot.pause()
-            assert app.commitments_shown
+            assert message_received
 
     async def test_v_key_shows_visions(self) -> None:
-        """'v' key shows visions in the panel."""
+        """'v' key posts ShowVisions message."""
         from jdo.screens.home import HomeScreen
 
+        message_received = False
+
         class TestApp(App):
-            BINDINGS = [("v", "show_visions", "Visions")]
-            visions_shown = False
-
             def compose(self) -> ComposeResult:
-                yield HomeScreen()
+                return
+                yield
 
-            def action_show_visions(self) -> None:
-                self.visions_shown = True
+            async def on_mount(self) -> None:
+                await self.push_screen(HomeScreen())
+
+            def on_home_screen_show_visions(self, message: HomeScreen.ShowVisions) -> None:
+                nonlocal message_received
+                message_received = True
 
         app = TestApp()
         async with app.run_test() as pilot:
+            await pilot.pause()
             await pilot.press("v")
             await pilot.pause()
-            assert app.visions_shown
+            assert message_received
 
     async def test_q_key_quits(self) -> None:
         """'q' key triggers quit action."""
         from jdo.screens.home import HomeScreen
 
+        quit_triggered = False
+
         class TestApp(App):
             BINDINGS = [("q", "quit", "Quit")]
-            quit_triggered = False
 
             def compose(self) -> ComposeResult:
-                yield HomeScreen()
+                return
+                yield
+
+            async def on_mount(self) -> None:
+                await self.push_screen(HomeScreen())
 
             def action_quit(self) -> None:
-                self.quit_triggered = True
+                nonlocal quit_triggered
+                quit_triggered = True
 
         app = TestApp()
         async with app.run_test() as pilot:
+            await pilot.pause()
             await pilot.press("q")
             await pilot.pause()
-            assert app.quit_triggered
+            assert quit_triggered
 
 
 class TestHomeScreenFooter:
@@ -130,13 +147,9 @@ class TestHomeScreenFooter:
         """HomeScreen includes a footer with shortcuts."""
         from jdo.screens.home import HomeScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield HomeScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(HomeScreen)
+        app = create_test_app_for_screen(HomeScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
             # HomeScreen should have BINDINGS defined
             assert hasattr(HomeScreen, "BINDINGS")
             assert len(HomeScreen.BINDINGS) > 0
@@ -191,13 +204,10 @@ class TestHomeScreenIntegrity:
         """HomeScreen has integrity indicator widget."""
         from jdo.screens.home import HomeScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield HomeScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            indicator = app.query_one("#integrity-indicator")
+        app = create_test_app_for_screen(HomeScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            indicator = pilot.app.screen.query_one("#integrity-indicator")
             assert indicator is not None
 
     async def test_home_screen_has_integrity_grade_reactive(self) -> None:
@@ -212,20 +222,14 @@ class TestHomeScreenIntegrity:
 
         from jdo.screens.home import HomeScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield HomeScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(HomeScreen())
         async with app.run_test() as pilot:
-            # Wait for mount to complete
             await pilot.pause()
-            indicator = app.query_one("#integrity-indicator", Static)
-            # Indicator should exist
+            screen = pilot.app.screen
+            assert isinstance(screen, HomeScreen)
+            indicator = screen.query_one("#integrity-indicator", Static)
             assert indicator is not None
-            # The watcher should have set some content
-            screen = app.query_one(HomeScreen)
-            # Default grade should be A+ (clean slate)
+            # Default grade should be one of the valid grades
             assert screen.integrity_grade in [
                 "A+",
                 "A",
@@ -243,24 +247,29 @@ class TestHomeScreenIntegrity:
             ]
 
     async def test_i_key_triggers_show_integrity(self) -> None:
-        """'i' key triggers show_integrity action."""
+        """'i' key posts ShowIntegrity message."""
         from jdo.screens.home import HomeScreen
 
+        message_received = False
+
         class TestApp(App):
-            BINDINGS = [("i", "show_integrity", "Integrity")]
-            integrity_shown = False
-
             def compose(self) -> ComposeResult:
-                yield HomeScreen()
+                return
+                yield
 
-            def action_show_integrity(self) -> None:
-                self.integrity_shown = True
+            async def on_mount(self) -> None:
+                await self.push_screen(HomeScreen())
+
+            def on_home_screen_show_integrity(self, message: HomeScreen.ShowIntegrity) -> None:
+                nonlocal message_received
+                message_received = True
 
         app = TestApp()
         async with app.run_test() as pilot:
+            await pilot.pause()
             await pilot.press("i")
             await pilot.pause()
-            assert app.integrity_shown
+            assert message_received
 
     async def test_home_screen_posts_show_integrity_message(self) -> None:
         """HomeScreen posts ShowIntegrity message on 'i' key."""
@@ -270,15 +279,20 @@ class TestHomeScreenIntegrity:
 
         class TestApp(App):
             def compose(self) -> ComposeResult:
-                yield HomeScreen()
+                return
+                yield
+
+            async def on_mount(self) -> None:
+                await self.push_screen(HomeScreen())
 
             def on_home_screen_show_integrity(self, message: HomeScreen.ShowIntegrity) -> None:
                 received_messages.append(message)
 
         app = TestApp()
         async with app.run_test() as pilot:
-            # First press may not trigger if bindings conflict, so we call action directly
-            screen = app.query_one(HomeScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, HomeScreen)
             screen.action_show_integrity()
             await pilot.pause()
             assert len(received_messages) == 1
@@ -289,14 +303,12 @@ class TestHomeScreenIntegrity:
 
         from jdo.screens.home import HomeScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield HomeScreen()
-
-        app = TestApp()
+        app = create_test_app_for_screen(HomeScreen())
         async with app.run_test() as pilot:
             await pilot.pause()
-            indicator = app.query_one("#integrity-indicator", Static)
+            screen = pilot.app.screen
+            assert isinstance(screen, HomeScreen)
+            indicator = screen.query_one("#integrity-indicator", Static)
             # Should have one of the grade classes
             has_grade_class = any(
                 cls in indicator.classes

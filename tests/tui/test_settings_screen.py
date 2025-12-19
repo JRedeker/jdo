@@ -11,6 +11,8 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 
+from tests.tui.conftest import create_test_app_for_screen
+
 
 class TestSettingsScreenRendering:
     """Tests for SettingsScreen basic rendering."""
@@ -19,28 +21,21 @@ class TestSettingsScreenRendering:
         """SettingsScreen renders without error."""
         from jdo.screens.settings import SettingsScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield SettingsScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(SettingsScreen)
-            assert screen is not None
+        app = create_test_app_for_screen(SettingsScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, SettingsScreen)
 
     async def test_settings_screen_shows_title(self) -> None:
         """SettingsScreen shows a title."""
         from jdo.screens.settings import SettingsScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield SettingsScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            # Should have settings title visible
-            screen = app.query_one(SettingsScreen)
-            assert screen is not None
+        app = create_test_app_for_screen(SettingsScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, SettingsScreen)
 
 
 class TestSettingsScreenAuthStatus:
@@ -50,17 +45,11 @@ class TestSettingsScreenAuthStatus:
         """Settings screen shows auth status for each provider."""
         from jdo.screens.settings import SettingsScreen
 
-        class TestApp(App):
-            def compose(self) -> ComposeResult:
-                yield SettingsScreen()
-
-        app = TestApp()
-        async with app.run_test():
-            screen = app.query_one(SettingsScreen)
-            # Should show providers (anthropic, openai, openrouter)
-            assert screen is not None
-            # The screen should display provider names
-            # Content will be verified in render output
+        app = create_test_app_for_screen(SettingsScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, SettingsScreen)
 
     async def test_shows_authenticated_status(self) -> None:
         """Shows 'Authenticated' when provider has credentials."""
@@ -69,14 +58,11 @@ class TestSettingsScreenAuthStatus:
         with patch("jdo.screens.settings.is_authenticated") as mock_auth:
             mock_auth.return_value = True
 
-            class TestApp(App):
-                def compose(self) -> ComposeResult:
-                    yield SettingsScreen()
-
-            app = TestApp()
-            async with app.run_test():
-                screen = app.query_one(SettingsScreen)
-                assert screen is not None
+            app = create_test_app_for_screen(SettingsScreen())
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                screen = pilot.app.screen
+                assert isinstance(screen, SettingsScreen)
 
     async def test_shows_not_authenticated_status(self) -> None:
         """Shows 'Not authenticated' when provider lacks credentials."""
@@ -85,14 +71,11 @@ class TestSettingsScreenAuthStatus:
         with patch("jdo.screens.settings.is_authenticated") as mock_auth:
             mock_auth.return_value = False
 
-            class TestApp(App):
-                def compose(self) -> ComposeResult:
-                    yield SettingsScreen()
-
-            app = TestApp()
-            async with app.run_test():
-                screen = app.query_one(SettingsScreen)
-                assert screen is not None
+            app = create_test_app_for_screen(SettingsScreen())
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                screen = pilot.app.screen
+                assert isinstance(screen, SettingsScreen)
 
 
 class TestSettingsScreenProviderInfo:
@@ -106,14 +89,11 @@ class TestSettingsScreenProviderInfo:
             mock_settings.return_value.ai_provider = "anthropic"
             mock_settings.return_value.ai_model = "claude-sonnet-4-20250514"
 
-            class TestApp(App):
-                def compose(self) -> ComposeResult:
-                    yield SettingsScreen()
-
-            app = TestApp()
-            async with app.run_test():
-                screen = app.query_one(SettingsScreen)
-                assert screen is not None
+            app = create_test_app_for_screen(SettingsScreen())
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                screen = pilot.app.screen
+                assert isinstance(screen, SettingsScreen)
 
     async def test_shows_current_ai_model(self) -> None:
         """Settings shows current AI model from settings."""
@@ -123,14 +103,11 @@ class TestSettingsScreenProviderInfo:
             mock_settings.return_value.ai_provider = "anthropic"
             mock_settings.return_value.ai_model = "claude-sonnet-4-20250514"
 
-            class TestApp(App):
-                def compose(self) -> ComposeResult:
-                    yield SettingsScreen()
-
-            app = TestApp()
-            async with app.run_test():
-                screen = app.query_one(SettingsScreen)
-                assert screen is not None
+            app = create_test_app_for_screen(SettingsScreen())
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                screen = pilot.app.screen
+                assert isinstance(screen, SettingsScreen)
 
 
 class TestSettingsScreenAuthFlows:
@@ -138,94 +115,112 @@ class TestSettingsScreenAuthFlows:
 
     async def test_launches_oauth_flow_for_claude(self) -> None:
         """Settings launches OAuth flow for Claude/Anthropic."""
+        from jdo.auth.screens import OAuthScreen
         from jdo.screens.settings import SettingsScreen
+
+        # Track if OAuth screen is launched
+        oauth_launched = False
 
         class TestApp(App):
             BINDINGS: ClassVar[list[Binding]] = [
                 Binding("escape", "back", "Back"),
             ]
-            oauth_launched = False
 
             def compose(self) -> ComposeResult:
-                yield SettingsScreen()
+                return
+                yield
+
+            async def on_mount(self) -> None:
+                await self.push_screen(SettingsScreen())
 
             def push_screen(self, screen, callback=None):
-                # Check if OAuthScreen is being pushed
-                from jdo.auth.screens import OAuthScreen
-
+                nonlocal oauth_launched
                 if isinstance(screen, OAuthScreen):
-                    self.oauth_launched = True
+                    oauth_launched = True
                 return super().push_screen(screen, callback)
 
         app = TestApp()
         async with app.run_test() as pilot:
-            screen = app.query_one(SettingsScreen)
-            # Trigger OAuth flow for anthropic
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, SettingsScreen)
             screen.launch_oauth_flow("anthropic")
             await pilot.pause()
-            assert app.oauth_launched
+            assert oauth_launched
 
     async def test_launches_api_key_flow_for_openai(self) -> None:
         """Settings launches API key flow for OpenAI."""
+        from jdo.auth.screens import ApiKeyScreen
         from jdo.screens.settings import SettingsScreen
+
+        api_key_launched = False
+        api_key_provider = None
 
         class TestApp(App):
             BINDINGS: ClassVar[list[Binding]] = [
                 Binding("escape", "back", "Back"),
             ]
-            api_key_launched = False
-            api_key_provider = None
 
             def compose(self) -> ComposeResult:
-                yield SettingsScreen()
+                return
+                yield
+
+            async def on_mount(self) -> None:
+                await self.push_screen(SettingsScreen())
 
             def push_screen(self, screen, callback=None):
-                # Check if ApiKeyScreen is being pushed
-                from jdo.auth.screens import ApiKeyScreen
-
+                nonlocal api_key_launched, api_key_provider
                 if isinstance(screen, ApiKeyScreen):
-                    self.api_key_launched = True
-                    self.api_key_provider = screen.provider_id
+                    api_key_launched = True
+                    api_key_provider = screen.provider_id
                 return super().push_screen(screen, callback)
 
         app = TestApp()
         async with app.run_test() as pilot:
-            screen = app.query_one(SettingsScreen)
-            # Trigger API key flow for openai
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, SettingsScreen)
             screen.launch_api_key_flow("openai")
             await pilot.pause()
-            assert app.api_key_launched
-            assert app.api_key_provider == "openai"
+            assert api_key_launched
+            assert api_key_provider == "openai"
 
     async def test_launches_api_key_flow_for_openrouter(self) -> None:
         """Settings launches API key flow for OpenRouter."""
+        from jdo.auth.screens import ApiKeyScreen
         from jdo.screens.settings import SettingsScreen
+
+        api_key_launched = False
+        api_key_provider = None
 
         class TestApp(App):
             BINDINGS: ClassVar[list[Binding]] = [
                 Binding("escape", "back", "Back"),
             ]
-            api_key_launched = False
-            api_key_provider = None
 
             def compose(self) -> ComposeResult:
-                yield SettingsScreen()
+                return
+                yield
+
+            async def on_mount(self) -> None:
+                await self.push_screen(SettingsScreen())
 
             def push_screen(self, screen, callback=None):
-                from jdo.auth.screens import ApiKeyScreen
-
+                nonlocal api_key_launched, api_key_provider
                 if isinstance(screen, ApiKeyScreen):
-                    self.api_key_launched = True
-                    self.api_key_provider = screen.provider_id
+                    api_key_launched = True
+                    api_key_provider = screen.provider_id
                 return super().push_screen(screen, callback)
 
         app = TestApp()
         async with app.run_test() as pilot:
-            screen = app.query_one(SettingsScreen)
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, SettingsScreen)
             screen.launch_api_key_flow("openrouter")
             await pilot.pause()
-            assert app.api_key_launched
-            assert app.api_key_provider == "openrouter"
+            assert api_key_launched
+            assert api_key_provider == "openrouter"
 
 
 class TestSettingsScreenKeyBindings:
@@ -235,20 +230,26 @@ class TestSettingsScreenKeyBindings:
         """Escape key posts a Back message to go back."""
         from jdo.screens.settings import SettingsScreen
 
-        class TestApp(App):
-            back_triggered = False
+        back_triggered = False
 
+        class TestApp(App):
             def compose(self) -> ComposeResult:
-                yield SettingsScreen()
+                return
+                yield
+
+            async def on_mount(self) -> None:
+                await self.push_screen(SettingsScreen())
 
             def on_settings_screen_back(self, event: SettingsScreen.Back) -> None:
-                self.back_triggered = True
+                nonlocal back_triggered
+                back_triggered = True
 
         app = TestApp()
         async with app.run_test() as pilot:
+            await pilot.pause()
             await pilot.press("escape")
             await pilot.pause()
-            assert app.back_triggered
+            assert back_triggered
 
     async def test_settings_screen_has_bindings(self) -> None:
         """SettingsScreen has BINDINGS defined."""
@@ -268,9 +269,9 @@ class TestSettingsScreenMessages:
         # SettingsScreen should have a Back message class
         assert hasattr(SettingsScreen, "Back")
 
-    async def test_posts_provider_changed_message(self) -> None:
-        """SettingsScreen posts ProviderChanged message when provider is selected."""
+    async def test_posts_auth_status_changed_message(self) -> None:
+        """SettingsScreen posts AuthStatusChanged message when auth status changes."""
         from jdo.screens.settings import SettingsScreen
 
-        # SettingsScreen should have a ProviderChanged message class
-        assert hasattr(SettingsScreen, "ProviderChanged")
+        # SettingsScreen should have an AuthStatusChanged message class
+        assert hasattr(SettingsScreen, "AuthStatusChanged")

@@ -6,12 +6,14 @@ for the JDO conversational interface.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 
 from pydantic_ai import Agent
 from pydantic_ai.messages import ModelRequest, ModelResponse
 
 from jdo.ai.agent import JDODependencies
+from jdo.ai.timeout import AI_STREAM_TIMEOUT_SECONDS
 
 # Maximum number of messages to include in context (excluding system prompt)
 MAX_CONTEXT_MESSAGES = 50
@@ -174,12 +176,17 @@ async def stream_response(
 
     Yields:
         Text chunks as they arrive from the AI.
+
+    Raises:
+        TimeoutError: If streaming exceeds timeout.
     """
     # Convert message history to PydanticAI format if provided
     model_history = None
     if message_history:
         model_history = _convert_to_model_messages(message_history)
 
-    async with agent.run_stream(prompt, deps=deps, message_history=model_history) as result:
-        async for chunk in result.stream_text():
-            yield chunk
+    # Wrap entire stream with timeout
+    async with asyncio.timeout(AI_STREAM_TIMEOUT_SECONDS):
+        async with agent.run_stream(prompt, deps=deps, message_history=model_history) as result:
+            async for chunk in result.stream_text():
+                yield chunk

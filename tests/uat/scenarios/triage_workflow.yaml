@@ -1,0 +1,22 @@
+name: triage_workflow
+description: Test the triage workflow for processing inbox items
+goal: |
+  Enter triage mode and process an item if any exist.
+  If no items need triage (triage count is 0), navigate to chat and add an ambiguous
+  note like "remember to follow up", then try triage again.
+  Complete the triage by accepting or classifying the item.
+  Return to home when done.
+
+preconditions: []
+
+success_criteria:
+  - screen:HomeScreen
+  - no_errors
+  - completed
+
+max_steps: 40
+timeout_seconds: 120
+
+tags:
+  - triage
+  - inbox
