@@ -154,13 +154,24 @@ class NavSidebar(Widget):
     def compose(self) -> ComposeResult:
         """Compose the sidebar layout."""
         self._option_list = OptionList()
-        self._populate_options()
+        # Add initial options
+        item_index = 0
+        for nav_item in NAV_ITEMS:
+            if nav_item is None:
+                self._option_list.add_option(None)  # None creates a separator
+            else:
+                item_index += 1
+                label = self._format_label(nav_item, item_index)
+                self._option_list.add_option(Option(label, id=nav_item.id))
         yield self._option_list
 
-    def _populate_options(self) -> None:
-        """Populate the OptionList with navigation items."""
-        if self._option_list is None:
+    def _refresh_options(self) -> None:
+        """Refresh the OptionList labels (called when display state changes)."""
+        if self._option_list is None or not self._option_list.is_mounted:
             return
+
+        # Store current highlighted option
+        current_highlighted = self._option_list.highlighted
 
         self._option_list.clear_options()
         item_index = 0
@@ -172,6 +183,10 @@ class NavSidebar(Widget):
                 item_index += 1
                 label = self._format_label(nav_item, item_index)
                 self._option_list.add_option(Option(label, id=nav_item.id))
+
+        # Restore highlighted index
+        if current_highlighted is not None:
+            self._option_list.highlighted = current_highlighted
 
     def _format_label(self, item: NavItem, index: int) -> Text:
         """Format a navigation item label.
@@ -227,7 +242,7 @@ class NavSidebar(Widget):
             self.remove_class("-collapsed")
 
         # Re-render labels
-        self._populate_options()
+        self._refresh_options()
 
     def set_active_item(self, item_id: str) -> None:
         """Set the active (highlighted) navigation item.
@@ -252,7 +267,7 @@ class NavSidebar(Widget):
         """
         self.triage_count = count
         # Re-render to update badge
-        self._populate_options()
+        self._refresh_options()
 
     def _select_by_index(self, index: int) -> None:
         """Select a navigation item by its 1-based index.
