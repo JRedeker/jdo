@@ -104,6 +104,7 @@ class NavSidebar(Widget):
         ("hierarchy", "Hierarchy", "H"),
         ("integrity", "Integrity", "I"),
         ("orphans", "Orphans", "O"),
+        ("triage", "Triage", "T"),    # Inbox items needing classification
         None,                         # Separator
         ("settings", "Settings", "S"),
     ]
@@ -137,6 +138,7 @@ class NavSidebar(Widget):
 | `hierarchy` | `hierarchy` | Full tree view |
 | `integrity` | `integrity` | Dashboard |
 | `orphans` | `list:commitment` (filtered) | Orphan commitments |
+| `triage` | `triage` | Inbox items needing classification |
 | `settings` | N/A | Push SettingsScreen |
 
 ## Risks / Trade-offs

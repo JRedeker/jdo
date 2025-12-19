@@ -11,10 +11,11 @@ The system SHALL implement full-screen views as Textual `Screen` subclasses that
 - **WHEN** the MainScreen is displayed
 - **THEN** it is an instance of `textual.screen.Screen` that integrates NavSidebar and content area
 
-#### Scenario: ChatScreen embedded in MainScreen
+#### Scenario: MainScreen embeds chat widgets
 - **GIVEN** the MainScreen is displayed
 - **WHEN** the content area is rendered
-- **THEN** it contains ChatContainer, PromptInput, and DataPanel widgets (not as separate Screen)
+- **THEN** it contains ChatContainer, PromptInput, and DataPanel widgets directly (not via ChatScreen)
+- **AND** ChatScreen is no longer used as a separate pushable screen
 
 #### Scenario: SettingsScreen is a Screen subclass
 - **GIVEN** the user navigates to the settings view
@@ -25,6 +26,7 @@ The system SHALL implement full-screen views as Textual `Screen` subclasses that
 - **GIVEN** the JdoApp is defined
 - **WHEN** screens are accessed
 - **THEN** MainScreen and SettingsScreen are registered in the `SCREENS` class variable for name-based navigation
+- **AND** HomeScreen and ChatScreen are NOT registered (deprecated)
 
 ### Requirement: Widget Architecture
 
@@ -124,3 +126,21 @@ The system SHALL ensure MainScreen's compose method yields the expected child wi
 **Reason**: HomeScreen is being replaced by NavSidebar integrated into MainScreen.
 
 **Migration**: Use MainScreen with NavSidebar for navigation discovery.
+
+### Requirement: ChatScreen as Separate Screen
+
+**Reason**: ChatScreen is no longer a separate pushable screen. Its widgets (ChatContainer, PromptInput, DataPanel) are embedded directly in MainScreen.
+
+**Migration**: Chat functionality is now part of MainScreen. No screen transitions needed for chat - just select "Chat" from NavSidebar to show chat-only view.
+
+### Requirement: Screen Stack for Navigation (Partial)
+
+**Reason**: Navigation between data views no longer uses screen push/pop. Only Settings uses push_screen.
+
+#### Scenario: Navigate forward with push_screen (MODIFIED)
+- **GIVEN** the user is on the MainScreen
+- **WHEN** the user triggers navigation to Settings
+- **THEN** `push_screen("settings")` is called and SettingsScreen becomes the active screen
+- **AND** navigation to data views (Goals, Commitments, etc.) does NOT use push_screen
+
+**Migration**: Data view navigation is handled by updating DataPanel content, not screen transitions.

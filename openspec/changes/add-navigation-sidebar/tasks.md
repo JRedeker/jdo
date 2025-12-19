@@ -58,29 +58,32 @@
   - Test: Arrow keys and Enter work when collapsed
   - Test: Focus management still behaves correctly
 
-## 4. HomeScreen Deprecation (DEFERRED)
+## 4. HomeScreen/ChatScreen Removal (PHASE 2 - COMPLETE)
 
-**Status**: Deferred to future work. The full layout refactor requires:
-- Moving ChatContainer, PromptInput, DataPanel from ChatScreen to JdoApp
-- Significant test updates
-- AI agent logic migration
+**Status**: COMPLETE. App now uses MainScreen as the primary interface.
 
-For now, NavSidebar widget and handlers are ready for integration.
+Completed:
+- Created MainScreen with embedded NavSidebar, ChatContainer, PromptInput, DataPanel
+- App starts with MainScreen instead of HomeScreen
+- Navigation via NavSidebar.Selected messages updates DataPanel content
+- Settings still uses push_screen/pop_screen
+- Tests updated to use MainScreen
+- HomeScreen and ChatScreen files retained for backward compatibility with isolated widget tests
 
-- [ ] 4.1 Update startup flow
-  - App mounts directly to main layout (no HomeScreen push)
-  - Preserve draft restoration modal
-  - Preserve AI configuration check
+- [x] 4.1 Full HomeScreen removal (Phase 2)
+  - App no longer uses HomeScreen on startup
+  - JdoApp handlers updated for MainScreen messages
+  - Tests updated to expect MainScreen
 
-- [ ] 4.2 Migrate HomeScreen features to sidebar
-  - Triage indicator as badge on sidebar item
-  - Integrity grade shown in sidebar header
-  - Vision review notification as system message
+- [x] 4.2 Full ChatScreen removal (Phase 2)
+  - MainScreen embeds all ChatScreen functionality
+  - AI agent logic works with MainScreen
+  - ChatScreen file retained for isolated tests only
 
-- [ ] 4.3 Mark HomeScreen as deprecated
-  - Add deprecation warning to HomeScreen class
-  - Update imports to not expose HomeScreen
-  - Keep for backwards compatibility
+- [x] 4.3 Remove deprecated letter-key shortcuts (Phase 2)
+  - Letter-key shortcuts (g, c, v, m, h, i, o, t, s, n) no longer trigger navigation
+  - Navigation uses sidebar selection or number keys (1-9)
+  - Tests updated to use sidebar navigation
 
 ## 5. Visual Polish (COMPLETE)
 

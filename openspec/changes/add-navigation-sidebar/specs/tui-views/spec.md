@@ -30,6 +30,18 @@ The system SHALL provide a main view showing commitments due soon and quick acti
 - **WHEN** user selects a goal due for review and activates it
 - **THEN** the `/goal review` flow starts
 
-#### Scenario: Quick access goals shortcut
-- **WHEN** user presses '2' (Goals nav item) or selects from sidebar
+#### Scenario: Quick access goals via sidebar
+- **WHEN** user presses '2' (Goals nav item) or selects "Goals" from NavSidebar
 - **THEN** the data panel shows the goals list
+
+## REMOVED Requirements
+
+### Requirement: Quick Access Goals Shortcut (Letter Key)
+
+**Reason**: Letter-key shortcuts ('g' for goals) are replaced by sidebar navigation and number keys.
+
+#### Scenario: Quick access goals shortcut (REMOVED)
+- **WHEN** user presses 'g' on home screen
+- **THEN** the data panel shows the goals list
+
+**Migration**: Use NavSidebar selection or press '2' for Goals quick access.

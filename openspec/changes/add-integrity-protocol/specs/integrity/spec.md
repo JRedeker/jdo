@@ -2,6 +2,10 @@
 
 The Integrity Protocol implements MPI's Honor-Your-Word framework: when commitments can't be met, users follow a structured recovery process (notify stakeholders, clean up impact). This capability provides the CleanupPlan entity, notification task workflow, integrity metrics, and scoring.
 
+**Cross-reference**:
+- See `add-navigation-sidebar/specs/tui-nav` for integrity display in NavSidebar header
+- See `refactor-codebase-maintainability` for final handler locations (IntegrityHandler, AtRiskHandler, etc.)
+
 ## ADDED Requirements
 
 ### Requirement: CleanupPlan Model

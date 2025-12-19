@@ -41,7 +41,7 @@ Track and display reliability metrics:
 
 ### Integrity Score
 
-Composite letter grade (A+ through D-) displayed on home screen, calculated from weighted metrics.
+Composite letter grade (A+ through D-) displayed in NavSidebar header (when expanded), calculated from weighted metrics. Full dashboard accessible via "Integrity" sidebar item or number key '7'.
 
 ### AI Risk Detection
 
@@ -61,13 +61,13 @@ Proactive checks on app launch for:
 - **Affected specs**:
   - `commitment` (modified - add `at_risk` status)
   - `integrity` (new capability - CleanupPlan, metrics, scoring)
-  - `tui-chat` (modified - new commands, home screen integrity score, AI risk detection)
+  - `tui-chat` (modified - new commands, NavSidebar integrity display, AI risk detection)
 
 - **Affected code**:
   - CommitmentStatus enum extension
   - New CleanupPlan SQLModel entity
   - New IntegrityMetrics calculation module
-  - TUI home screen modification
+  - NavSidebar header modification (integrity grade display)
   - AI prompt extensions for risk detection and notification drafting
 
 - **Breaking changes**: None - `at_risk` is additive to existing statuses
@@ -78,6 +78,7 @@ Proactive checks on app launch for:
 - Requires `wire_ai_to_chat` - ✓ Complete
 - **CRITICAL**: Requires `persist_handler_results` - Command handlers must save to database
 - Should be implemented after `implement-jdo-app` (TUI app shell and commands infrastructure)
+- **Alignment**: Aligns with `add-navigation-sidebar` - integrity grade displayed in NavSidebar header, accessed via sidebar item '7' (not legacy 'i' key)
 
 ## Design Decisions (Resolved)
 

@@ -1,14 +1,16 @@
 # Capability: TUI Chat Interface (Integrity Protocol Extension)
 
-This spec extends the TUI chat interface from `add-conversational-tui` to add integrity commands, home screen integrity display, and AI risk detection.
+This spec extends the TUI chat interface to add integrity commands, integrity display via NavSidebar, and AI risk detection.
 
-**Cross-reference**: See `add-conversational-tui/specs/tui-chat` for the base TUI specification.
+**Cross-reference**: 
+- See `specs/tui-chat` for the base TUI specification.
+- See `add-navigation-sidebar/specs/tui-nav` for NavSidebar architecture.
 
 **Implementation Notes** (Textual-specific):
-- Integrity grade in header: Extend `Header` or add custom widget docked to top-right
+- Integrity grade display: Shown in NavSidebar header (see tui-nav "Sidebar Header Display" requirement)
 - At-risk styling: Use Textual CSS with warning color class (e.g., `.at-risk { color: $warning; }`)
-- AI risk detection: Check on `on_mount()` of main screen, display via system message in chat
-- 'i' and 'r' bindings: Add to appropriate widget BINDINGS with `show=True` for footer display
+- AI risk detection: Check on `on_mount()` of MainScreen, display via system message in chat
+- Integrity navigation: Via NavSidebar selection or number key '7'
 
 ## ADDED Requirements
 
@@ -84,21 +86,23 @@ The system SHALL support the `/integrity` command to show the integrity dashboar
 - **WHEN** user types `/integrity` with no commitment history
 - **THEN** the dashboard shows "A+" with message: "You're starting with a clean slate. Keep your commitments to maintain your integrity score."
 
-### Requirement: Home Screen Integrity Display
+### Requirement: Integrity Display via NavSidebar
 
-The system SHALL display the integrity grade on the home screen.
+The system SHALL display the integrity grade in the NavSidebar header area.
 
-#### Scenario: Display integrity grade on home
-- **WHEN** user views the home screen
-- **THEN** the integrity letter grade is displayed in the header area (e.g., "Integrity: A-")
+**Note**: This requirement is implemented via `add-navigation-sidebar/specs/tui-nav` "Sidebar Header Display" requirement. The integrity grade is shown in the NavSidebar header when expanded.
+
+#### Scenario: Display integrity grade in sidebar header
+- **WHEN** user views the main layout with NavSidebar expanded
+- **THEN** the integrity letter grade is displayed in the NavSidebar header (e.g., "Integrity: A-")
 
 #### Scenario: Integrity grade styling
 - **WHEN** displaying integrity grade
 - **THEN** grade is color-coded: A grades (green), B grades (blue), C grades (yellow), D/F grades (red)
 
-#### Scenario: Tap integrity for details
-- **WHEN** user presses 'i' on home screen
-- **THEN** the integrity dashboard is shown in the data panel
+#### Scenario: Access integrity dashboard via sidebar
+- **WHEN** user selects "Integrity" from NavSidebar (item 7) or presses number key '7'
+- **THEN** the integrity dashboard is displayed in the DataPanel
 
 ### Requirement: AI Risk Detection on Launch
 
@@ -144,28 +148,40 @@ The system SHALL provide clear visual distinction for at-risk commitments.
 - **WHEN** displaying a notification task (is_notification_task=True)
 - **THEN** the task has distinct styling (e.g., bell icon) indicating it's a notification
 
-### Requirement: Keyboard Navigation (Extended)
+### Requirement: Integrity Navigation via Sidebar
 
-The system SHALL add keyboard shortcuts for integrity features.
+The system SHALL provide access to integrity features through NavSidebar.
 
-#### Scenario: Quick access integrity
+#### Scenario: Integrity item in sidebar
+- **WHEN** viewing the NavSidebar
+- **THEN** "Integrity" appears as navigation item (position 7)
+
+#### Scenario: Quick access integrity via number key
+- **WHEN** user presses '7' (Integrity nav item)
+- **THEN** the integrity dashboard is displayed in the DataPanel
+
+#### Scenario: Mark at-risk from commitment view
+- **WHEN** user is viewing a commitment in DataPanel and types `/atrisk`
+- **THEN** the at-risk workflow begins for that commitment
+
+## REMOVED Requirements
+
+### Requirement: Legacy Letter-Key Integrity Shortcut
+
+**Reason**: Letter-key shortcuts are replaced by NavSidebar navigation per `add-navigation-sidebar` change.
+
+#### Scenario: Quick access integrity via 'i' key (REMOVED)
 - **WHEN** user presses 'i' on home screen
 - **THEN** the integrity dashboard is displayed in the data panel
 
-**Note**: 'i' is currently unused in HomeScreen bindings (uses: n, g, c, v, m, o, h, t, s, q)
+**Migration**: Use NavSidebar selection "Integrity" or press number key '7'.
 
-#### Scenario: Mark at-risk shortcut
-- **WHEN** user presses 'r' while viewing a commitment
-- **THEN** the at-risk workflow begins (equivalent to `/atrisk`)
+### Requirement: Legacy Footer Shortcuts
 
-### Requirement: Footer Shortcuts (Extended)
+**Reason**: Footer letter shortcuts are replaced by NavSidebar per `add-navigation-sidebar` change.
 
-The system SHALL update the footer to show new shortcuts.
-
-#### Scenario: Home screen footer includes integrity
+#### Scenario: Home screen footer includes i:integrity (REMOVED)
 - **WHEN** viewing home screen
 - **THEN** footer includes: i:integrity alongside existing shortcuts
 
-#### Scenario: Commitment view footer includes at-risk
-- **WHEN** viewing a commitment that is not already at_risk
-- **THEN** footer includes: r:at-risk alongside existing shortcuts
+**Migration**: Integrity is accessible via NavSidebar; footer shows context-appropriate bindings only.

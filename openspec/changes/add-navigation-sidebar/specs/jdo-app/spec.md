@@ -79,15 +79,21 @@ The system SHALL provide consistent global key bindings.
 - **WHEN** the user presses '['
 - **THEN** the NavSidebar toggles between expanded and collapsed states
 
-#### Scenario: Optional number keys provide quick navigation
+#### Scenario: Number keys provide quick navigation
 - **GIVEN** the application is running
 - **WHEN** the user presses a number key (1-9)
-- **THEN** the corresponding NavSidebar item is selected as a convenience shortcut
+- **THEN** the corresponding NavSidebar item is selected (1=Chat, 2=Goals, 3=Commitments, etc.)
+- **AND** number keys work regardless of which widget has focus
 
-#### Scenario: Tab cycles focus
-- **GIVEN** the application is running
+#### Scenario: Tab cycles focus with visible widgets
+- **GIVEN** the application is running with DataPanel visible
 - **WHEN** the user presses Tab
-- **THEN** focus cycles between NavSidebar, PromptInput, and DataPanel
+- **THEN** focus cycles in order: NavSidebar → PromptInput → DataPanel → NavSidebar
+
+#### Scenario: Tab skips hidden DataPanel
+- **GIVEN** the application is running with DataPanel hidden (Chat view)
+- **WHEN** the user presses Tab
+- **THEN** focus cycles in order: NavSidebar → PromptInput → NavSidebar
 
 ### Requirement: Application Layout
 

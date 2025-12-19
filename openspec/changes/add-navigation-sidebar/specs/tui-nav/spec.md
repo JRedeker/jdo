@@ -9,7 +9,7 @@ The system SHALL provide a NavSidebar widget that displays navigation options in
 #### Scenario: Sidebar displays navigation items
 - **GIVEN** the application is running
 - **WHEN** the main screen is displayed
-- **THEN** the NavSidebar shows navigation items: Chat, Goals, Commitments, Visions, Milestones, Hierarchy, Integrity, Orphans, Settings
+- **THEN** the NavSidebar shows navigation items: Chat, Goals, Commitments, Visions, Milestones, Hierarchy, Integrity, Orphans, Triage, Settings
 
 #### Scenario: Sidebar items are keyboard navigable
 - **WHEN** the sidebar has focus
@@ -82,6 +82,10 @@ The system SHALL handle navigation item selection by updating the content area a
 - **WHEN** user selects "Orphans" from sidebar
 - **THEN** the DataPanel shows commitments without goal/milestone linkage
 
+#### Scenario: Triage selection shows inbox items
+- **WHEN** user selects "Triage" from sidebar
+- **THEN** the DataPanel shows the triage workflow for items needing classification
+
 #### Scenario: Settings selection opens settings screen
 - **WHEN** user selects "Settings" from sidebar
 - **THEN** the SettingsScreen is pushed onto the screen stack
@@ -102,6 +106,30 @@ The system SHALL manage focus between sidebar and content area consistently.
 #### Scenario: Focus returns to prompt after navigation
 - **WHEN** user selects a navigation item (except Settings)
 - **THEN** focus moves to the PromptInput after content updates
+
+#### Scenario: Tab skips hidden DataPanel
+- **GIVEN** the DataPanel is hidden (Chat view selected)
+- **WHEN** user presses Tab
+- **THEN** focus cycles between NavSidebar and PromptInput only
+
+#### Scenario: Focus fallback when widgets unavailable
+- **GIVEN** only NavSidebar is focusable
+- **WHEN** user presses Tab
+- **THEN** focus remains on NavSidebar
+
+### Requirement: Sidebar Error Handling
+
+The system SHALL handle sidebar errors gracefully without breaking navigation.
+
+#### Scenario: Sidebar renders with empty items gracefully
+- **GIVEN** the sidebar items list is empty or corrupted
+- **WHEN** the sidebar attempts to render
+- **THEN** a minimal fallback view is shown with Settings item only
+
+#### Scenario: Sidebar selection failure does not crash
+- **WHEN** a sidebar selection handler encounters an error
+- **THEN** an error message is displayed in the chat area
+- **AND** the sidebar remains functional for subsequent selections
 
 ### Requirement: Triage Badge
 
@@ -134,3 +162,20 @@ The system SHALL remember sidebar state within a session.
 - **GIVEN** user has "Goals" selected in sidebar
 - **WHEN** a modal dialog opens and closes
 - **THEN** "Goals" remains selected in sidebar
+
+### Requirement: Sidebar Header Display
+
+The system SHALL display contextual information in the NavSidebar header area.
+
+#### Scenario: Integrity grade in sidebar header
+- **WHEN** the sidebar is rendered in expanded mode
+- **THEN** the integrity letter grade is displayed above the navigation items (e.g., "Integrity: A-")
+
+#### Scenario: Integrity grade color coding in header
+- **WHEN** the integrity grade is displayed in sidebar header
+- **THEN** grade is color-coded: A-range = green, B-range = blue, C-range = yellow, D/F = red
+
+#### Scenario: Header collapses with sidebar
+- **GIVEN** the sidebar is in collapsed mode
+- **WHEN** the sidebar is rendered
+- **THEN** the integrity grade is hidden to save space

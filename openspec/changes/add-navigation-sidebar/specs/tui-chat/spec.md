@@ -49,3 +49,47 @@ The system SHALL enhance risk warnings with time-based analysis.
 #### Scenario: Daily capacity warning
 - **WHEN** user's allocated hours exceed available hours
 - **THEN** a warning message appears in chat: "Over-committed today: X hours allocated, Y hours available"
+
+## REMOVED Requirements
+
+### Requirement: Keyboard Navigation Letter Shortcuts
+
+**Reason**: Letter-key shortcuts (v, m, h) are replaced by NavSidebar selection and number keys.
+
+#### Scenario: Quick access visions (REMOVED)
+- **WHEN** user presses 'v' on home screen or with prompt focused
+- **THEN** the data panel shows visions list
+
+**Migration**: Use NavSidebar selection or press '4' for Visions quick access.
+
+#### Scenario: Quick access milestones (REMOVED)
+- **WHEN** user presses 'm' on home screen or with prompt focused
+- **THEN** the data panel shows milestones list
+
+**Migration**: Use NavSidebar selection or press '5' for Milestones quick access.
+
+#### Scenario: Quick access hierarchy (REMOVED)
+- **WHEN** user presses 'h' on home screen
+- **THEN** the data panel shows the full planning hierarchy tree
+
+**Migration**: Use NavSidebar selection or press '6' for Hierarchy quick access.
+
+### Requirement: Home Screen Footer Shortcuts
+
+**Reason**: Footer letter shortcuts (v:visions, m:milestones, h:hierarchy) are replaced by sidebar navigation.
+
+#### Scenario: Footer shows old shortcuts (REMOVED)
+- **WHEN** viewing home screen
+- **THEN** footer includes: v:visions, m:milestones, h:hierarchy alongside existing shortcuts
+
+**Migration**: Footer now shows context-appropriate bindings; navigation shortcuts are discoverable via NavSidebar.
+
+### Requirement: Integrity Always Visible (Home Screen)
+
+**Reason**: Integrity grade display moves from home screen to NavSidebar header.
+
+#### Scenario: Integrity grade on home screen (REMOVED)
+- **WHEN** user views the home screen
+- **THEN** current integrity letter grade is displayed prominently
+
+**Migration**: See tui-nav spec "Sidebar Header Display" requirement for integrity grade in NavSidebar header.
