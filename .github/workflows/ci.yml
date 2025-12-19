@@ -77,6 +77,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for SonarCloud
       - name: Install gum
         run: |
           sudo mkdir -p /etc/apt/keyrings
@@ -88,7 +90,31 @@ jobs:
           enable-cache: true
       - run: uv python install ${{ env.PYTHON_VERSION }}
       - run: uv sync --dev
-      - run: source .github/scripts/ci-utils.sh && ci_test
+      - name: Run tests with coverage
+        run: uv run pytest --cov=src/jdo --cov-report=xml --cov-branch -q
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 1
+
+  sonarcloud:
+    name: "📊 SonarCloud"
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for blame information
+      - name: Download coverage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   roadmap:
     name: "📋 Roadmap"

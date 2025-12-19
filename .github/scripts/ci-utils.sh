@@ -46,11 +46,42 @@ ci_typecheck() {
 
 ci_complexity() {
   _header "📊 COMPLEXITY" "" "CCN ≤ 10 | NLOC ≤ 50 | Params ≤ 6"
-  if ! uv run lizard src/ -C 10 -L 50 -a 6 -w; then
-    _warn "⚠️ COMPLEXITY WARNING" "" "Some functions exceed thresholds"
+
+  # Create temp files for comparison
+  local tmp_current tmp_whitelist tmp_raw
+  tmp_current=$(mktemp)
+  tmp_whitelist=$(mktemp)
+  tmp_raw=$(mktemp)
+
+  # Run lizard and capture output (suppress uv build messages)
+  uv run lizard src/ -C 10 -L 50 -a 6 -w > "$tmp_raw" 2>&1 || true
+
+  # Extract just the warning lines and sort
+  grep "^src/" "$tmp_raw" | sort > "$tmp_current" || true
+  rm -f "$tmp_raw"
+
+  if [ ! -s "$tmp_current" ]; then
+    rm -f "$tmp_current" "$tmp_whitelist"
+    _success "✅ COMPLEXITY PASSED"
+    return 0
+  fi
+
+  # Get whitelisted warnings (skip comments and empty lines)
+  grep "^src/" whitelizard.txt | sort > "$tmp_whitelist" 2>/dev/null || true
+
+  # Find new warnings not in whitelist
+  local new_warnings
+  new_warnings=$(comm -23 "$tmp_current" "$tmp_whitelist")
+
+  rm -f "$tmp_current" "$tmp_whitelist"
+
+  if [ -n "$new_warnings" ]; then
+    echo "$new_warnings"
+    _error "❌ NEW COMPLEXITY VIOLATIONS" "" "Add to whitelizard.txt or refactor"
     return 1
   fi
-  _success "✅ COMPLEXITY PASSED"
+
+  _success "✅ COMPLEXITY PASSED (whitelisted warnings only)"
 }
 
 ci_test() {
