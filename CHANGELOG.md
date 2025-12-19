@@ -12,6 +12,9 @@ When a feature spec is archived, it should be added here and removed from `ROADM
 #### Navigation & UX
 - **fix-navigation-and-review-textual** (2025-12-19): Fixed all HomeScreen keyboard shortcuts (g/c/v/m/o/h/i), added ChatScreenConfig pattern, comprehensive Textual patterns documentation
 
+#### Testing
+- **add-ai-driven-uat** (2025-12-19): AI-driven UAT framework with scenario definitions and mock agent testing
+
 #### AI Integration
 - **wire-ai-to-chat** (2025-12-19): Connected PydanticAI agent to ChatScreen with streaming responses and tool invocation
 - **persist-handler-results** (2025-12-19): Wired command handlers to database persistence with confirmation flow

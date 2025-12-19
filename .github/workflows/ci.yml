@@ -103,6 +103,8 @@ jobs:
     name: "📊 SonarCloud"
     runs-on: ubuntu-latest
     needs: test
+    # SonarCloud is optional - skip if not configured
+    if: ${{ vars.SONAR_ENABLED == 'true' }}
     steps:
       - uses: actions/checkout@v4
         with:
