@@ -17,12 +17,17 @@ The system SHALL provide a NavSidebar widget that displays navigation options in
 - **THEN** the highlighted item changes accordingly
 
 #### Scenario: Sidebar item selection posts message
-- **WHEN** the user presses Enter on a highlighted item
+- **WHEN** the user presses Enter on a highlighted item (or clicks it)
 - **THEN** the sidebar posts a `NavSidebar.Selected` message with the item ID
 
-#### Scenario: Sidebar supports number key shortcuts
+#### Scenario: Sidebar keyboard navigation is consistent
+- **WHEN** the sidebar has focus
+- **AND** the user uses Tab, arrow keys, or Enter
+- **THEN** the highlight and selection move predictably without overlapping letter shortcuts
+
+#### Scenario: Sidebar optionally responds to number keys
 - **WHEN** the user presses a number key (1-9)
-- **THEN** the corresponding navigation item is selected directly
+- **THEN** the corresponding navigation item is selected as a convenience shortcut
 
 #### Scenario: Sidebar collapse toggle
 - **WHEN** the user presses `[` key
@@ -36,7 +41,7 @@ The system SHALL provide a NavSidebar widget that displays navigation options in
 #### Scenario: Expanded sidebar shows full labels
 - **GIVEN** the sidebar is in expanded state
 - **WHEN** the sidebar is rendered
-- **THEN** full labels are shown with shortcut hints (e.g., "1 Chat", "2 Goals")
+- **THEN** full labels are shown with optional number hints (e.g., "Chat", "Goals")
 
 ### Requirement: Navigation Item Selection
 

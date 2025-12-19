@@ -325,7 +325,7 @@ class TestNavSidebarActiveState:
             sidebar.focus()
             await pilot.pause()
 
-            # Select goals
+            # Select goals via number key
             await pilot.press("2")
             await pilot.pause()
 

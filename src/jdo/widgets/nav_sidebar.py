@@ -242,7 +242,9 @@ class NavSidebar(Widget):
             self.remove_class("-collapsed")
 
         # Re-render labels
-        self._refresh_options()
+        refresh = getattr(self, "_refresh_options", None)
+        if refresh:
+            refresh()
 
     def set_active_item(self, item_id: str) -> None:
         """Set the active (highlighted) navigation item.
@@ -267,7 +269,9 @@ class NavSidebar(Widget):
         """
         self.triage_count = count
         # Re-render to update badge
-        self._refresh_options()
+        refresh = getattr(self, "_refresh_options", None)
+        if refresh:
+            refresh()
 
     def _select_by_index(self, index: int) -> None:
         """Select a navigation item by its 1-based index.

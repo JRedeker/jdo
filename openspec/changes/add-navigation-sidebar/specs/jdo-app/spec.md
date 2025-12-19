@@ -79,10 +79,10 @@ The system SHALL provide consistent global key bindings.
 - **WHEN** the user presses '['
 - **THEN** the NavSidebar toggles between expanded and collapsed states
 
-#### Scenario: Number keys select navigation items
+#### Scenario: Optional number keys provide quick navigation
 - **GIVEN** the application is running
 - **WHEN** the user presses a number key (1-9)
-- **THEN** the corresponding NavSidebar item is selected
+- **THEN** the corresponding NavSidebar item is selected as a convenience shortcut
 
 #### Scenario: Tab cycles focus
 - **GIVEN** the application is running

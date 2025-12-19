@@ -2,61 +2,61 @@
 
 ## 1. Foundation - NavSidebar Widget (TDD)
 
-- [ ] 1.1 Write unit tests for NavSidebar widget
+- [x] 1.1 Write unit tests for NavSidebar widget
   - Test: Widget renders with expected navigation items
   - Test: Up/down keys navigate items
   - Test: Enter key posts Selected message
   - Test: Collapse toggle changes display mode
   - Test: Number keys (1-9) select items directly
   
-- [ ] 1.2 Implement NavSidebar widget
+- [x] 1.2 Implement NavSidebar widget
   - Create `src/jdo/widgets/nav_sidebar.py`
   - Extend from `Widget`, compose `OptionList`
   - Define ITEMS list with id, label, shortcut
   - Implement Selected message class
   - Add collapse/expand functionality
 
-- [ ] 1.3 Add NavSidebar CSS styling
+- [x] 1.3 Add NavSidebar CSS styling
   - Collapsed mode: 3-char width, single letters
-  - Expanded mode: full labels with shortcuts
+  - Expanded mode: full labels (no shortcuts)
   - Active item highlight
   - Separator styling
 
 ## 2. Integration - App Layout (TDD)
 
-- [ ] 2.1 Write integration tests for sidebar in app
+- [x] 2.1 Write integration tests for sidebar in app
   - Test: Sidebar visible on app startup
   - Test: Sidebar selection changes DataPanel content
   - Test: Settings selection pushes SettingsScreen
   - Test: Sidebar collapse persists during session
 
-- [ ] 2.2 Modify JdoApp to include NavSidebar
+- [x] 2.2 Modify JdoApp to include NavSidebar
   - Add NavSidebar to compose()
   - Handle NavSidebar.Selected messages
   - Remove HomeScreen from startup flow
   - Add `[` binding for collapse toggle
 
-- [ ] 2.3 Wire sidebar selections to DataPanel
+- [x] 2.3 Wire sidebar selections to DataPanel
   - Map item IDs to DataPanel modes
   - Query and pass data for list views
   - Handle hierarchy and integrity modes
 
 ## 3. Navigation Behavior (TDD)
 
-- [ ] 3.1 Write tests for navigation bindings
-  - Test: `1-9` keys select sidebar items
+- [x] 3.1 Write tests for navigation bindings
   - Test: `Tab` cycles focus: sidebar → prompt → panel
   - Test: `Escape` behavior is context-aware
   - Test: `q` quits from any state
+  - Test: Arrow / Enter / mouse interactions select items
 
-- [ ] 3.2 Implement global navigation bindings
-  - Add number key bindings to JdoApp
+- [x] 3.2 Implement global navigation bindings
   - Implement focus cycling with Tab
   - Update Escape handling for new layout
+  - Ensure mouse/arrow/Enter navigation is wired
 
-- [ ] 3.3 Write tests for collapsed mode navigation
-  - Test: Number keys work when collapsed
-  - Test: Arrow keys expand and navigate
+- [x] 3.3 Write tests for collapsed mode navigation
+  - Test: Arrow keys and Enter work when collapsed
+  - Test: Focus management still behaves correctly
 
 ## 4. HomeScreen Deprecation
 
@@ -101,7 +101,7 @@
 ## Validation
 
 After each task group:
-```bash
+```
 uv run ruff check --fix src/ tests/
 uv run ruff format src/ tests/
 uv run pytest tests/tui/ -v

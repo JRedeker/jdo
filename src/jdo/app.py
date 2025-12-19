@@ -30,6 +30,7 @@ from jdo.screens.draft_restore import DraftRestoreScreen
 from jdo.screens.home import HomeScreen
 from jdo.screens.settings import SettingsScreen
 from jdo.widgets.hierarchy_view import HierarchyView
+from jdo.widgets.nav_sidebar import NavSidebar
 
 
 class JdoApp(App[None]):
@@ -422,6 +423,192 @@ class JdoApp(App[None]):
         returning from settings via on_settings_screen_back.
         """
         logger.info("Authentication status changed")
+
+    def on_nav_sidebar_selected(self, message: NavSidebar.Selected) -> None:
+        """Handle navigation selection from NavSidebar.
+
+        Routes sidebar selections to the appropriate view/screen.
+        """
+        item_id = message.item_id
+        logger.debug(f"NavSidebar selection: {item_id}")
+
+        # Map item IDs to handler methods
+        handlers = {
+            "chat": self._nav_to_chat,
+            "goals": self._nav_to_goals,
+            "commitments": self._nav_to_commitments,
+            "visions": self._nav_to_visions,
+            "milestones": self._nav_to_milestones,
+            "hierarchy": self._nav_to_hierarchy,
+            "integrity": self._nav_to_integrity,
+            "orphans": self._nav_to_orphans,
+            "triage": self._nav_to_triage,
+            "settings": self._nav_to_settings,
+        }
+
+        handler = handlers.get(item_id)
+        if handler:
+            handler()
+
+    def _nav_to_chat(self) -> None:
+        """Navigate to chat screen."""
+        self.push_screen(ChatScreen())
+
+    def _nav_to_goals(self) -> None:
+        """Navigate to goals list view."""
+        with get_session() as session:
+            goals = list(session.exec(select(Goal)).all())
+            goal_items = [
+                {
+                    "id": str(g.id),
+                    "title": g.title,
+                    "problem_statement": g.problem_statement,
+                    "status": g.status.value,
+                }
+                for g in goals
+            ]
+        self.push_screen(
+            ChatScreen(
+                ChatScreenConfig(
+                    initial_mode="list", initial_entity_type="goal", initial_data=goal_items
+                )
+            )
+        )
+
+    def _nav_to_commitments(self) -> None:
+        """Navigate to commitments list view."""
+        with get_session() as session:
+            results = list(session.exec(select(Commitment, Stakeholder).join(Stakeholder)).all())
+            commitment_items = [
+                {
+                    "id": str(c.id),
+                    "deliverable": c.deliverable,
+                    "stakeholder_name": s.name,
+                    "due_date": c.due_date.isoformat(),
+                    "status": c.status.value,
+                }
+                for c, s in results
+            ]
+        self.push_screen(
+            ChatScreen(
+                ChatScreenConfig(
+                    initial_mode="list",
+                    initial_entity_type="commitment",
+                    initial_data=commitment_items,
+                )
+            )
+        )
+
+    def _nav_to_visions(self) -> None:
+        """Navigate to visions list view."""
+        with get_session() as session:
+            visions = list(session.exec(select(Vision)).all())
+            vision_items = [
+                {
+                    "id": str(v.id),
+                    "title": v.title,
+                    "timeframe": v.timeframe,
+                    "status": v.status.value,
+                }
+                for v in visions
+            ]
+        self.push_screen(
+            ChatScreen(
+                ChatScreenConfig(
+                    initial_mode="list", initial_entity_type="vision", initial_data=vision_items
+                )
+            )
+        )
+
+    def _nav_to_milestones(self) -> None:
+        """Navigate to milestones list view."""
+        with get_session() as session:
+            milestones = list(session.exec(select(Milestone)).all())
+            milestone_items = [
+                {
+                    "id": str(m.id),
+                    "description": m.description,
+                    "target_date": m.target_date.isoformat(),
+                    "status": m.status.value,
+                }
+                for m in milestones
+            ]
+        self.push_screen(
+            ChatScreen(
+                ChatScreenConfig(
+                    initial_mode="list",
+                    initial_entity_type="milestone",
+                    initial_data=milestone_items,
+                )
+            )
+        )
+
+    def _nav_to_hierarchy(self) -> None:
+        """Navigate to hierarchy view."""
+        self.push_screen(ChatScreen())
+
+    def _nav_to_integrity(self) -> None:
+        """Navigate to integrity dashboard."""
+        with get_session() as session:
+            service = IntegrityService()
+            metrics = service.calculate_integrity_metrics(session)
+            integrity_data = {
+                "composite_score": metrics.composite_score,
+                "letter_grade": metrics.letter_grade,
+                "on_time_rate": metrics.on_time_rate,
+                "notification_timeliness": metrics.notification_timeliness,
+                "cleanup_completion_rate": metrics.cleanup_completion_rate,
+                "current_streak_weeks": metrics.current_streak_weeks,
+                "total_completed": metrics.total_completed,
+                "total_on_time": metrics.total_on_time,
+                "total_at_risk": metrics.total_at_risk,
+                "total_abandoned": metrics.total_abandoned,
+            }
+        self.push_screen(
+            ChatScreen(
+                ChatScreenConfig(
+                    initial_mode="integrity", initial_entity_type="", initial_data=integrity_data
+                )
+            )
+        )
+
+    def _nav_to_orphans(self) -> None:
+        """Navigate to orphan commitments view."""
+        with get_session() as session:
+            results = list(
+                session.exec(
+                    select(Commitment, Stakeholder)
+                    .join(Stakeholder)
+                    .where(Commitment.goal_id == None)  # noqa: E711
+                ).all()
+            )
+            orphan_items = [
+                {
+                    "id": str(c.id),
+                    "deliverable": c.deliverable,
+                    "stakeholder_name": s.name,
+                    "due_date": c.due_date.isoformat(),
+                    "status": c.status.value,
+                }
+                for c, s in results
+            ]
+        self.push_screen(
+            ChatScreen(
+                ChatScreenConfig(
+                    initial_mode="list",
+                    initial_entity_type="commitment",
+                    initial_data=orphan_items,
+                )
+            )
+        )
+
+    def _nav_to_triage(self) -> None:
+        """Navigate to triage mode."""
+        self.push_screen(ChatScreen(ChatScreenConfig(triage_mode=True)))
+
+    def _nav_to_settings(self) -> None:
+        """Navigate to settings screen."""
+        self.push_screen(SettingsScreen())
 
     def on_hierarchy_view_item_selected(self, message: HierarchyView.ItemSelected) -> None:
         """Handle item selection from HierarchyView widget.

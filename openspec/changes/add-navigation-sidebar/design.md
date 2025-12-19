@@ -7,13 +7,13 @@ JDO is a TUI application built with Textual. Current navigation uses:
 - Each shortcut pushes ChatScreen with different data pre-loaded
 - Bindings don't work consistently across screens
 
-This creates discoverability and consistency problems.
+This creates discoverability and consistency problems, especially as letter-key shortcuts produce conflicts on certain layouts.
 
 ## Goals
 
 - **Discoverable navigation**: Users can see available views without memorization
 - **Consistent behavior**: Navigation works the same from any screen
-- **Keyboard-first**: Quick access via number keys (1-9)
+- **Keyboard-first**: Quick navigation via Tab, arrow keys, Enter, mouse clicks, and optional number keys
 - **Space-efficient**: Sidebar can collapse to icon-only mode
 
 ## Non-Goals
@@ -94,18 +94,18 @@ class NavSidebar(Widget):
     """Persistent navigation sidebar."""
     
     ITEMS = [
-        ("chat", "Chat", "n"),       # Default view
+        ("chat", "Chat", "C"),
         None,                         # Separator
-        ("goals", "Goals", "g"),
-        ("commitments", "Commitments", "c"),
-        ("visions", "Visions", "v"),
-        ("milestones", "Milestones", "m"),
+        ("goals", "Goals", "G"),
+        ("commitments", "Commitments", "Cm"),
+        ("visions", "Visions", "V"),
+        ("milestones", "Milestones", "M"),
         None,                         # Separator
-        ("hierarchy", "Hierarchy", "h"),
-        ("integrity", "Integrity", "i"),
-        ("orphans", "Orphans", "o"),
+        ("hierarchy", "Hierarchy", "H"),
+        ("integrity", "Integrity", "I"),
+        ("orphans", "Orphans", "O"),
         None,                         # Separator
-        ("settings", "Settings", "s"),
+        ("settings", "Settings", "S"),
     ]
     
     class Selected(Message):
@@ -119,8 +119,8 @@ class NavSidebar(Widget):
 
 | Key | Action | Scope |
 |-----|--------|-------|
-| `1-9` | Select nav item by position | Global |
 | `[` | Toggle sidebar collapse | Global |
+| Arrow keys / Enter / Mouse click | Navigate and select sidebar items | Global |
 | `Tab` | Cycle focus: sidebar → chat → data panel | Global |
 | `Escape` | Context-aware (clear input, unfocus, or quit confirmation) | Global |
 | `q` | Quit | Global |
