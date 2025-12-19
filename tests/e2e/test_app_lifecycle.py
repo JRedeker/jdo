@@ -29,7 +29,7 @@ from jdo.models.draft import EntityType
 from jdo.screens.ai_required import AiRequiredScreen
 from jdo.screens.chat import ChatScreen
 from jdo.screens.draft_restore import DraftRestoreScreen
-from jdo.screens.home import HomeScreen
+from jdo.screens.main import MainScreen
 from jdo.screens.settings import SettingsScreen
 
 
@@ -48,9 +48,9 @@ class TestAppStartupFlows:
             async with app.run_test() as pilot:
                 await pilot.pause()
 
-                # Should show HomeScreen directly (no AI required screen)
+                # Should show MainScreen directly (no AI required screen)
                 home_screens = app.screen_stack
-                assert any(isinstance(screen, HomeScreen) for screen in home_screens)
+                assert any(isinstance(screen, MainScreen) for screen in home_screens)
                 assert not any(isinstance(screen, AiRequiredScreen) for screen in home_screens)
 
     async def test_app_shows_draft_restore_on_pending_draft(self) -> None:
@@ -95,8 +95,8 @@ class TestAppStartupFlows:
                 await pilot.press("d")
                 await pilot.pause()
 
-                # Should navigate to HomeScreen
-                assert any(isinstance(screen, HomeScreen) for screen in app.screen_stack)
+                # Should navigate to MainScreen
+                assert any(isinstance(screen, MainScreen) for screen in app.screen_stack)
 
                 # Draft should be deleted from database
                 with get_session() as session:
@@ -164,11 +164,12 @@ class TestSettingsScreenFlows:
             async with app.run_test() as pilot:
                 await pilot.pause()
 
-                # Should be on home
-                assert isinstance(app.screen, HomeScreen)
+                # Should be on main screen
+                assert isinstance(app.screen, MainScreen)
 
-                # Navigate to settings
-                await pilot.press("s")
+                # Navigate to settings via sidebar
+                sidebar = app.screen.nav_sidebar
+                sidebar.post_message(sidebar.Selected("settings"))
                 await pilot.pause()
                 assert isinstance(app.screen, SettingsScreen)
 
@@ -176,8 +177,8 @@ class TestSettingsScreenFlows:
                 await pilot.press("escape")
                 await pilot.pause()
 
-                # Should be back on home
-                assert isinstance(app.screen, HomeScreen)
+                # Should be back on main screen
+                assert isinstance(app.screen, MainScreen)
 
     async def test_settings_back_triggers_ai_check_via_worker(self) -> None:
         """Back from settings triggers AI config check in worker context.
@@ -201,8 +202,8 @@ class TestSettingsScreenFlows:
 
                 # App should still be running (no crash)
                 assert app.is_running or app._exit
-                # Should have returned to home without errors
-                assert isinstance(app.screen, HomeScreen)
+                # Should have returned to main screen without errors
+                assert isinstance(app.screen, MainScreen)
 
 
 class TestChatCommandFlows:

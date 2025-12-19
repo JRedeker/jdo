@@ -1,16 +1,16 @@
 name: triage_workflow
 description: Test the triage workflow for processing inbox items
 goal: |
-  Enter triage mode and process an item if any exist.
-  If no items need triage (triage count is 0), navigate to chat and add an ambiguous
+  Enter triage mode by pressing '9' or selecting Triage from the sidebar.
+  Process any items that exist.
+  If no items need triage (triage count is 0), use the chat to add an ambiguous
   note like "remember to follow up", then try triage again.
   Complete the triage by accepting or classifying the item.
-  Return to home when done.
 
 preconditions: []
 
 success_criteria:
-  - screen:HomeScreen
+  - screen:MainScreen
   - no_errors
   - completed
 

@@ -1,6 +1,6 @@
 """Main Textual application for JDO.
 
-The JdoApp is the application shell that integrates all screens
+The JdoApp is the application shell that integrates MainScreen
 and manages the application lifecycle.
 """
 
@@ -25,19 +25,17 @@ from jdo.models import Commitment, Goal, Milestone, Stakeholder, Vision
 from jdo.models.draft import Draft
 from jdo.observability import init_sentry
 from jdo.screens.ai_required import AiRequiredScreen
-from jdo.screens.chat import ChatScreen, ChatScreenConfig
 from jdo.screens.draft_restore import DraftRestoreScreen
-from jdo.screens.home import HomeScreen
+from jdo.screens.main import MainScreen
 from jdo.screens.settings import SettingsScreen
 from jdo.widgets.hierarchy_view import HierarchyView
-from jdo.widgets.nav_sidebar import NavSidebar
 
 
 class JdoApp(App[None]):
     """The JDO Textual application.
 
-    Integrates HomeScreen, ChatScreen, and SettingsScreen with
-    message-based navigation and startup initialization.
+    Uses MainScreen as the primary interface with embedded
+    NavSidebar, ChatContainer, PromptInput, and DataPanel.
     """
 
     TITLE = "JDO"
@@ -60,6 +58,7 @@ class JdoApp(App[None]):
         self._db_initialized = False
         self._snoozed_reviews: set[UUID] = set()
         self._visions_due_for_review: list[Vision] = []
+        self._main_screen: MainScreen | None = None
 
         # Configure logging and observability
         settings = get_settings()
@@ -80,7 +79,7 @@ class JdoApp(App[None]):
         yield Footer()
 
     async def on_mount(self) -> None:
-        """Handle app mount - initialize database and show home screen."""
+        """Handle app mount - initialize database and show main screen."""
         logger.debug("App mounted, initializing database")
         # Initialize database tables
         if not self._db_initialized:
@@ -88,8 +87,10 @@ class JdoApp(App[None]):
             self._db_initialized = True
             logger.info("Database initialized")
 
-        # Always start at home screen
-        await self.push_screen(HomeScreen())
+        # Start with MainScreen
+        main_screen = MainScreen()
+        self._main_screen = main_screen
+        await self.push_screen(main_screen)
 
         # If AI is not configured, block usage until configured.
         # Run in a worker to allow push_screen_wait (required by Textual)
@@ -168,25 +169,24 @@ class JdoApp(App[None]):
             decision: "restore" or "discard", or None if dismissed.
 
         Note: The DraftRestoreScreen is a ModalScreen that auto-pops on dismiss.
-        HomeScreen is already on the stack, so we only push if navigating to ChatScreen.
+        MainScreen is already on the stack.
         """
         # Get the draft ID from the stored pending draft
         pending = self._check_pending_drafts()
         if not pending:
             # Draft was already deleted or doesn't exist
-            # HomeScreen is already showing, just check vision reviews
             self._check_vision_reviews()
             return
 
         draft_id = pending.id
 
         if decision == "restore":
-            # Navigate to chat with the draft
-            self.push_screen(ChatScreen(ChatScreenConfig(draft_id=draft_id)))
+            # Update MainScreen with the draft
+            if self._main_screen:
+                self._main_screen.set_draft_id(draft_id)
         else:
             # Discard (or None/escape) - delete the draft
             self._delete_draft(draft_id)
-            # HomeScreen is already showing, just check vision reviews
             self._check_vision_reviews()
 
     def _delete_draft(self, draft_id: UUID) -> None:
@@ -229,37 +229,54 @@ class JdoApp(App[None]):
         """Toggle dark mode."""
         self.theme = "textual-light" if self.theme == "textual-dark" else "textual-dark"
 
-    # Message handlers for screen navigation
+    # Message handlers for MainScreen
 
-    def on_home_screen_new_chat(self, _message: HomeScreen.NewChat) -> None:
-        """Handle new chat request from HomeScreen."""
-        logger.debug("Navigating to ChatScreen")
-        self.push_screen(ChatScreen())
+    def on_main_screen_quit_requested(self, _message: MainScreen.QuitRequested) -> None:
+        """Handle quit request from MainScreen."""
+        self.exit()
 
-    def on_home_screen_open_settings(self, _message: HomeScreen.OpenSettings) -> None:
-        """Handle settings request from HomeScreen."""
+    def on_main_screen_open_settings(self, _message: MainScreen.OpenSettings) -> None:
+        """Handle settings request from MainScreen."""
         logger.debug("Navigating to SettingsScreen")
         self.push_screen(SettingsScreen())
 
-    def on_settings_screen_back(self, _message: SettingsScreen.Back) -> None:
-        """Handle back request from SettingsScreen."""
-        self.pop_screen()
-        # Run in worker since _ensure_ai_configured uses push_screen_wait
-        self.run_worker(self._ensure_ai_configured(), exclusive=True)
+    def on_main_screen_navigation_selected(self, message: MainScreen.NavigationSelected) -> None:
+        """Handle navigation selection from MainScreen.
 
-    def on_chat_screen_back(self, _message: ChatScreen.Back) -> None:
-        """Handle back request from ChatScreen."""
-        self.pop_screen()
+        Updates the MainScreen's data panel based on sidebar selection.
+        """
+        item_id = message.item_id
+        logger.debug(f"Navigation selected: {item_id}")
 
-    def on_home_screen_start_triage(self, _message: HomeScreen.StartTriage) -> None:
-        """Handle triage request from HomeScreen."""
-        logger.debug("Navigating to ChatScreen in triage mode")
-        # Navigate to chat with triage mode
-        self.push_screen(ChatScreen(ChatScreenConfig(triage_mode=True)))
+        if not self._main_screen:
+            return
 
-    def on_home_screen_show_goals(self, _message: HomeScreen.ShowGoals) -> None:
-        """Handle show goals request from HomeScreen."""
-        logger.debug("Navigating to ChatScreen with goals view")
+        # Map item IDs to data fetching methods
+        handlers = {
+            "chat": self._show_chat_view,
+            "goals": self._show_goals_view,
+            "commitments": self._show_commitments_view,
+            "visions": self._show_visions_view,
+            "milestones": self._show_milestones_view,
+            "hierarchy": self._show_hierarchy_view,
+            "integrity": self._show_integrity_view,
+            "orphans": self._show_orphans_view,
+            "triage": self._show_triage_view,
+        }
+
+        handler = handlers.get(item_id)
+        if handler:
+            handler()
+
+    def _show_chat_view(self) -> None:
+        """Show chat-only view (hide data panel)."""
+        if self._main_screen:
+            self._main_screen.data_panel.show_list("", [])
+
+    def _show_goals_view(self) -> None:
+        """Show goals in data panel."""
+        if not self._main_screen:
+            return
         with get_session() as session:
             goals = list(session.exec(select(Goal)).all())
             goal_items = [
@@ -271,17 +288,12 @@ class JdoApp(App[None]):
                 }
                 for g in goals
             ]
-        self.push_screen(
-            ChatScreen(
-                ChatScreenConfig(
-                    initial_mode="list", initial_entity_type="goal", initial_data=goal_items
-                )
-            )
-        )
+        self._main_screen.data_panel.show_list("goal", goal_items)
 
-    def on_home_screen_show_commitments(self, _message: HomeScreen.ShowCommitments) -> None:
-        """Handle show commitments request from HomeScreen."""
-        logger.debug("Navigating to ChatScreen with commitments view")
+    def _show_commitments_view(self) -> None:
+        """Show commitments in data panel."""
+        if not self._main_screen:
+            return
         with get_session() as session:
             results = list(session.exec(select(Commitment, Stakeholder).join(Stakeholder)).all())
             commitment_items = [
@@ -294,19 +306,12 @@ class JdoApp(App[None]):
                 }
                 for c, s in results
             ]
-        self.push_screen(
-            ChatScreen(
-                ChatScreenConfig(
-                    initial_mode="list",
-                    initial_entity_type="commitment",
-                    initial_data=commitment_items,
-                )
-            )
-        )
+        self._main_screen.data_panel.show_list("commitment", commitment_items)
 
-    def on_home_screen_show_visions(self, _message: HomeScreen.ShowVisions) -> None:
-        """Handle show visions request from HomeScreen."""
-        logger.debug("Navigating to ChatScreen with visions view")
+    def _show_visions_view(self) -> None:
+        """Show visions in data panel."""
+        if not self._main_screen:
+            return
         with get_session() as session:
             visions = list(session.exec(select(Vision)).all())
             vision_items = [
@@ -318,17 +323,12 @@ class JdoApp(App[None]):
                 }
                 for v in visions
             ]
-        self.push_screen(
-            ChatScreen(
-                ChatScreenConfig(
-                    initial_mode="list", initial_entity_type="vision", initial_data=vision_items
-                )
-            )
-        )
+        self._main_screen.data_panel.show_list("vision", vision_items)
 
-    def on_home_screen_show_milestones(self, _message: HomeScreen.ShowMilestones) -> None:
-        """Handle show milestones request from HomeScreen."""
-        logger.debug("Navigating to ChatScreen with milestones view")
+    def _show_milestones_view(self) -> None:
+        """Show milestones in data panel."""
+        if not self._main_screen:
+            return
         with get_session() as session:
             milestones = list(session.exec(select(Milestone)).all())
             milestone_items = [
@@ -340,21 +340,40 @@ class JdoApp(App[None]):
                 }
                 for m in milestones
             ]
-        self.push_screen(
-            ChatScreen(
-                ChatScreenConfig(
-                    initial_mode="list",
-                    initial_entity_type="milestone",
-                    initial_data=milestone_items,
-                )
-            )
-        )
+        self._main_screen.data_panel.show_list("milestone", milestone_items)
 
-    def on_home_screen_show_orphans(self, _message: HomeScreen.ShowOrphans) -> None:
-        """Handle show orphan commitments request from HomeScreen."""
-        logger.debug("Navigating to ChatScreen with orphan commitments view")
+    def _show_hierarchy_view(self) -> None:
+        """Show hierarchy in data panel."""
+        # For now, show empty - hierarchy command can populate this
+        if self._main_screen:
+            self._main_screen.data_panel.show_list("", [])
+
+    def _show_integrity_view(self) -> None:
+        """Show integrity dashboard in data panel."""
+        if not self._main_screen:
+            return
         with get_session() as session:
-            # Orphan commitments have no goal_id
+            service = IntegrityService()
+            metrics = service.calculate_integrity_metrics(session)
+            integrity_data = {
+                "composite_score": metrics.composite_score,
+                "letter_grade": metrics.letter_grade,
+                "on_time_rate": metrics.on_time_rate,
+                "notification_timeliness": metrics.notification_timeliness,
+                "cleanup_completion_rate": metrics.cleanup_completion_rate,
+                "current_streak_weeks": metrics.current_streak_weeks,
+                "total_completed": metrics.total_completed,
+                "total_on_time": metrics.total_on_time,
+                "total_at_risk": metrics.total_at_risk,
+                "total_abandoned": metrics.total_abandoned,
+            }
+        self._main_screen.data_panel.show_integrity_dashboard(integrity_data)
+
+    def _show_orphans_view(self) -> None:
+        """Show orphan commitments in data panel."""
+        if not self._main_screen:
+            return
+        with get_session() as session:
             results = list(
                 session.exec(
                     select(Commitment, Stakeholder)
@@ -372,47 +391,18 @@ class JdoApp(App[None]):
                 }
                 for c, s in results
             ]
-        self.push_screen(
-            ChatScreen(
-                ChatScreenConfig(
-                    initial_mode="list",
-                    initial_entity_type="commitment",
-                    initial_data=orphan_items,
-                )
-            )
-        )
+        self._main_screen.data_panel.show_list("commitment", orphan_items)
 
-    def on_home_screen_show_hierarchy(self, _message: HomeScreen.ShowHierarchy) -> None:
-        """Handle show hierarchy request from HomeScreen."""
-        logger.debug("Navigating to ChatScreen with hierarchy view")
-        # For now, just navigate to chat - hierarchy view can be built with /hierarchy command
-        self.push_screen(ChatScreen())
+    def _show_triage_view(self) -> None:
+        """Show triage view in data panel."""
+        if self._main_screen:
+            self._main_screen.set_triage_mode(True)
 
-    def on_home_screen_show_integrity(self, _message: HomeScreen.ShowIntegrity) -> None:
-        """Handle show integrity dashboard request from HomeScreen."""
-        logger.debug("Navigating to ChatScreen with integrity dashboard")
-        with get_session() as session:
-            service = IntegrityService()
-            metrics = service.calculate_integrity_metrics(session)
-            integrity_data = {
-                "composite_score": metrics.composite_score,
-                "letter_grade": metrics.letter_grade,
-                "on_time_rate": metrics.on_time_rate,
-                "notification_timeliness": metrics.notification_timeliness,
-                "cleanup_completion_rate": metrics.cleanup_completion_rate,
-                "current_streak_weeks": metrics.current_streak_weeks,
-                "total_completed": metrics.total_completed,
-                "total_on_time": metrics.total_on_time,
-                "total_at_risk": metrics.total_at_risk,
-                "total_abandoned": metrics.total_abandoned,
-            }
-        self.push_screen(
-            ChatScreen(
-                ChatScreenConfig(
-                    initial_mode="integrity", initial_entity_type="", initial_data=integrity_data
-                )
-            )
-        )
+    def on_settings_screen_back(self, _message: SettingsScreen.Back) -> None:
+        """Handle back request from SettingsScreen."""
+        self.pop_screen()
+        # Run in worker since _ensure_ai_configured uses push_screen_wait
+        self.run_worker(self._ensure_ai_configured(), exclusive=True)
 
     def on_settings_screen_auth_status_changed(
         self, _message: SettingsScreen.AuthStatusChanged
@@ -424,197 +414,14 @@ class JdoApp(App[None]):
         """
         logger.info("Authentication status changed")
 
-    def on_nav_sidebar_selected(self, message: NavSidebar.Selected) -> None:
-        """Handle navigation selection from NavSidebar.
-
-        Routes sidebar selections to the appropriate view/screen.
-        """
-        item_id = message.item_id
-        logger.debug(f"NavSidebar selection: {item_id}")
-
-        # Map item IDs to handler methods
-        handlers = {
-            "chat": self._nav_to_chat,
-            "goals": self._nav_to_goals,
-            "commitments": self._nav_to_commitments,
-            "visions": self._nav_to_visions,
-            "milestones": self._nav_to_milestones,
-            "hierarchy": self._nav_to_hierarchy,
-            "integrity": self._nav_to_integrity,
-            "orphans": self._nav_to_orphans,
-            "triage": self._nav_to_triage,
-            "settings": self._nav_to_settings,
-        }
-
-        handler = handlers.get(item_id)
-        if handler:
-            handler()
-
-    def _nav_to_chat(self) -> None:
-        """Navigate to chat screen."""
-        self.push_screen(ChatScreen())
-
-    def _nav_to_goals(self) -> None:
-        """Navigate to goals list view."""
-        with get_session() as session:
-            goals = list(session.exec(select(Goal)).all())
-            goal_items = [
-                {
-                    "id": str(g.id),
-                    "title": g.title,
-                    "problem_statement": g.problem_statement,
-                    "status": g.status.value,
-                }
-                for g in goals
-            ]
-        self.push_screen(
-            ChatScreen(
-                ChatScreenConfig(
-                    initial_mode="list", initial_entity_type="goal", initial_data=goal_items
-                )
-            )
-        )
-
-    def _nav_to_commitments(self) -> None:
-        """Navigate to commitments list view."""
-        with get_session() as session:
-            results = list(session.exec(select(Commitment, Stakeholder).join(Stakeholder)).all())
-            commitment_items = [
-                {
-                    "id": str(c.id),
-                    "deliverable": c.deliverable,
-                    "stakeholder_name": s.name,
-                    "due_date": c.due_date.isoformat(),
-                    "status": c.status.value,
-                }
-                for c, s in results
-            ]
-        self.push_screen(
-            ChatScreen(
-                ChatScreenConfig(
-                    initial_mode="list",
-                    initial_entity_type="commitment",
-                    initial_data=commitment_items,
-                )
-            )
-        )
-
-    def _nav_to_visions(self) -> None:
-        """Navigate to visions list view."""
-        with get_session() as session:
-            visions = list(session.exec(select(Vision)).all())
-            vision_items = [
-                {
-                    "id": str(v.id),
-                    "title": v.title,
-                    "timeframe": v.timeframe,
-                    "status": v.status.value,
-                }
-                for v in visions
-            ]
-        self.push_screen(
-            ChatScreen(
-                ChatScreenConfig(
-                    initial_mode="list", initial_entity_type="vision", initial_data=vision_items
-                )
-            )
-        )
-
-    def _nav_to_milestones(self) -> None:
-        """Navigate to milestones list view."""
-        with get_session() as session:
-            milestones = list(session.exec(select(Milestone)).all())
-            milestone_items = [
-                {
-                    "id": str(m.id),
-                    "description": m.description,
-                    "target_date": m.target_date.isoformat(),
-                    "status": m.status.value,
-                }
-                for m in milestones
-            ]
-        self.push_screen(
-            ChatScreen(
-                ChatScreenConfig(
-                    initial_mode="list",
-                    initial_entity_type="milestone",
-                    initial_data=milestone_items,
-                )
-            )
-        )
-
-    def _nav_to_hierarchy(self) -> None:
-        """Navigate to hierarchy view."""
-        self.push_screen(ChatScreen())
-
-    def _nav_to_integrity(self) -> None:
-        """Navigate to integrity dashboard."""
-        with get_session() as session:
-            service = IntegrityService()
-            metrics = service.calculate_integrity_metrics(session)
-            integrity_data = {
-                "composite_score": metrics.composite_score,
-                "letter_grade": metrics.letter_grade,
-                "on_time_rate": metrics.on_time_rate,
-                "notification_timeliness": metrics.notification_timeliness,
-                "cleanup_completion_rate": metrics.cleanup_completion_rate,
-                "current_streak_weeks": metrics.current_streak_weeks,
-                "total_completed": metrics.total_completed,
-                "total_on_time": metrics.total_on_time,
-                "total_at_risk": metrics.total_at_risk,
-                "total_abandoned": metrics.total_abandoned,
-            }
-        self.push_screen(
-            ChatScreen(
-                ChatScreenConfig(
-                    initial_mode="integrity", initial_entity_type="", initial_data=integrity_data
-                )
-            )
-        )
-
-    def _nav_to_orphans(self) -> None:
-        """Navigate to orphan commitments view."""
-        with get_session() as session:
-            results = list(
-                session.exec(
-                    select(Commitment, Stakeholder)
-                    .join(Stakeholder)
-                    .where(Commitment.goal_id == None)  # noqa: E711
-                ).all()
-            )
-            orphan_items = [
-                {
-                    "id": str(c.id),
-                    "deliverable": c.deliverable,
-                    "stakeholder_name": s.name,
-                    "due_date": c.due_date.isoformat(),
-                    "status": c.status.value,
-                }
-                for c, s in results
-            ]
-        self.push_screen(
-            ChatScreen(
-                ChatScreenConfig(
-                    initial_mode="list",
-                    initial_entity_type="commitment",
-                    initial_data=orphan_items,
-                )
-            )
-        )
-
-    def _nav_to_triage(self) -> None:
-        """Navigate to triage mode."""
-        self.push_screen(ChatScreen(ChatScreenConfig(triage_mode=True)))
-
-    def _nav_to_settings(self) -> None:
-        """Navigate to settings screen."""
-        self.push_screen(SettingsScreen())
-
     def on_hierarchy_view_item_selected(self, message: HierarchyView.ItemSelected) -> None:
         """Handle item selection from HierarchyView widget.
 
-        Shows the selected item's details in a ChatScreen view.
+        Shows the selected item's details in the data panel.
         """
+        if not self._main_screen:
+            return
+
         item = message.item
         logger.debug(f"Hierarchy item selected: {type(item).__name__}")
 
@@ -663,15 +470,7 @@ class JdoApp(App[None]):
             # Unknown type, ignore
             return
 
-        self.push_screen(
-            ChatScreen(
-                ChatScreenConfig(
-                    initial_mode="view",
-                    initial_entity_type=entity_type,
-                    initial_data=data,
-                )
-            )
-        )
+        self._main_screen.data_panel.show_view(entity_type, data)
 
 
 def main() -> None:

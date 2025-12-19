@@ -1,14 +1,14 @@
 name: integrity_dashboard
 description: Test viewing the integrity dashboard and metrics
 goal: |
-  Navigate to the integrity dashboard by pressing 'i' from the home screen.
-  The integrity view should show the current grade and any metrics.
-  Explore the integrity information, then return to home using escape.
+  Navigate to the integrity dashboard by pressing '7' or selecting Integrity from the sidebar.
+  The integrity view should show the current grade and any metrics in the data panel.
+  Explore the integrity information, then use Tab to return focus to the prompt.
 
 preconditions: []
 
 success_criteria:
-  - screen:HomeScreen
+  - screen:MainScreen
   - no_errors
   - completed
 

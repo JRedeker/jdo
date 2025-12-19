@@ -1080,6 +1080,10 @@ class TestChatScreenAtRiskShortcut:
                     panel._entity_type = "commitment"
                     panel._data = {"status": "at_risk", "deliverable": "Test"}
 
+                    # Move focus away from prompt input so 'r' triggers screen binding
+                    screen.set_focus(panel)
+                    await pilot.pause()
+
                     # Press 'r'
                     await pilot.press("r")
                     await pilot.pause()
@@ -1133,6 +1137,10 @@ class TestChatScreenAtRiskShortcut:
                     panel.mode = PanelMode.VIEW
                     panel._entity_type = "commitment"
                     panel._data = {"status": "pending", "deliverable": "Test"}
+
+                    # Move focus away from prompt input so 'r' triggers screen binding
+                    screen.set_focus(panel)
+                    await pilot.pause()
 
                     # Press 'r'
                     await pilot.press("r")
