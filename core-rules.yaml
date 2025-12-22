@@ -163,3 +163,10 @@ rules:
     tags: [modularity, reuse]
     hint: prefer_libs
     priority: 4
+
+  P27:
+    name: zero-preexisting-bugs
+    rule: Treat every discovered defect as yours to fix; when testing or touching neighboring code, stop and remediate the issue immediately instead of labeling it “pre-existing.”
+    tags: [quality, ownership]
+    hint: fix_now
+    priority: 9

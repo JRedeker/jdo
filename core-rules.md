@@ -124,3 +124,7 @@ P25 — reuse
 P26 — no-backups
   - Rely on Git for history; avoid local backup artifacts in working dirs.
   - tags:policy,hygiene • hint:avoid_local_backups • prio:4
+
+P27 — zero-preexisting-bugs
+  - Do not treat defects as “pre-existing”; when you find any issue during testing or adjacent fixes, pause and resolve it immediately before proceeding.
+  - tags:quality,ownership • hint:fix_now • prio:9
