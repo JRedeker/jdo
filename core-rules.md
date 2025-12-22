@@ -69,6 +69,10 @@ P13 — minimize-debt
   - Prefer solutions that reduce long-term technical debt.
   - tags:debt • hint:minimize_debt • prio:7
 
+P13a — invest-upfront
+  - Invest time in sound architecture and design decisions upfront; prioritize correctness and alignment over speed when architectural choices have long-term impact.
+  - tags:architecture,long-term,debt-prevention • hint:upfront_investment • prio:8
+
 P14 — observability
   - Emit structured logs/traces for actions to aid debugging.
   - tags:observability • hint:emit_logs • prio:7
