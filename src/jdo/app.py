@@ -10,7 +10,6 @@ from typing import ClassVar
 from uuid import UUID
 
 from loguru import logger
-from sqlmodel import select
 from textual.app import App, ComposeResult
 from textual.binding import BindingType
 from textual.widgets import Footer, Header
@@ -18,8 +17,8 @@ from textual.widgets import Footer, Header
 from jdo.auth.api import is_authenticated
 from jdo.config import get_settings
 from jdo.db import create_db_and_tables, get_session
+from jdo.db.navigation import NavigationService
 from jdo.db.session import get_pending_drafts, get_visions_due_for_review
-from jdo.integrity.service import IntegrityService
 from jdo.logging import configure_logging
 from jdo.models import Commitment, Goal, Milestone, Stakeholder, Vision
 from jdo.models.draft import Draft
@@ -251,152 +250,62 @@ class JdoApp(App[None]):
         if not self._main_screen:
             return
 
-        # Map item IDs to data fetching methods
-        handlers = {
-            "chat": self._show_chat_view,
-            "goals": self._show_goals_view,
-            "commitments": self._show_commitments_view,
-            "visions": self._show_visions_view,
-            "milestones": self._show_milestones_view,
-            "hierarchy": self._show_hierarchy_view,
-            "integrity": self._show_integrity_view,
-            "orphans": self._show_orphans_view,
-            "triage": self._show_triage_view,
-        }
+        # Use dispatcher to navigate to the selected view
+        self._navigate_to_view(item_id)
 
-        handler = handlers.get(item_id)
-        if handler:
-            handler()
+    def _navigate_to_view(self, item_id: str) -> None:
+        """Navigate to a view based on item ID.
 
-    def _show_chat_view(self) -> None:
-        """Show chat-only view (hide data panel)."""
-        if self._main_screen:
+        Dispatcher method that fetches appropriate data and updates the data panel.
+        Consolidates all navigation logic previously spread across multiple methods.
+
+        Args:
+            item_id: Navigation item ID (e.g., "goals", "commitments", "integrity").
+        """
+        if not self._main_screen:
+            return
+
+        # Special cases that don't follow the list pattern
+        if item_id == "chat":
+            # Chat view - hide data panel
             self._main_screen.data_panel.show_list("", [])
-
-    def _show_goals_view(self) -> None:
-        """Show goals in data panel."""
-        if not self._main_screen:
             return
-        with get_session() as session:
-            goals = list(session.exec(select(Goal)).all())
-            goal_items = [
-                {
-                    "id": str(g.id),
-                    "title": g.title,
-                    "problem_statement": g.problem_statement,
-                    "status": g.status.value,
-                }
-                for g in goals
-            ]
-        self._main_screen.data_panel.show_list("goal", goal_items)
 
-    def _show_commitments_view(self) -> None:
-        """Show commitments in data panel."""
-        if not self._main_screen:
-            return
-        with get_session() as session:
-            results = list(session.exec(select(Commitment, Stakeholder).join(Stakeholder)).all())
-            commitment_items = [
-                {
-                    "id": str(c.id),
-                    "deliverable": c.deliverable,
-                    "stakeholder_name": s.name,
-                    "due_date": c.due_date.isoformat(),
-                    "status": c.status.value,
-                }
-                for c, s in results
-            ]
-        self._main_screen.data_panel.show_list("commitment", commitment_items)
-
-    def _show_visions_view(self) -> None:
-        """Show visions in data panel."""
-        if not self._main_screen:
-            return
-        with get_session() as session:
-            visions = list(session.exec(select(Vision)).all())
-            vision_items = [
-                {
-                    "id": str(v.id),
-                    "title": v.title,
-                    "timeframe": v.timeframe,
-                    "status": v.status.value,
-                }
-                for v in visions
-            ]
-        self._main_screen.data_panel.show_list("vision", vision_items)
-
-    def _show_milestones_view(self) -> None:
-        """Show milestones in data panel."""
-        if not self._main_screen:
-            return
-        with get_session() as session:
-            milestones = list(session.exec(select(Milestone)).all())
-            milestone_items = [
-                {
-                    "id": str(m.id),
-                    "description": m.description,
-                    "target_date": m.target_date.isoformat(),
-                    "status": m.status.value,
-                }
-                for m in milestones
-            ]
-        self._main_screen.data_panel.show_list("milestone", milestone_items)
-
-    def _show_hierarchy_view(self) -> None:
-        """Show hierarchy in data panel."""
-        # For now, show empty - hierarchy command can populate this
-        if self._main_screen:
+        if item_id == "hierarchy":
+            # Hierarchy view - show empty for now, command can populate
             self._main_screen.data_panel.show_list("", [])
-
-    def _show_integrity_view(self) -> None:
-        """Show integrity dashboard in data panel."""
-        if not self._main_screen:
             return
-        with get_session() as session:
-            service = IntegrityService()
-            metrics = service.calculate_integrity_metrics(session)
-            integrity_data = {
-                "composite_score": metrics.composite_score,
-                "letter_grade": metrics.letter_grade,
-                "on_time_rate": metrics.on_time_rate,
-                "notification_timeliness": metrics.notification_timeliness,
-                "cleanup_completion_rate": metrics.cleanup_completion_rate,
-                "current_streak_weeks": metrics.current_streak_weeks,
-                "total_completed": metrics.total_completed,
-                "total_on_time": metrics.total_on_time,
-                "total_at_risk": metrics.total_at_risk,
-                "total_abandoned": metrics.total_abandoned,
-            }
-        self._main_screen.data_panel.show_integrity_dashboard(integrity_data)
 
-    def _show_orphans_view(self) -> None:
-        """Show orphan commitments in data panel."""
-        if not self._main_screen:
-            return
-        with get_session() as session:
-            results = list(
-                session.exec(
-                    select(Commitment, Stakeholder)
-                    .join(Stakeholder)
-                    .where(Commitment.goal_id == None)  # noqa: E711
-                ).all()
-            )
-            orphan_items = [
-                {
-                    "id": str(c.id),
-                    "deliverable": c.deliverable,
-                    "stakeholder_name": s.name,
-                    "due_date": c.due_date.isoformat(),
-                    "status": c.status.value,
-                }
-                for c, s in results
-            ]
-        self._main_screen.data_panel.show_list("commitment", orphan_items)
-
-    def _show_triage_view(self) -> None:
-        """Show triage view in data panel."""
-        if self._main_screen:
+        if item_id == "triage":
+            # Triage view - special mode
             self._main_screen.set_triage_mode(True)
+            return
+
+        # Standard entity list views - use NavigationService
+        with get_session() as session:
+            if item_id == "goals":
+                items = NavigationService.get_goals_list(session)
+                self._main_screen.data_panel.show_list("goal", items)
+
+            elif item_id == "commitments":
+                items = NavigationService.get_commitments_list(session)
+                self._main_screen.data_panel.show_list("commitment", items)
+
+            elif item_id == "visions":
+                items = NavigationService.get_visions_list(session)
+                self._main_screen.data_panel.show_list("vision", items)
+
+            elif item_id == "milestones":
+                items = NavigationService.get_milestones_list(session)
+                self._main_screen.data_panel.show_list("milestone", items)
+
+            elif item_id == "orphans":
+                items = NavigationService.get_orphans_list(session)
+                self._main_screen.data_panel.show_list("commitment", items)
+
+            elif item_id == "integrity":
+                integrity_data = NavigationService.get_integrity_data(session)
+                self._main_screen.data_panel.show_integrity_dashboard(integrity_data)
 
     def on_settings_screen_back(self, _message: SettingsScreen.Back) -> None:
         """Handle back request from SettingsScreen."""
