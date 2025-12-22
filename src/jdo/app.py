@@ -281,31 +281,42 @@ class JdoApp(App[None]):
             self._main_screen.set_triage_mode(True)
             return
 
-        # Standard entity list views - use NavigationService
-        with get_session() as session:
-            if item_id == "goals":
-                items = NavigationService.get_goals_list(session)
-                self._main_screen.data_panel.show_list("goal", items)
+        # Standard entity list views - use NavigationService with error handling
+        try:
+            with get_session() as session:
+                if item_id == "goals":
+                    items = NavigationService.get_goals_list(session)
+                    self._main_screen.data_panel.show_list("goal", items)
 
-            elif item_id == "commitments":
-                items = NavigationService.get_commitments_list(session)
-                self._main_screen.data_panel.show_list("commitment", items)
+                elif item_id == "commitments":
+                    items = NavigationService.get_commitments_list(session)
+                    self._main_screen.data_panel.show_list("commitment", items)
 
-            elif item_id == "visions":
-                items = NavigationService.get_visions_list(session)
-                self._main_screen.data_panel.show_list("vision", items)
+                elif item_id == "visions":
+                    items = NavigationService.get_visions_list(session)
+                    self._main_screen.data_panel.show_list("vision", items)
 
-            elif item_id == "milestones":
-                items = NavigationService.get_milestones_list(session)
-                self._main_screen.data_panel.show_list("milestone", items)
+                elif item_id == "milestones":
+                    items = NavigationService.get_milestones_list(session)
+                    self._main_screen.data_panel.show_list("milestone", items)
 
-            elif item_id == "orphans":
-                items = NavigationService.get_orphans_list(session)
-                self._main_screen.data_panel.show_list("commitment", items)
+                elif item_id == "orphans":
+                    items = NavigationService.get_orphans_list(session)
+                    self._main_screen.data_panel.show_list("commitment", items)
 
-            elif item_id == "integrity":
-                integrity_data = NavigationService.get_integrity_data(session)
-                self._main_screen.data_panel.show_integrity_dashboard(integrity_data)
+                elif item_id == "integrity":
+                    integrity_data = NavigationService.get_integrity_data(session)
+                    self._main_screen.data_panel.show_integrity_dashboard(integrity_data)
+
+                else:
+                    # Unknown item_id - log warning but don't crash
+                    logger.warning(f"Unknown navigation item_id: {item_id}")
+
+        except Exception as e:
+            # Catch-all for any navigation failures
+            logger.error(f"Navigation failed for {item_id}: {e}")
+            # Show empty list as fallback
+            self._main_screen.data_panel.show_list("", [])
 
     def on_settings_screen_back(self, _message: SettingsScreen.Back) -> None:
         """Handle back request from SettingsScreen."""

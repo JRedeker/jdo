@@ -151,6 +151,11 @@ ignore = [
 ]
 "src/jdo/app.py" = [
     "C901",    # _navigate_to_view dispatcher complexity (11) justified - maps all navigation items
+    "BLE001",  # Catch Exception for navigation errors - provides graceful fallback
+]
+"src/jdo/db/navigation.py" = [
+    "TRY300",  # Return in try block is clearer than else for early-return pattern
+    "BLE001",  # Catch Exception for database errors - provides graceful fallback with empty lists
 ]
 
 [tool.ruff.lint.isort]
