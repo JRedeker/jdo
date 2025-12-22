@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from jdo.commands.confirmation import ConfirmationMatcher, ConfirmationResult
+
+# Keep importing from handlers module (will be re-exported from handlers package)
 from jdo.commands.handlers import (
     AtRiskHandler,
     CancelHandler,

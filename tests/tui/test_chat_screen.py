@@ -1345,3 +1345,82 @@ class TestChatScreenRiskDismissal:
                 # Only kept_commit should remain
                 assert len(filtered.overdue_commitments) == 1
                 assert filtered.overdue_commitments[0].id == "kept-456"
+
+
+class TestConversationPruning:
+    """Tests for conversation history pruning to prevent memory leaks."""
+
+    async def test_prune_conversation_keeps_only_max_messages(self) -> None:
+        """Conversation pruning keeps only MAX_CONVERSATION_HISTORY messages."""
+        from jdo.screens.chat import MAX_CONVERSATION_HISTORY, ChatScreen
+
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
+
+            # Add more than MAX messages to conversation
+            for i in range(MAX_CONVERSATION_HISTORY + 10):
+                screen._conversation.append({"role": "user", "content": f"Message {i}"})
+
+            # Prune
+            screen._prune_conversation()
+
+            # Should have exactly MAX messages
+            assert len(screen._conversation) == MAX_CONVERSATION_HISTORY
+
+            # Should keep the most recent messages
+            assert screen._conversation[-1]["content"] == f"Message {MAX_CONVERSATION_HISTORY + 9}"
+            assert screen._conversation[0]["content"] == "Message 10"
+
+    async def test_prune_conversation_no_op_when_under_limit(self) -> None:
+        """Pruning does nothing when conversation is under limit."""
+        from jdo.screens.chat import MAX_CONVERSATION_HISTORY, ChatScreen
+
+        app = create_test_app_for_screen(ChatScreen())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen = pilot.app.screen
+            assert isinstance(screen, ChatScreen)
+
+            # Add fewer than MAX messages
+            for i in range(10):
+                screen._conversation.append({"role": "user", "content": f"Message {i}"})
+
+            # Prune
+            screen._prune_conversation()
+
+            # Should still have all messages
+            assert len(screen._conversation) == 10
+
+    async def test_prune_called_after_user_message(self) -> None:
+        """Pruning is called after adding user message to conversation."""
+        from jdo.screens.chat import ChatScreen
+        from jdo.widgets.prompt_input import PromptInput
+
+        app = create_test_app_for_screen(ChatScreen())
+        with patch("jdo.screens.chat.ChatScreen._send_to_ai"):
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                screen = pilot.app.screen
+                assert isinstance(screen, ChatScreen)
+                prompt = screen.query_one(PromptInput)
+
+                # Pre-fill conversation to near the limit
+                from jdo.screens.chat import MAX_CONVERSATION_HISTORY
+
+                for i in range(MAX_CONVERSATION_HISTORY + 5):
+                    screen._conversation.append({"role": "user", "content": f"Message {i}"})
+
+                initial_length = len(screen._conversation)
+                assert initial_length > MAX_CONVERSATION_HISTORY
+
+                # Submit a message (which should trigger pruning)
+                prompt.focus()
+                prompt.insert("test message")
+                prompt.action_submit()
+                await pilot.pause()
+
+                # Should have pruned to MAX_CONVERSATION_HISTORY
+                assert len(screen._conversation) == MAX_CONVERSATION_HISTORY

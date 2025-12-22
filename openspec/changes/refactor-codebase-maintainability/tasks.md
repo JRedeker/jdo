@@ -11,10 +11,14 @@
 
 ## 2. Handler Package Setup (P2 - God Class Split)
 
+> **Caution:** Do **not** remove `HandlerResult`/`CommandHandler` from `handlers.py` or update consumer imports until the new package (Tasks 2.1–2.3) is fully wired and `handlers/__init__.py` exports the complete handler registry. Breaking this order strands `ChatScreen`/`commands` imports and forces a full revert.
+
 - [ ] 2.1 Create `handlers/` package directory structure
 - [ ] 2.2 Create `handlers/base.py` with `HandlerResult` dataclass and `CommandHandler` ABC
 - [ ] 2.3 Create `handlers/__init__.py` with lazy registry pattern and `get_handler()`
 - [ ] 2.4 Verify existing tests pass with new package structure (no handlers moved yet)
+- [ ] 2.5 After 2.1–2.4 pass, update consumers (e.g., `chat.py`, `commands/__init__.py`) to import from `jdo.commands.handlers.base`, then run `python -c "from jdo.commands.handlers import get_handler"` to confirm imports remain intact
+- [ ] 2.6 Only after 2.5 is green, delete the local `HandlerResult`/`CommandHandler` definitions from `handlers.py` (ensures no import downtime)
 
 ## 3. Migrate Handlers by Domain
 

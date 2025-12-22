@@ -40,6 +40,9 @@ from jdo.widgets.chat_message import MessageRole, create_error_message
 from jdo.widgets.data_panel import DataPanel, PanelMode
 from jdo.widgets.prompt_input import PromptInput
 
+# Maximum conversation history to retain (prevents memory exhaustion and API token limits)
+MAX_CONVERSATION_HISTORY = 50
+
 
 class ConfirmationState(str, Enum):
     """State for tracking confirmation flow.
@@ -454,6 +457,7 @@ class ChatScreen(Screen[None]):
         # Add user message to chat and history
         await self.chat_container.add_message(MessageRole.USER, text)
         self._conversation.append({"role": "user", "content": text})
+        self._prune_conversation()
 
         # Send to AI
         self._send_to_ai(text)
@@ -920,6 +924,15 @@ class ChatScreen(Screen[None]):
         self._pending_draft = None
         self._pending_entity_type = None
 
+    def _prune_conversation(self) -> None:
+        """Keep only the last MAX_CONVERSATION_HISTORY messages.
+
+        Prevents memory exhaustion and API token limit issues in long chat sessions.
+        Maintains recent context (last 50 messages = ~25 exchanges) for AI coherence.
+        """
+        if len(self._conversation) > MAX_CONVERSATION_HISTORY:
+            self._conversation = self._conversation[-MAX_CONVERSATION_HISTORY:]
+
     def _send_to_ai(self, prompt: str) -> None:
         """Send a message to the AI agent and stream the response.
 
@@ -983,6 +996,7 @@ class ChatScreen(Screen[None]):
             if accumulated_text:
                 # Add to conversation history
                 self._conversation.append({"role": "assistant", "content": accumulated_text})
+                self._prune_conversation()
 
         except Exception as e:
             logger.exception("AI streaming error")

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from typing import Any
-
 from uuid import UUID
 
 from jdo.commands.handlers.base import CommandHandler, HandlerResult

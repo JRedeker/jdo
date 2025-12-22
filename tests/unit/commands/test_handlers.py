@@ -159,8 +159,11 @@ class TestCommitHandler:
         mock_service.get_commitment_velocity.return_value = (3, 3)
 
         with (
-            patch("jdo.commands.handlers.get_session"),
-            patch("jdo.commands.handlers.PersistenceService", return_value=mock_service),
+            patch("jdo.commands.handlers.commitment_handlers.get_session"),
+            patch(
+                "jdo.commands.handlers.commitment_handlers.PersistenceService",
+                return_value=mock_service,
+            ),
             patch("jdo.config.settings.get_database_path", return_value=Path("/tmp/test.db")),
         ):
             handler = CommitHandler()
@@ -191,8 +194,11 @@ class TestCommitHandler:
         mock_service.get_commitment_velocity.return_value = (8, 2)  # 8 created, 2 completed
 
         with (
-            patch("jdo.commands.handlers.get_session"),
-            patch("jdo.commands.handlers.PersistenceService", return_value=mock_service),
+            patch("jdo.commands.handlers.commitment_handlers.get_session"),
+            patch(
+                "jdo.commands.handlers.commitment_handlers.PersistenceService",
+                return_value=mock_service,
+            ),
             patch("jdo.config.settings.get_database_path", return_value=Path("/tmp/test.db")),
         ):
             handler = CommitHandler()
