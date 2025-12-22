@@ -149,6 +149,9 @@ ignore = [
     "C901",    # _calculate_streak_weeks complexity justified for clarity of logic
     "PLR0912", # _calculate_streak_weeks branches needed for complete streak tracking
 ]
+"src/jdo/app.py" = [
+    "C901",    # _navigate_to_view dispatcher complexity (11) justified - maps all navigation items
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["jdo"]
