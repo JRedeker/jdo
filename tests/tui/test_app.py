@@ -6,6 +6,9 @@ MainScreen and manages the application lifecycle.
 
 from __future__ import annotations
 
+from pathlib import Path
+from unittest.mock import patch
+
 import pytest
 from textual.widgets import Footer, Header
 
@@ -410,3 +413,115 @@ class TestVisionReviews:
             # Get unsnoozed reviews (should be empty)
             unsnoozed = typed_app.get_unsnoozed_reviews()
             assert len(unsnoozed) == 0
+
+
+@pytest.mark.tui
+class TestProviderAutoSelection:
+    """Tests for automatic provider selection on startup."""
+
+    async def test_find_authenticated_provider_prefers_openai(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_find_authenticated_provider prefers openai when both are authenticated."""
+        from jdo.config.settings import reset_settings
+        from jdo.db.engine import reset_engine
+
+        reset_engine()
+
+        # Set up environment with openai
+        monkeypatch.setenv("JDO_DATABASE_PATH", str(tmp_path / "test.db"))
+        monkeypatch.setenv("JDO_AI_PROVIDER", "openai")
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        reset_settings()
+
+        # Mock both providers as authenticated
+        with patch("jdo.app.is_authenticated") as mock_auth:
+            mock_auth.side_effect = lambda p: p in ["openai", "openrouter"]
+
+            app = JdoApp()
+            result = app._find_authenticated_provider()
+
+            assert result == "openai"
+
+        reset_engine()
+
+    async def test_find_authenticated_provider_returns_openrouter_if_only_one(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_find_authenticated_provider returns openrouter if only it is authenticated."""
+        from jdo.config.settings import reset_settings
+        from jdo.db.engine import reset_engine
+
+        reset_engine()
+
+        monkeypatch.setenv("JDO_DATABASE_PATH", str(tmp_path / "test.db"))
+        monkeypatch.setenv("JDO_AI_PROVIDER", "openai")
+        reset_settings()
+
+        # Mock only openrouter as authenticated
+        with patch("jdo.app.is_authenticated") as mock_auth:
+            mock_auth.side_effect = lambda p: p == "openrouter"
+
+            app = JdoApp()
+            result = app._find_authenticated_provider()
+
+            assert result == "openrouter"
+
+        reset_engine()
+
+    async def test_find_authenticated_provider_returns_none_if_none_authenticated(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_find_authenticated_provider returns None if no providers authenticated."""
+        from jdo.config.settings import reset_settings
+        from jdo.db.engine import reset_engine
+
+        reset_engine()
+
+        monkeypatch.setenv("JDO_DATABASE_PATH", str(tmp_path / "test.db"))
+        monkeypatch.setenv("JDO_AI_PROVIDER", "openai")
+        reset_settings()
+
+        # Mock no providers as authenticated
+        with patch("jdo.app.is_authenticated") as mock_auth:
+            mock_auth.return_value = False
+
+            app = JdoApp()
+            result = app._find_authenticated_provider()
+
+            assert result is None
+
+        reset_engine()
+
+    async def test_auto_selects_provider_when_default_not_authenticated(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """App auto-selects an authenticated provider when default lacks credentials."""
+        from jdo.config.settings import reset_settings
+        from jdo.db.engine import reset_engine
+
+        reset_engine()
+
+        # Set up with openai as default but no openai key
+        monkeypatch.setenv("JDO_DATABASE_PATH", str(tmp_path / "test.db"))
+        monkeypatch.setenv("JDO_AI_PROVIDER", "openai")
+        monkeypatch.setenv("JDO_ENV_FILE", str(tmp_path / ".env"))
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        reset_settings()
+
+        # Mock openrouter as authenticated, openai as not
+        with (
+            patch("jdo.app.is_authenticated") as mock_auth,
+            patch("jdo.app.set_ai_provider") as mock_set_provider,
+        ):
+            mock_auth.side_effect = lambda p: p == "openrouter"
+
+            app = JdoApp()
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                await pilot.pause()
+
+                # Should have called set_ai_provider with openrouter
+                mock_set_provider.assert_called_once_with("openrouter")
+
+        reset_engine()

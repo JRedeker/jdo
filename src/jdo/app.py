@@ -15,7 +15,8 @@ from textual.binding import BindingType
 from textual.widgets import Footer, Header
 
 from jdo.auth.api import is_authenticated
-from jdo.config import get_settings
+from jdo.auth.registry import list_providers
+from jdo.config import SUPPORTED_PROVIDERS, get_settings, set_ai_provider
 from jdo.db import create_db_and_tables, get_session
 from jdo.db.navigation import NavigationService
 from jdo.db.session import get_pending_drafts, get_visions_due_for_review
@@ -123,15 +124,49 @@ class JdoApp(App[None]):
         settings = get_settings()
         return is_authenticated(settings.ai_provider)
 
+    def _find_authenticated_provider(self) -> str | None:
+        """Find an authenticated provider to use as fallback.
+
+        Prefers openai if authenticated, otherwise returns first authenticated provider.
+
+        Returns:
+            Provider ID string if found, None if no providers authenticated.
+        """
+        # Get all registered providers
+        all_providers = list_providers()
+
+        # Filter to only supported providers
+        providers = [p for p in all_providers if p in SUPPORTED_PROVIDERS]
+
+        # Prefer openai if authenticated
+        if "openai" in providers and is_authenticated("openai"):
+            return "openai"
+
+        # Otherwise, return first authenticated provider
+        for provider in providers:
+            if is_authenticated(provider):
+                return provider
+
+        return None
+
     async def _ensure_ai_configured(self) -> None:
         """Ensure the user has configured AI before using the app.
 
+        First tries auto-selection if current provider lacks credentials.
         Blocks app usage until the user configures a provider or quits.
         """
         settings = get_settings()
         if is_authenticated(settings.ai_provider):
             return
 
+        # Try auto-selecting an authenticated provider
+        fallback = self._find_authenticated_provider()
+        if fallback:
+            logger.info(f"Auto-selecting authenticated provider: {fallback}")
+            set_ai_provider(fallback)
+            return
+
+        # No authenticated providers - show modal
         while True:
             decision = await self.push_screen_wait(AiRequiredScreen())
             if decision == "settings":

@@ -208,3 +208,199 @@ class TestSettingsSingleton:
             reset_settings()
             settings2 = get_settings()
             assert settings2.ai_provider == "openrouter"
+
+
+class TestEnvFileHelpers:
+    """Tests for .env file read/write helpers."""
+
+    def test_load_env_file_parses_key_value(self, tmp_path: Path) -> None:
+        """_load_env_file parses KEY=VALUE format correctly."""
+        from jdo.config.settings import _load_env_file
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("FOO=bar\nBAZ=qux\n")
+
+        values = _load_env_file(env_file)
+
+        assert values == {"FOO": "bar", "BAZ": "qux"}
+
+    def test_load_env_file_skips_comments(self, tmp_path: Path) -> None:
+        """_load_env_file skips comment lines."""
+        from jdo.config.settings import _load_env_file
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("# This is a comment\nFOO=bar\n# Another comment\nBAZ=qux\n")
+
+        values = _load_env_file(env_file)
+
+        assert values == {"FOO": "bar", "BAZ": "qux"}
+
+    def test_load_env_file_skips_blank_lines(self, tmp_path: Path) -> None:
+        """_load_env_file skips blank lines."""
+        from jdo.config.settings import _load_env_file
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("FOO=bar\n\nBAZ=qux\n\n")
+
+        values = _load_env_file(env_file)
+
+        assert values == {"FOO": "bar", "BAZ": "qux"}
+
+    def test_load_env_file_handles_quoted_values(self, tmp_path: Path) -> None:
+        """_load_env_file removes surrounding quotes from values."""
+        from jdo.config.settings import _load_env_file
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("FOO=\"bar baz\"\nQUX='single quoted'\n")
+
+        values = _load_env_file(env_file)
+
+        assert values == {"FOO": "bar baz", "QUX": "single quoted"}
+
+    def test_load_env_file_returns_empty_for_missing_file(self, tmp_path: Path) -> None:
+        """_load_env_file returns empty dict if file doesn't exist."""
+        from jdo.config.settings import _load_env_file
+
+        env_file = tmp_path / ".env"  # Does not exist
+
+        values = _load_env_file(env_file)
+
+        assert values == {}
+
+    def test_write_env_file_creates_file(self, tmp_path: Path) -> None:
+        """_write_env_file creates the file with KEY=VALUE format."""
+        from jdo.config.settings import _write_env_file
+
+        env_file = tmp_path / ".env"
+        values = {"FOO": "bar", "BAZ": "qux"}
+
+        _write_env_file(env_file, values)
+
+        content = env_file.read_text()
+        assert "FOO=bar" in content
+        assert "BAZ=qux" in content
+
+    def test_write_env_file_creates_parent_directory(self, tmp_path: Path) -> None:
+        """_write_env_file creates parent directory if needed."""
+        from jdo.config.settings import _write_env_file
+
+        env_file = tmp_path / "subdir" / ".env"
+        values = {"FOO": "bar"}
+
+        _write_env_file(env_file, values)
+
+        assert env_file.exists()
+        assert "FOO=bar" in env_file.read_text()
+
+    def test_write_env_file_quotes_values_with_spaces(self, tmp_path: Path) -> None:
+        """_write_env_file quotes values containing spaces."""
+        from jdo.config.settings import _write_env_file
+
+        env_file = tmp_path / ".env"
+        values = {"FOO": "bar baz"}
+
+        _write_env_file(env_file, values)
+
+        content = env_file.read_text()
+        assert 'FOO="bar baz"' in content
+
+    def test_write_env_file_sorts_keys(self, tmp_path: Path) -> None:
+        """_write_env_file sorts keys alphabetically."""
+        from jdo.config.settings import _write_env_file
+
+        env_file = tmp_path / ".env"
+        values = {"ZZZ": "last", "AAA": "first", "MMM": "middle"}
+
+        _write_env_file(env_file, values)
+
+        content = env_file.read_text()
+        lines = content.strip().split("\n")
+        keys = [line.split("=")[0] for line in lines]
+        assert keys == ["AAA", "MMM", "ZZZ"]
+
+
+class TestSetAiProvider:
+    """Tests for set_ai_provider function."""
+
+    def test_updates_singleton_instance(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """set_ai_provider updates the singleton in memory."""
+        from jdo.config.settings import get_settings, reset_settings, set_ai_provider
+
+        # Use tmp_path for env file to avoid polluting real .env
+        monkeypatch.setenv("JDO_ENV_FILE", str(tmp_path / ".env"))
+        # Ensure no env var pollutes the default
+        monkeypatch.delenv("JDO_AI_PROVIDER", raising=False)
+        # Change to tmp_path to avoid loading the project .env file
+        monkeypatch.chdir(tmp_path)
+
+        with patch("jdo.config.settings.get_database_path", return_value=tmp_path / "test.db"):
+            reset_settings()
+            settings = get_settings()
+            assert settings.ai_provider == "openai"  # Default
+
+            set_ai_provider("openrouter")
+
+            settings = get_settings()
+            assert settings.ai_provider == "openrouter"
+
+    def test_writes_to_env_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """set_ai_provider persists the choice to .env file."""
+        from jdo.config.settings import reset_settings, set_ai_provider
+
+        env_file = tmp_path / ".env"
+        monkeypatch.setenv("JDO_ENV_FILE", str(env_file))
+
+        with patch("jdo.config.settings.get_database_path", return_value=tmp_path / "test.db"):
+            reset_settings()
+            set_ai_provider("openrouter")
+
+        content = env_file.read_text()
+        assert "JDO_AI_PROVIDER=openrouter" in content
+
+    def test_preserves_other_env_values(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """set_ai_provider preserves existing .env values."""
+        from jdo.config.settings import reset_settings, set_ai_provider
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("JDO_AI_MODEL=gpt-4o\nOTHER_VAR=value\n")
+        monkeypatch.setenv("JDO_ENV_FILE", str(env_file))
+
+        with patch("jdo.config.settings.get_database_path", return_value=tmp_path / "test.db"):
+            reset_settings()
+            set_ai_provider("openrouter")
+
+        content = env_file.read_text()
+        assert "JDO_AI_PROVIDER=openrouter" in content
+        assert "JDO_AI_MODEL=gpt-4o" in content
+        assert "OTHER_VAR=value" in content
+
+    def test_raises_for_invalid_provider(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """set_ai_provider raises ValueError for unsupported provider."""
+        from jdo.config.settings import reset_settings, set_ai_provider
+
+        monkeypatch.setenv("JDO_ENV_FILE", str(tmp_path / ".env"))
+
+        with patch("jdo.config.settings.get_database_path", return_value=tmp_path / "test.db"):
+            reset_settings()
+            with pytest.raises(ValueError, match="Unsupported provider"):
+                set_ai_provider("invalid_provider")
+
+    def test_returns_validated_provider(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """set_ai_provider returns the validated AIProvider value."""
+        from jdo.config.settings import reset_settings, set_ai_provider
+
+        monkeypatch.setenv("JDO_ENV_FILE", str(tmp_path / ".env"))
+
+        with patch("jdo.config.settings.get_database_path", return_value=tmp_path / "test.db"):
+            reset_settings()
+            result = set_ai_provider("openrouter")
+
+        assert result == "openrouter"

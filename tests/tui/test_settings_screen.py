@@ -240,3 +240,106 @@ class TestSettingsScreenMessages:
 
         # SettingsScreen should have an AuthStatusChanged message class
         assert hasattr(SettingsScreen, "AuthStatusChanged")
+
+
+class TestSettingsScreenProviderSelector:
+    """Tests for provider selector RadioSet in SettingsScreen."""
+
+    async def test_provider_selector_hidden_when_single_provider(self) -> None:
+        """Provider selector is hidden when only one provider is authenticated."""
+        from jdo.screens.settings import SettingsScreen
+
+        with (
+            patch("jdo.screens.settings.is_authenticated") as mock_auth,
+            patch("jdo.screens.settings.get_settings") as mock_settings,
+        ):
+            # Only openai authenticated
+            mock_auth.side_effect = lambda p: p == "openai"
+            mock_settings.return_value.ai_provider = "openai"
+            mock_settings.return_value.ai_model = "gpt-4o"
+
+            app = create_test_app_for_screen(SettingsScreen())
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                screen = pilot.app.screen
+                assert isinstance(screen, SettingsScreen)
+
+                # Provider selector section should be hidden
+                selector_section = screen.query_one("#provider-selector-section")
+                assert "hidden" in selector_section.classes
+
+    async def test_provider_selector_visible_when_multiple_providers(self) -> None:
+        """Provider selector is visible when multiple providers are authenticated."""
+        from jdo.screens.settings import SettingsScreen
+
+        with (
+            patch("jdo.screens.settings.is_authenticated") as mock_auth,
+            patch("jdo.screens.settings.get_settings") as mock_settings,
+        ):
+            # Both providers authenticated
+            mock_auth.return_value = True
+            mock_settings.return_value.ai_provider = "openai"
+            mock_settings.return_value.ai_model = "gpt-4o"
+
+            app = create_test_app_for_screen(SettingsScreen())
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                screen = pilot.app.screen
+                assert isinstance(screen, SettingsScreen)
+
+                # Provider selector section should be visible
+                selector_section = screen.query_one("#provider-selector-section")
+                assert "hidden" not in selector_section.classes
+
+    async def test_provider_selector_preselects_current_provider(self) -> None:
+        """Provider selector pre-selects the current provider."""
+        from textual.widgets import RadioButton
+
+        from jdo.screens.settings import SettingsScreen
+
+        with (
+            patch("jdo.screens.settings.is_authenticated") as mock_auth,
+            patch("jdo.screens.settings.get_settings") as mock_settings,
+        ):
+            mock_auth.return_value = True
+            mock_settings.return_value.ai_provider = "openrouter"
+            mock_settings.return_value.ai_model = "claude-3"
+
+            app = create_test_app_for_screen(SettingsScreen())
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                screen = pilot.app.screen
+                assert isinstance(screen, SettingsScreen)
+
+                # OpenRouter radio button should be selected
+                openrouter_radio = screen.query_one("#provider-radio-openrouter", RadioButton)
+                assert openrouter_radio.value is True
+
+    async def test_provider_selector_calls_set_ai_provider(self) -> None:
+        """Selecting a provider calls set_ai_provider."""
+        from textual.widgets import RadioButton
+
+        from jdo.screens.settings import SettingsScreen
+
+        with (
+            patch("jdo.screens.settings.is_authenticated") as mock_auth,
+            patch("jdo.screens.settings.get_settings") as mock_settings,
+            patch("jdo.screens.settings.set_ai_provider") as mock_set_provider,
+        ):
+            mock_auth.return_value = True
+            mock_settings.return_value.ai_provider = "openai"
+            mock_settings.return_value.ai_model = "gpt-4o"
+
+            app = create_test_app_for_screen(SettingsScreen())
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                screen = pilot.app.screen
+                assert isinstance(screen, SettingsScreen)
+
+                # Click on openrouter radio button
+                openrouter_radio = screen.query_one("#provider-radio-openrouter", RadioButton)
+                openrouter_radio.toggle()
+                await pilot.pause()
+
+                # Should have called set_ai_provider
+                mock_set_provider.assert_called_with("openrouter")

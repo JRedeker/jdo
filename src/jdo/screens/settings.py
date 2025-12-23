@@ -14,11 +14,12 @@ from textual.containers import Container, Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.message import Message
 from textual.screen import Screen
-from textual.widgets import Button, Static
+from textual.widgets import Button, RadioButton, RadioSet, Static
 
 from jdo.auth.api import is_authenticated
 from jdo.auth.registry import AuthMethod, get_auth_methods, get_provider_info, list_providers
 from jdo.auth.screens import ApiKeyScreen
+from jdo.config import set_ai_provider
 from jdo.config.settings import get_settings
 
 
@@ -106,6 +107,21 @@ class SettingsScreen(Screen[None]):
         text-align: center;
         color: $text-muted;
     }
+
+    SettingsScreen #provider-selector {
+        margin-top: 1;
+        margin-bottom: 1;
+        height: auto;
+        width: 100%;
+    }
+
+    SettingsScreen #provider-selector-section {
+        display: block;
+    }
+
+    SettingsScreen #provider-selector-section.hidden {
+        display: none;
+    }
     """
 
     BINDINGS: ClassVar[list[Binding]] = [
@@ -131,6 +147,10 @@ class SettingsScreen(Screen[None]):
     def compose(self) -> ComposeResult:
         """Compose the settings screen layout."""
         settings = get_settings()
+        current_provider = settings.ai_provider
+
+        # Get authenticated providers for the selector
+        authenticated_providers = [p for p in list_providers() if is_authenticated(p)]
 
         with Container(id="settings-container"), Vertical(id="settings-box"):
             yield Static("Settings", classes="title")
@@ -140,11 +160,33 @@ class SettingsScreen(Screen[None]):
             yield Static(
                 f"Provider: {settings.ai_provider}",
                 classes="current-setting",
+                id="current-provider-display",
             )
             yield Static(
                 f"Model: {settings.ai_model}",
                 classes="current-setting",
             )
+
+            # Provider selector section - only show if multiple authenticated providers
+            hide_selector = len(authenticated_providers) <= 1
+            with Container(
+                id="provider-selector-section",
+                classes="hidden" if hide_selector else "",
+            ):
+                yield Static("Switch Provider", classes="section-title")
+                with RadioSet(id="provider-selector"):
+                    for provider_id in list_providers():
+                        provider_info = get_provider_info(provider_id)
+                        provider_name = provider_info.name if provider_info else provider_id
+                        is_current = provider_id == current_provider
+                        is_auth = is_authenticated(provider_id)
+                        # Only show authenticated providers in selector
+                        if is_auth:
+                            yield RadioButton(
+                                provider_name,
+                                value=is_current,
+                                id=f"provider-radio-{provider_id}",
+                            )
 
             # Provider Authentication section
             yield Static("Provider Authentication", classes="section-title")
@@ -179,6 +221,41 @@ class SettingsScreen(Screen[None]):
             provider_id = button_id.replace("configure-", "")
             self._configure_provider(provider_id)
 
+    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
+        """Handle provider selection change.
+
+        Args:
+            event: The RadioSet.Changed event.
+        """
+        if event.radio_set.id != "provider-selector":
+            return
+
+        # Get the selected radio button
+        pressed = event.pressed
+        if not pressed or not pressed.id:
+            return
+
+        # Extract provider_id from radio button id (format: provider-radio-{provider_id})
+        provider_id = pressed.id.replace("provider-radio-", "")
+
+        # Update provider setting
+        set_ai_provider(provider_id)
+
+        # Update the display
+        self._update_provider_display(provider_id)
+
+    def _update_provider_display(self, provider_id: str) -> None:
+        """Update the current provider display.
+
+        Args:
+            provider_id: The new provider ID.
+        """
+        try:
+            display_widget = self.query_one("#current-provider-display", Static)
+            display_widget.update(f"Provider: {provider_id}")
+        except NoMatches:
+            pass
+
     def _configure_provider(self, provider_id: str) -> None:
         """Configure authentication for a provider.
 
@@ -211,8 +288,11 @@ class SettingsScreen(Screen[None]):
         """Refresh auth status widgets to reflect current state.
 
         Queries each provider's authentication status and updates the
-        corresponding status widget text and classes.
+        corresponding status widget text and classes. Also updates
+        the provider selector visibility.
         """
+        authenticated_providers = []
+
         for provider_id in list_providers():
             try:
                 status_widget = self.query_one(f"#auth-status-{provider_id}", Static)
@@ -221,6 +301,8 @@ class SettingsScreen(Screen[None]):
                 continue
 
             authenticated = is_authenticated(provider_id)
+            if authenticated:
+                authenticated_providers.append(provider_id)
             status_text = "Authenticated" if authenticated else "Not authenticated"
 
             # Update widget text
@@ -229,6 +311,16 @@ class SettingsScreen(Screen[None]):
             # Update widget classes
             status_widget.remove_class("authenticated", "not-authenticated")
             status_widget.add_class("authenticated" if authenticated else "not-authenticated")
+
+        # Update provider selector section visibility
+        try:
+            selector_section = self.query_one("#provider-selector-section", Container)
+            if len(authenticated_providers) <= 1:
+                selector_section.add_class("hidden")
+            else:
+                selector_section.remove_class("hidden")
+        except NoMatches:
+            pass
 
     def action_back(self) -> None:
         """Go back to the previous screen."""

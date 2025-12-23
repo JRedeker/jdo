@@ -2,6 +2,18 @@
 
 from __future__ import annotations
 
-from jdo.config.settings import JDOSettings, get_settings, reset_settings
+from jdo.config.settings import (
+    SUPPORTED_PROVIDERS,
+    JDOSettings,
+    get_settings,
+    reset_settings,
+    set_ai_provider,
+)
 
-__all__ = ["JDOSettings", "get_settings", "reset_settings"]
+__all__ = [
+    "SUPPORTED_PROVIDERS",
+    "JDOSettings",
+    "get_settings",
+    "reset_settings",
+    "set_ai_provider",
+]
