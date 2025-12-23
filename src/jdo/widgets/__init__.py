@@ -18,6 +18,7 @@ from jdo.widgets.data_panel import (
     get_quick_stats_message,
 )
 from jdo.widgets.hierarchy_view import HierarchyView
+from jdo.widgets.integrity_summary import IntegritySummary
 from jdo.widgets.nav_sidebar import NavItem, NavSidebar
 from jdo.widgets.prompt_input import PromptInput
 
@@ -26,6 +27,7 @@ __all__ = [
     "ChatMessage",
     "DataPanel",
     "HierarchyView",
+    "IntegritySummary",
     "MessageRole",
     "NavItem",
     "NavSidebar",

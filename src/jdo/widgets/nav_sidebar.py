@@ -6,16 +6,22 @@ Provides persistent, collapsible navigation for the application.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
+from textual.containers import Vertical
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import OptionList
 from textual.widgets._option_list import Option
+
+from jdo.widgets.integrity_summary import IntegritySummary
+
+if TYPE_CHECKING:
+    from jdo.models.integrity_metrics import IntegrityMetrics
 
 
 @dataclass
@@ -76,9 +82,14 @@ class NavSidebar(Widget):
         width: 5;
     }
 
-    NavSidebar OptionList {
+    NavSidebar #sidebar-content {
         width: 100%;
         height: 100%;
+    }
+
+    NavSidebar OptionList {
+        width: 100%;
+        height: 1fr;
         background: transparent;
         border: none;
     }
@@ -150,6 +161,7 @@ class NavSidebar(Widget):
         """
         super().__init__(name=name, id=id, classes=classes)
         self._option_list: OptionList | None = None
+        self._integrity_summary: IntegritySummary | None = None
         self._nav_items = [item for item in NAV_ITEMS if item is not None]
         # Build item_id -> OptionList highlighted index mapping
         # Note: OptionList.highlighted uses selectable option indices only (excludes separators)
@@ -159,17 +171,26 @@ class NavSidebar(Widget):
 
     def compose(self) -> ComposeResult:
         """Compose the sidebar layout."""
-        self._option_list = OptionList()
+        option_list = OptionList()
+        integrity_summary = IntegritySummary(id="integrity-summary")
+
+        # Store references for later use
+        self._option_list = option_list
+        self._integrity_summary = integrity_summary
+
         # Add initial options
         item_index = 0
         for nav_item in NAV_ITEMS:
             if nav_item is None:
-                self._option_list.add_option(None)  # None creates a separator
+                option_list.add_option(None)  # None creates a separator
             else:
                 item_index += 1
                 label = self._format_label(nav_item, item_index)
-                self._option_list.add_option(Option(label, id=nav_item.id))
-        yield self._option_list
+                option_list.add_option(Option(label, id=nav_item.id))
+
+        with Vertical(id="sidebar-content"):
+            yield option_list
+            yield integrity_summary
 
     def _refresh_options(self) -> None:
         """Refresh the OptionList labels (called when display state changes)."""
@@ -250,6 +271,10 @@ class NavSidebar(Widget):
         # Re-render labels
         self._refresh_options()
 
+        # Update integrity summary collapsed state
+        if self._integrity_summary is not None:
+            self._integrity_summary.set_collapsed(collapsed)
+
     def set_active_item(self, item_id: str) -> None:
         """Set the active (highlighted) navigation item.
 
@@ -271,6 +296,15 @@ class NavSidebar(Widget):
         self.triage_count = count
         # Re-render to update badge
         self._refresh_options()
+
+    def update_integrity(self, metrics: IntegrityMetrics) -> None:
+        """Update the integrity summary display.
+
+        Args:
+            metrics: The integrity metrics to display.
+        """
+        if self._integrity_summary is not None:
+            self._integrity_summary.update_metrics(metrics)
 
     def _select_by_index(self, index: int) -> None:
         """Select a navigation item by its 1-based index.

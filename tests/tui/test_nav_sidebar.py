@@ -395,3 +395,81 @@ class TestNavSidebarTriageBadge:
             await pilot.pause()
 
             assert sidebar.triage_count == 0
+
+
+class TestIntegritySummaryWidget:
+    """Tests for IntegritySummary widget in NavSidebar."""
+
+    async def test_integrity_summary_present_in_sidebar(self) -> None:
+        """NavSidebar contains an IntegritySummary widget."""
+        from jdo.widgets.integrity_summary import IntegritySummary
+
+        app = NavSidebarTestApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            sidebar = app.query_one(NavSidebar)
+            summary = sidebar.query_one(IntegritySummary)
+            assert summary is not None
+
+    async def test_integrity_summary_default_values(self) -> None:
+        """IntegritySummary shows default values when not updated."""
+        from jdo.widgets.integrity_summary import IntegritySummary
+
+        app = NavSidebarTestApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            sidebar = app.query_one(NavSidebar)
+            summary = sidebar.query_one(IntegritySummary)
+            assert summary.grade == "--"
+            assert summary.score == 0.0
+
+    async def test_update_integrity_updates_summary(self) -> None:
+        """update_integrity method updates the IntegritySummary widget."""
+        from jdo.models.integrity_metrics import IntegrityMetrics
+
+        app = NavSidebarTestApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            sidebar = app.query_one(NavSidebar)
+
+            # Create mock metrics
+            metrics = IntegrityMetrics(
+                on_time_rate=0.9,
+                notification_timeliness=0.85,
+                cleanup_completion_rate=0.8,
+                current_streak_weeks=2,
+                total_completed=10,
+                total_on_time=9,
+                total_at_risk=1,
+                total_abandoned=0,
+            )
+
+            sidebar.update_integrity(metrics)
+            await pilot.pause()
+
+            from jdo.widgets.integrity_summary import IntegritySummary
+
+            summary = sidebar.query_one(IntegritySummary)
+            # Should show B+ grade (score ~88)
+            assert summary.grade.startswith("B") or summary.grade.startswith("A")
+            assert summary.score > 80
+
+    async def test_collapsed_sidebar_collapses_summary(self) -> None:
+        """Collapsing sidebar collapses IntegritySummary display."""
+        from jdo.widgets.integrity_summary import IntegritySummary
+
+        app = NavSidebarTestApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            sidebar = app.query_one(NavSidebar)
+            summary = sidebar.query_one(IntegritySummary)
+
+            # Initially not collapsed
+            assert not summary.collapsed
+
+            # Collapse sidebar
+            sidebar.toggle_collapse()
+            await pilot.pause()
+
+            # Summary should also be collapsed
+            assert summary.collapsed

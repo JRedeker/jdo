@@ -222,8 +222,9 @@ class MainScreen(Screen[None]):
         prompt = self.query_one("#prompt-input", PromptInput)
         prompt.focus()
 
-        # Update triage badge
+        # Update triage badge and integrity summary
         self._update_triage_badge()
+        self._update_integrity_summary()
 
         # If initial data provided, display it in the panel
         if self._initial_mode and self._initial_entity_type:
@@ -242,6 +243,18 @@ class MainScreen(Screen[None]):
         except Exception:
             # Database may not be initialized (e.g., in tests)
             logger.debug("Could not update triage badge - database may not be initialized")
+
+    def _update_integrity_summary(self) -> None:
+        """Update the integrity summary in the sidebar."""
+        try:
+            with get_session() as session:
+                service = IntegrityService()
+                metrics = service.calculate_integrity_metrics_with_trends(session)
+                sidebar = self.query_one("#nav-sidebar", NavSidebar)
+                sidebar.update_integrity(metrics)
+        except Exception:
+            # Database may not be initialized (e.g., in tests)
+            logger.debug("Could not update integrity summary - database may not be initialized")
 
     def _display_initial_data(self) -> None:
         """Display initial data in the panel if provided."""
