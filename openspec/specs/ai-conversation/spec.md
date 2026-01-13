@@ -1,5 +1,8 @@
 # ai-conversation Specification
 
+## Purpose
+Define the conversational AI interaction patterns for the JDO REPL, including natural language intent parsing, confirmation flows for entity creation/modification, contextual data display, conversation history management, error communication, proactive user guidance, and hybrid input handling (natural language + slash commands).
+
 ## Requirements
 
 ### Requirement: Intent-Based Interaction
