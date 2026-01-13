@@ -55,8 +55,9 @@ Tell it in plain language. The AI extracts goals, milestones, commitments, and t
 |---|---|
 | **Conversational Interface** | Chat naturally—the AI structures your goals for you |
 | **Flexible Hierarchy** | Visions, Goals, Milestones, Commitments, Tasks |
-| **Streaming AI Responses** | Responses appear token-by-token for a responsive feel |
+| **Streaming AI Responses** | Responses appear token-by-token with markdown rendering |
 | **Hybrid Input** | Natural language primary, slash commands for power users |
+| **Visual Polish** | Animated spinner, tab completion, status bar, rounded tables |
 | **Recurring Commitments** | Set it once, generate instances automatically |
 | **Multiple AI Providers** | OpenAI or OpenRouter—your choice |
 | **Local-First Storage** | Your data stays on your machine, always |

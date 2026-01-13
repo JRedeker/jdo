@@ -11,6 +11,7 @@ When a feature spec is archived, it should be added here and removed from `ROADM
 
 #### REPL & Startup
 - **add-startup-restoration**: Vision review notices on startup with non-blocking `/review` command and session-only snooze
+- **enhance-visual-output**: Animated thinking spinner, slash command auto-completion, bottom toolbar with cached stats, markdown AI response rendering, rounded table borders
 
 #### Navigation & UX
 - **fix-navigation-and-review-textual** (2025-12-19): Fixed all HomeScreen keyboard shortcuts (g/c/v/m/o/h/i), added ChatScreenConfig pattern, comprehensive Textual patterns documentation
