@@ -123,8 +123,8 @@ class TestSlashCommands:
 
         assert result is True
 
-    async def test_complete_command_not_implemented(self, mock_db_session):
-        """Complete command shows not implemented message."""
+    async def test_complete_command_without_args(self, mock_db_session):
+        """Complete command without args shows usage message."""
         session = Session()
         result = await handle_slash_command("/complete", session, mock_db_session)
 

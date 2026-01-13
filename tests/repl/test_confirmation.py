@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.exc import SQLAlchemyError
 
 from jdo.repl.loop import _confirm_draft, _handle_confirmation
 from jdo.repl.session import PendingDraft, Session
@@ -57,7 +58,7 @@ class TestConfirmDraft:
         self, mock_db_session: MagicMock, mock_persistence: MagicMock
     ) -> None:
         """Test error handling when commitment creation fails."""
-        mock_persistence.save_commitment.side_effect = Exception("Database error")
+        mock_persistence.save_commitment.side_effect = SQLAlchemyError("Database error")
 
         draft = PendingDraft(
             action="create", entity_type="commitment", data={"deliverable": "Test"}

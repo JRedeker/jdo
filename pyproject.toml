@@ -100,6 +100,12 @@ ignore = [
 "src/**/*.py" = [
     "PLW0603", # Global statement needed for singleton pattern (engine, settings)
 ]
+"src/jdo/ai/agent.py" = [
+    "PLC0415", # Late import of tools to avoid circular dependency
+]
+"src/jdo/ai/context.py" = [
+    "PLC0415", # Late import of PydanticAI messages in conversion function
+]
 "src/jdo/auth/oauth.py" = [
     "S105",    # TOKEN_URL constant is not a secret
     "PLR2004", # HTTP status codes are self-documenting
@@ -107,13 +113,11 @@ ignore = [
     "EM101",   # String literals in OAuth exceptions
     "EM102",   # f-strings in OAuth exceptions
 ]
-
 "src/jdo/auth/store.py" = [
     "BLE001",  # Catching Exception for JSON parse failures is intentional
 ]
-
-"src/jdo/db/task_history_service.py" = [
-    "PLR0913", # log_event needs 8 args for complete event context (task, commitment, status, etc.)
+"src/jdo/cli.py" = [
+    "PLC0415", # Lazy import of TUI to avoid loading when running CLI subcommands
 ]
 "src/jdo/commands/handlers.py" = [
     "ARG002",  # Unused cmd/context args - handlers implement common interface
@@ -121,27 +125,23 @@ ignore = [
     "RUF012",  # ClassVar for _ENTITY_MAP, _COMMAND_HELP - immutable at runtime
     "BLE001",  # Catch Exception for database errors in guardrail queries
 ]
-"src/jdo/ai/agent.py" = [
-    "PLC0415", # Late import of tools to avoid circular dependency
+"src/jdo/db/navigation.py" = [
+    "TRY300",  # Return in try block is clearer than else for early-return pattern
+    "BLE001",  # Catch Exception for database errors - provides graceful fallback with empty lists
 ]
-"src/jdo/ai/context.py" = [
-    "PLC0415", # Late import of PydanticAI messages in conversion function
-]
-"src/jdo/cli.py" = [
-    "PLC0415", # Lazy import of TUI to avoid loading when running CLI subcommands
-]
-"src/jdo/observability.py" = [
-    "PLC0415", # Lazy import of JDOError to avoid circular import
+"src/jdo/db/task_history_service.py" = [
+    "PLR0913", # log_event needs 8 args for complete event context (task, commitment, status, etc.)
 ]
 "src/jdo/integrity/service.py" = [
     "PLR2004", # Magic value 7 days for timeliness is self-documenting in context
     "C901",    # _calculate_streak_weeks complexity justified for clarity of logic
     "PLR0912", # _calculate_streak_weeks branches needed for complete streak tracking
 ]
-
-"src/jdo/db/navigation.py" = [
-    "TRY300",  # Return in try block is clearer than else for early-return pattern
-    "BLE001",  # Catch Exception for database errors - provides graceful fallback with empty lists
+"src/jdo/observability.py" = [
+    "PLC0415", # Lazy import of JDOError to avoid circular import
+]
+"src/jdo/repl/loop.py" = [
+    "BLE001",  # Catch Exception for unexpected AI extraction errors - provides graceful user feedback
 ]
 
 [tool.ruff.lint.isort]

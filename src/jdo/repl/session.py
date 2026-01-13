@@ -7,6 +7,7 @@ Implements token-based history pruning per research findings.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any
 from uuid import UUID
 
@@ -65,6 +66,22 @@ class PendingDraft:
     entity_id: UUID | None = None  # For update/delete operations
 
 
+@dataclass
+class DashboardCacheUpdate:
+    """Data for updating dashboard cache.
+
+    All fields are optional - only provided fields will be updated.
+    """
+
+    commitments: list[dict[str, Any]] | None = None
+    goals: list[dict[str, Any]] | None = None
+    integrity_grade: str | None = None
+    integrity_score: int | None = None
+    integrity_trend: str | None = None
+    streak_weeks: int | None = None
+    triage_count: int | None = None
+
+
 class Session:
     """Session state for the REPL.
 
@@ -82,6 +99,17 @@ class Session:
         # Cached counts for bottom toolbar (avoid DB queries per keystroke)
         self.cached_commitment_count: int = 0
         self.cached_triage_count: int = 0
+        # Cached summary data for commitment summary panel
+        self.cached_at_risk_count: int = 0
+        self.cached_next_due_deliverable: str | None = None
+        self.cached_next_due_date: date | None = None
+        # Cached dashboard data for multi-panel display
+        self.cached_dashboard_commitments: list[dict[str, Any]] = []
+        self.cached_dashboard_goals: list[dict[str, Any]] = []
+        self.cached_integrity_grade: str = ""
+        self.cached_integrity_score: int = 0
+        self.cached_integrity_trend: str = "stable"
+        self.cached_streak_weeks: int = 0
 
     def add_user_message(self, content: str) -> None:
         """Add a user message to history.
@@ -178,15 +206,52 @@ class Session:
         return self.message_history.copy()
 
     def update_cached_counts(
-        self, commitment_count: int | None = None, triage_count: int | None = None
+        self,
+        commitment_count: int | None = None,
+        triage_count: int | None = None,
+        at_risk_count: int | None = None,
+        next_due_deliverable: str | None = None,
+        next_due_date: date | None = None,
     ) -> None:
-        """Update cached counts for toolbar display.
+        """Update cached counts for toolbar and summary panel display.
 
         Args:
             commitment_count: Active commitment count (if provided).
             triage_count: Triage queue count (if provided).
+            at_risk_count: At-risk commitment count (if provided).
+            next_due_deliverable: Deliverable of next due commitment.
+            next_due_date: Due date of next due commitment.
         """
         if commitment_count is not None:
             self.cached_commitment_count = commitment_count
         if triage_count is not None:
             self.cached_triage_count = triage_count
+        if at_risk_count is not None:
+            self.cached_at_risk_count = at_risk_count
+        # Allow clearing next_due by passing empty string
+        if next_due_deliverable is not None:
+            self.cached_next_due_deliverable = next_due_deliverable or None
+        if next_due_date is not None:
+            self.cached_next_due_date = next_due_date
+
+    def update_dashboard_cache(self, update: DashboardCacheUpdate) -> None:
+        """Update cached dashboard data.
+
+        Args:
+            update: DashboardCacheUpdate with fields to update.
+        """
+        if update.commitments is not None:
+            self.cached_dashboard_commitments = update.commitments
+            self.cached_commitment_count = len(update.commitments)
+        if update.goals is not None:
+            self.cached_dashboard_goals = update.goals
+        if update.integrity_grade is not None:
+            self.cached_integrity_grade = update.integrity_grade
+        if update.integrity_score is not None:
+            self.cached_integrity_score = update.integrity_score
+        if update.integrity_trend is not None:
+            self.cached_integrity_trend = update.integrity_trend
+        if update.streak_weeks is not None:
+            self.cached_streak_weeks = update.streak_weeks
+        if update.triage_count is not None:
+            self.cached_triage_count = update.triage_count

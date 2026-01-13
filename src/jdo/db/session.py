@@ -17,6 +17,7 @@ from jdo.models.draft import EntityType
 from jdo.models.goal import GoalProgress, GoalStatus
 from jdo.models.milestone import MilestoneStatus
 from jdo.models.recurring_commitment import RecurringCommitmentStatus
+from jdo.models.stakeholder import Stakeholder
 from jdo.models.task import Task
 from jdo.models.vision import VisionStatus
 from jdo.recurrence.calculator import get_next_due_date
@@ -359,3 +360,125 @@ def get_triage_count(session: Session) -> int:
     )
     result = session.exec(statement).one()
     return int(result)
+
+
+def get_dashboard_commitments(
+    session: Session,
+    limit: int = 5,
+) -> list[dict]:
+    """Get commitments for dashboard display.
+
+    Returns active commitments ordered by due date, with status
+    and overdue information calculated.
+
+    Args:
+        session: Database session.
+        limit: Maximum number of commitments to return.
+
+    Returns:
+        List of dicts with deliverable, stakeholder, due_display, status, is_overdue.
+    """
+    # Import here to avoid circular dependency
+    from jdo.output.formatters import format_relative_date  # noqa: PLC0415
+
+    today = today_date()
+    active_statuses = [
+        CommitmentStatus.PENDING,
+        CommitmentStatus.IN_PROGRESS,
+        CommitmentStatus.AT_RISK,
+    ]
+
+    statement = (
+        select(Commitment)
+        .where(Commitment.status.in_(active_statuses))
+        .order_by(Commitment.due_date.asc())
+        .limit(limit)
+    )
+    commitments = list(session.exec(statement).all())
+
+    result = []
+    for c in commitments:
+        # Determine status string
+        is_overdue = c.due_date is not None and c.due_date < today
+        if is_overdue:
+            days_overdue = (today - c.due_date).days
+            status = "overdue"
+            due_display = f"OVERDUE ({days_overdue}d)"
+        elif c.status == CommitmentStatus.AT_RISK:
+            status = "at_risk"
+            due_display = format_relative_date(c.due_date) if c.due_date else "No date"
+        elif c.status == CommitmentStatus.IN_PROGRESS:
+            status = "in_progress"
+            due_display = format_relative_date(c.due_date) if c.due_date else "No date"
+        else:
+            status = "pending"
+            due_display = format_relative_date(c.due_date) if c.due_date else "No date"
+
+        # Get stakeholder name (relationship or fallback)
+        stakeholder_name = "Unknown"
+        if hasattr(c, "stakeholder") and c.stakeholder:
+            stakeholder_name = c.stakeholder.name
+        elif hasattr(c, "stakeholder_id") and c.stakeholder_id:
+            stakeholder = session.get(Stakeholder, c.stakeholder_id)
+            if stakeholder:
+                stakeholder_name = stakeholder.name
+
+        result.append(
+            {
+                "deliverable": c.deliverable,
+                "stakeholder": stakeholder_name,
+                "due_display": due_display,
+                "status": status,
+                "is_overdue": is_overdue,
+            }
+        )
+
+    return result
+
+
+def get_dashboard_goals(session: Session, limit: int = 3) -> list[dict]:
+    """Get goals for dashboard display with progress.
+
+    Returns active goals with their commitment completion progress.
+
+    Args:
+        session: Database session.
+        limit: Maximum number of goals to return.
+
+    Returns:
+        List of dicts with title, progress_percent, progress_text, needs_review.
+    """
+    today = today_date()
+
+    statement = (
+        select(Goal)
+        .where(Goal.status == GoalStatus.ACTIVE)
+        .order_by(Goal.created_at.asc())
+        .limit(limit)
+    )
+    goals = list(session.exec(statement).all())
+
+    result = []
+    for g in goals:
+        # Get commitment progress for this goal
+        progress = get_commitment_progress(session, g.id)
+
+        # Check if review is due
+        needs_review = g.next_review_date is not None and g.next_review_date <= today
+
+        # Format progress text
+        if progress.total == 0:
+            progress_text = "no commitments"
+        else:
+            progress_text = f"{progress.completed}/{progress.total} done"
+
+        result.append(
+            {
+                "title": g.title,
+                "progress_percent": progress.completion_rate,
+                "progress_text": progress_text,
+                "needs_review": needs_review,
+            }
+        )
+
+    return result

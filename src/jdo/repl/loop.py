@@ -33,10 +33,22 @@ from jdo.config import get_settings
 from jdo.db import create_db_and_tables, get_session
 from jdo.db.navigation import NavigationService
 from jdo.db.persistence import PersistenceService
-from jdo.db.session import get_triage_count, get_visions_due_for_review
+from jdo.db.session import (
+    get_dashboard_commitments,
+    get_dashboard_goals,
+    get_triage_count,
+    get_visions_due_for_review,
+)
 from jdo.models.commitment import Commitment, CommitmentStatus
 from jdo.models.goal import Goal
 from jdo.models.vision import Vision
+from jdo.output.dashboard import (
+    DashboardCommitment,
+    DashboardData,
+    DashboardGoal,
+    DashboardIntegrity,
+    format_dashboard,
+)
 from jdo.output.formatters import (
     format_commitment_list,
     format_commitment_proposal,
@@ -494,10 +506,8 @@ def _confirm_draft(
                 f"[green]Created commitment #{str(commitment.id)[:6]}: "
                 f"{commitment.deliverable}[/green]"
             )
-            # Update cached counts for toolbar after entity creation
-            session.update_cached_counts(
-                commitment_count=_get_active_commitment_count(db_session),
-            )
+            # Update cached dashboard data after entity creation
+            _update_dashboard_cache(session, db_session)
             session.clear_pending_draft()
             return True
 
@@ -647,10 +657,8 @@ def _handle_complete(args: str, session: Session, db_session: DBSession) -> None
 
     console.print(f"[green]Completed commitment: {target_commitment.deliverable}[/green]")
 
-    # Update cached counts after entity completion
-    session.update_cached_counts(
-        commitment_count=_get_active_commitment_count(db_session),
-    )
+    # Update cached dashboard data after entity completion
+    _update_dashboard_cache(session, db_session)
 
 
 def _handle_list(args: str, db_session: DBSession) -> None:
@@ -807,6 +815,95 @@ def _get_active_commitment_count(db_session: DBSession) -> int:
     return len(list(db_session.exec(statement).all()))
 
 
+def _update_dashboard_cache(session: Session, db_session: DBSession) -> None:
+    """Update session cache with current dashboard data.
+
+    Args:
+        session: REPL session state.
+        db_session: Database session.
+    """
+    from jdo.repl.session import DashboardCacheUpdate  # noqa: PLC0415
+
+    # Fetch dashboard data from database
+    commitments = get_dashboard_commitments(db_session)
+    goals = get_dashboard_goals(db_session)
+    triage_count = get_triage_count(db_session)
+
+    # Update session cache
+    update = DashboardCacheUpdate(
+        commitments=commitments,
+        goals=goals,
+        triage_count=triage_count,
+        # Integrity data placeholder - implement when IntegrityService is ready
+        integrity_grade="",
+        integrity_score=0,
+        integrity_trend="stable",
+        streak_weeks=0,
+    )
+    session.update_dashboard_cache(update)
+
+
+def _build_dashboard_data(session: Session) -> DashboardData:
+    """Build dashboard data from session cache.
+
+    Args:
+        session: REPL session state with cached dashboard data.
+
+    Returns:
+        DashboardData ready for formatting.
+    """
+    # Convert cached dicts to dataclasses
+    commitments = [
+        DashboardCommitment(
+            deliverable=c["deliverable"],
+            stakeholder=c["stakeholder"],
+            due_display=c["due_display"],
+            status=c["status"],
+            is_overdue=c.get("is_overdue", False),
+        )
+        for c in session.cached_dashboard_commitments
+    ]
+
+    goals = [
+        DashboardGoal(
+            title=g["title"],
+            progress_percent=g["progress_percent"],
+            progress_text=g["progress_text"],
+            needs_review=g.get("needs_review", False),
+        )
+        for g in session.cached_dashboard_goals
+    ]
+
+    # Build integrity data if available
+    integrity = None
+    if session.cached_integrity_grade:
+        integrity = DashboardIntegrity(
+            grade=session.cached_integrity_grade,
+            score=session.cached_integrity_score,
+            trend=session.cached_integrity_trend,
+            streak_weeks=session.cached_streak_weeks,
+        )
+
+    return DashboardData(
+        commitments=commitments,
+        goals=goals,
+        integrity=integrity,
+        triage_count=session.cached_triage_count,
+    )
+
+
+def _show_dashboard(session: Session) -> None:
+    """Display dashboard panels using cached session data.
+
+    Args:
+        session: REPL session state with cached dashboard data.
+    """
+    data = _build_dashboard_data(session)
+    dashboard = format_dashboard(data)
+    if dashboard:
+        console.print(dashboard)
+
+
 def _initialize_agent() -> Agent[JDODependencies, str]:
     """Initialize database, check credentials, and create AI agent.
 
@@ -839,10 +936,8 @@ def _setup_session_state(
     deps = JDODependencies(session=db_session)
     session = Session()
 
-    session.update_cached_counts(
-        commitment_count=_get_active_commitment_count(db_session),
-        triage_count=get_triage_count(db_session),
-    )
+    # Initialize dashboard cache with full data
+    _update_dashboard_cache(session, db_session)
 
     return session, deps
 
@@ -905,6 +1000,9 @@ async def _main_repl_loop(
         agent: The PydanticAI agent.
         deps: Agent dependencies.
     """
+    # Show initial dashboard before first prompt
+    _show_dashboard(session)
+
     while True:
         try:
             user_input = await prompt_session.prompt_async()
@@ -916,6 +1014,9 @@ async def _main_repl_loop(
 
             if not await _process_user_input(user_input, session, db_session, agent, deps):
                 break
+
+            # Show dashboard before next prompt
+            _show_dashboard(session)
 
         except KeyboardInterrupt:
             console.print("\n[dim]Input cancelled.[/dim]")

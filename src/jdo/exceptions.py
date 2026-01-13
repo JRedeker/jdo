@@ -20,10 +20,74 @@ Hierarchy:
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any
 
 # Maximum length for raw response in context (truncate to avoid huge logs)
 MAX_RAW_RESPONSE_LENGTH = 500
+
+# Template for credential recovery hints
+_CREDENTIAL_RECOVERY_HINT_TEMPLATE = "Run 'jdo auth' to {action} your {provider} API key."
+
+
+@dataclass
+class ErrorContext:
+    """Structured context for exception debugging information.
+
+    Provides type-safe context information for exceptions while maintaining
+    backward compatibility with dictionary-based access.
+    """
+
+    provider: str | None = None
+    status_code: int | None = None
+    expected_type: str | None = None
+    raw_response: str | None = None
+    supported_providers: list[str] | None = None
+    _extra: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert context to dictionary for backward compatibility."""
+        result: dict[str, Any] = self._extra.copy()
+        if self.provider is not None:
+            result["provider"] = self.provider
+        if self.status_code is not None:
+            result["status_code"] = self.status_code
+        if self.expected_type is not None:
+            result["expected_type"] = self.expected_type
+        if self.raw_response is not None:
+            result["raw_response"] = self.raw_response
+        if self.supported_providers is not None:
+            result["supported_providers"] = self.supported_providers
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> ErrorContext:
+        """Create ErrorContext from dictionary for backward compatibility."""
+        if data is None:
+            return cls()
+        return cls(
+            provider=data.get("provider"),
+            status_code=data.get("status_code"),
+            expected_type=data.get("expected_type"),
+            raw_response=data.get("raw_response"),
+            supported_providers=data.get("supported_providers"),
+            _extra={
+                k: v
+                for k, v in data.items()
+                if k
+                not in {
+                    "provider",
+                    "status_code",
+                    "expected_type",
+                    "raw_response",
+                    "supported_providers",
+                }
+            },
+        )
+
+
+def _format_credential_recovery_hint(provider: str, action: str) -> str:
+    return _CREDENTIAL_RECOVERY_HINT_TEMPLATE.format(provider=provider, action=action)
 
 
 class JDOError(Exception):
@@ -43,19 +107,22 @@ class JDOError(Exception):
         message: str,
         *,
         recovery_hint: str | None = None,
-        context: dict[str, Any] | None = None,
+        context: dict[str, Any] | ErrorContext | None = None,
     ) -> None:
         """Initialize the exception.
 
         Args:
             message: The error message.
             recovery_hint: Optional hint for users on how to resolve the error.
-            context: Optional dictionary of additional context for debugging.
+            context: Optional dictionary or ErrorContext of additional context for debugging.
         """
         super().__init__(message)
         self.message = message
         self.recovery_hint = recovery_hint
-        self.context = context or {}
+        if isinstance(context, ErrorContext):
+            self.context = context.to_dict()
+        else:
+            self.context = context or {}
 
     def __str__(self) -> str:
         """Return string representation including recovery hint if present."""
@@ -129,7 +196,7 @@ class ProviderError(AIError):
         provider: str | None = None,
         status_code: int | None = None,
         recovery_hint: str | None = None,
-        context: dict[str, Any] | None = None,
+        context: dict[str, Any] | ErrorContext | None = None,
     ) -> None:
         """Initialize provider error with additional context.
 
@@ -138,15 +205,14 @@ class ProviderError(AIError):
             provider: Name of the AI provider (e.g., "anthropic", "openai").
             status_code: HTTP status code if applicable.
             recovery_hint: Optional hint for users on how to resolve the error.
-            context: Optional dictionary of additional context for debugging.
+            context: Optional dictionary or ErrorContext of additional context for debugging.
         """
-        ctx = context or {}
-        if provider:
-            ctx["provider"] = provider
-        if status_code:
-            ctx["status_code"] = status_code
+        ctx_obj = ErrorContext.from_dict(context) if isinstance(context, dict) else context
+        ctx_obj = ctx_obj or ErrorContext()
+        ctx_obj.provider = provider
+        ctx_obj.status_code = status_code
 
-        super().__init__(message, recovery_hint=recovery_hint, context=ctx)
+        super().__init__(message, recovery_hint=recovery_hint, context=ctx_obj)
         self.provider = provider
         self.status_code = status_code
 
@@ -167,7 +233,7 @@ class ExtractionError(AIError):
         expected_type: str | None = None,
         raw_response: str | None = None,
         recovery_hint: str | None = None,
-        context: dict[str, Any] | None = None,
+        context: dict[str, Any] | ErrorContext | None = None,
     ) -> None:
         """Initialize extraction error with additional context.
 
@@ -176,19 +242,19 @@ class ExtractionError(AIError):
             expected_type: The type/schema that was expected.
             raw_response: The raw response that failed to parse.
             recovery_hint: Optional hint for users on how to resolve the error.
-            context: Optional dictionary of additional context for debugging.
+            context: Optional dictionary or ErrorContext of additional context for debugging.
         """
-        ctx = context or {}
-        if expected_type:
-            ctx["expected_type"] = expected_type
+        ctx_obj = ErrorContext.from_dict(context) if isinstance(context, dict) else context
+        ctx_obj = ctx_obj or ErrorContext()
+        ctx_obj.expected_type = expected_type
         if raw_response:
-            # Truncate long responses
-            if len(raw_response) > MAX_RAW_RESPONSE_LENGTH:
-                ctx["raw_response"] = raw_response[:MAX_RAW_RESPONSE_LENGTH]
-            else:
-                ctx["raw_response"] = raw_response
+            ctx_obj.raw_response = (
+                raw_response[:MAX_RAW_RESPONSE_LENGTH]
+                if len(raw_response) > MAX_RAW_RESPONSE_LENGTH
+                else raw_response
+            )
 
-        super().__init__(message, recovery_hint=recovery_hint, context=ctx)
+        super().__init__(message, recovery_hint=recovery_hint, context=ctx_obj)
         self.expected_type = expected_type
         self.raw_response = raw_response
 
@@ -220,21 +286,22 @@ class MissingCredentialsError(AuthError):
         provider: str,
         *,
         recovery_hint: str | None = None,
-        context: dict[str, Any] | None = None,
+        context: dict[str, Any] | ErrorContext | None = None,
     ) -> None:
         """Initialize missing credentials error.
 
         Args:
             provider: The AI provider that lacks credentials.
             recovery_hint: Optional hint for users on how to resolve the error.
-            context: Optional dictionary of additional context for debugging.
+            context: Optional dictionary or ErrorContext of additional context for debugging.
         """
         msg = f"No credentials configured for AI provider: {provider}"
-        hint = recovery_hint or f"Run 'jdo auth' to configure your {provider} API key."
-        ctx = context or {}
-        ctx["provider"] = provider
+        hint = recovery_hint or _format_credential_recovery_hint(provider, "configure")
+        ctx_obj = ErrorContext.from_dict(context) if isinstance(context, dict) else context
+        ctx_obj = ctx_obj or ErrorContext()
+        ctx_obj.provider = provider
 
-        super().__init__(msg, recovery_hint=hint, context=ctx)
+        super().__init__(msg, recovery_hint=hint, context=ctx_obj)
         self.provider = provider
 
 
@@ -251,21 +318,22 @@ class InvalidCredentialsError(AuthError):
         provider: str,
         *,
         recovery_hint: str | None = None,
-        context: dict[str, Any] | None = None,
+        context: dict[str, Any] | ErrorContext | None = None,
     ) -> None:
         """Initialize invalid credentials error.
 
         Args:
             provider: The AI provider with invalid credentials.
             recovery_hint: Optional hint for users on how to resolve the error.
-            context: Optional dictionary of additional context for debugging.
+            context: Optional dictionary or ErrorContext of additional context for debugging.
         """
         msg = f"Invalid credentials format for AI provider: {provider}"
-        hint = recovery_hint or f"Run 'jdo auth' to reconfigure your {provider} API key."
-        ctx = context or {}
-        ctx["provider"] = provider
+        hint = recovery_hint or _format_credential_recovery_hint(provider, "reconfigure")
+        ctx_obj = ErrorContext.from_dict(context) if isinstance(context, dict) else context
+        ctx_obj = ctx_obj or ErrorContext()
+        ctx_obj.provider = provider
 
-        super().__init__(msg, recovery_hint=hint, context=ctx)
+        super().__init__(msg, recovery_hint=hint, context=ctx_obj)
         self.provider = provider
 
 
@@ -282,23 +350,24 @@ class UnsupportedProviderError(ConfigError):
         provider: str,
         *,
         recovery_hint: str | None = None,
-        context: dict[str, Any] | None = None,
+        context: dict[str, Any] | ErrorContext | None = None,
     ) -> None:
         """Initialize unsupported provider error.
 
         Args:
             provider: The unsupported provider name.
             recovery_hint: Optional hint for users on how to resolve the error.
-            context: Optional dictionary of additional context for debugging.
+            context: Optional dictionary or ErrorContext of additional context for debugging.
         """
         supported = ["openai", "anthropic", "google", "openrouter"]
         msg = f"Unsupported AI provider: {provider}. Supported: {', '.join(supported)}"
         hint = recovery_hint or f"Set JDO_AI_PROVIDER to one of: {', '.join(supported)}"
-        ctx = context or {}
-        ctx["provider"] = provider
-        ctx["supported_providers"] = supported
+        ctx_obj = ErrorContext.from_dict(context) if isinstance(context, dict) else context
+        ctx_obj = ctx_obj or ErrorContext()
+        ctx_obj.provider = provider
+        ctx_obj.supported_providers = supported
 
-        super().__init__(msg, recovery_hint=hint, context=ctx)
+        super().__init__(msg, recovery_hint=hint, context=ctx_obj)
         self.provider = provider
         self.supported_providers = supported
 

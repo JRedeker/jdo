@@ -20,6 +20,7 @@ When a feature spec is archived, it should be added here and removed from `ROADM
 - **add-ai-driven-uat** (2025-12-19): AI-driven UAT framework with scenario definitions and mock agent testing
 
 #### AI Integration
+- **improve-ai-credential-usage**: Explicit API credential passing to PydanticAI providers, credential validation, structured logging, CLI auth commands (`jdo auth set`, `jdo auth status`), improved error messages with recovery hints
 - **wire-ai-to-chat** (2025-12-19): Connected PydanticAI agent to ChatScreen with streaming responses and tool invocation
 - **persist-handler-results** (2025-12-19): Wired command handlers to database persistence with confirmation flow
 - **add-ai-coaching-time-management** (2025-12-19): AI time coaching with /hours command and task duration tracking
@@ -27,6 +28,9 @@ When a feature spec is archived, it should be added here and removed from `ROADM
 #### Reliability & Validation
 - **add-commitment-guardrails** (2025-12-19): Validation guardrails for commitment creation with stakeholder and timeline requirements
 - **add-reliability-compliance** (2025-12-19): Command timeout handling, retry logic, and reliability patterns
+
+#### Authentication & CLI
+- **improve-ai-credential-usage**: Added `jdo auth set` and `jdo auth status` CLI commands, credential storage in auth.json with 0600 permissions, explicit provider initialization with `OpenRouterProvider`/`OpenAIProvider`, comprehensive credential error handling with `MissingCredentialsError`, `InvalidCredentialsError`, `UnsupportedProviderError`
 
 ## [0.1.0] - 2025-12-17
 

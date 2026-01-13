@@ -55,11 +55,12 @@ Tell it in plain language. The AI extracts goals, milestones, commitments, and t
 |---|---|
 | **Conversational Interface** | Chat naturally—the AI structures your goals for you |
 | **Flexible Hierarchy** | Visions, Goals, Milestones, Commitments, Tasks |
+| **Live Dashboard** | Multi-panel display with commitments, goals, progress bars, and status |
 | **Streaming AI Responses** | Responses appear token-by-token with markdown rendering |
 | **Hybrid Input** | Natural language primary, slash commands for power users |
-| **Visual Polish** | Animated spinner, tab completion, status bar, rounded tables |
+| **Visual Polish** | Animated spinner, tab completion, status bar, rounded panels |
 | **Recurring Commitments** | Set it once, generate instances automatically |
-| **Multiple AI Providers** | OpenAI or OpenRouter—your choice |
+| **Multiple AI Providers** | OpenAI, OpenRouter, Anthropic, or Google—your choice |
 | **Local-First Storage** | Your data stays on your machine, always |
 
 ---
@@ -99,8 +100,16 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 **1. Configure your AI provider**
 
+Using environment variables:
 ```bash
-export OPENAI_API_KEY="sk-..."
+export OPENROUTER_API_KEY="sk-or-..."
+export JDO_AI_PROVIDER="openrouter"
+export JDO_AI_MODEL="gpt-5.1-mini"
+```
+
+Or using the interactive auth command:
+```bash
+jdo auth set openrouter
 ```
 
 <details>
@@ -109,6 +118,12 @@ export OPENAI_API_KEY="sk-..."
 ```bash
 export OPENROUTER_API_KEY="sk-or-..."
 export JDO_AI_PROVIDER="openrouter"
+```
+
+Or interactively:
+```bash
+jdo auth set openrouter
+jdo set JDO_AI_PROVIDER=openrouter
 ```
 
 </details>
@@ -120,6 +135,33 @@ uv run jdo
 ```
 
 **3. Start talking about what you want to accomplish.**
+
+---
+
+## The Dashboard
+
+When you launch jdo, you see a live dashboard showing your current state at a glance:
+
+```
+╭─ 📋 Commitments (3 active, 1 at-risk) ───────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  ●    Send invoice to Client                           Client                  OVERDUE (2 days)  │
+│  ●    Submit Q1 report                                 Finance                     Today 5:00pm  │
+│  ○    Review PR #234                                   Team                            Tomorrow  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ 🎯 Goals (2 active) ────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  Launch MVP                                        ████████████████░░░░     80%        4/5 done  │
+│  Health & Fitness                                  ████████████░░░░░░░░     60%        review ⚠  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│      📊 Integrity: A- (91%) ↑          🔥 Streak: 3 weeks                📥 Triage: 5            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
+
+The dashboard adapts to your data—showing only what's relevant, from a minimal status bar to a full three-panel view.
 
 ---
 
@@ -169,6 +211,7 @@ For power users who prefer instant, deterministic actions:
 | `/list goals` | List all goals |
 | `/list visions` | List all visions |
 | `/commit "..."` | Create a new commitment |
+| `/complete <id>` | Mark a commitment as complete |
 | `/review` | Review visions due for quarterly review |
 
 Or just type naturally—the AI understands plain English.
@@ -181,6 +224,8 @@ Or just type naturally—the AI understands plain English.
 |---------|-------------|
 | `jdo` | Launch the conversational REPL |
 | `jdo capture "text"` | Quick capture for later triage |
+| `jdo auth status` | Show credential status for all providers |
+| `jdo auth set <provider>` | Set API key for an AI provider |
 | `jdo db status` | Show database migration status |
 | `jdo db upgrade` | Apply pending migrations |
 
@@ -212,8 +257,8 @@ Vision ─────────────── "Become financially indepen
 
 | Variable | Default | Description |
 |:---------|:--------|:------------|
-| `JDO_AI_PROVIDER` | `openai` | Provider: `openai`, `openrouter` |
-| `JDO_AI_MODEL` | `gpt-4o` | Model identifier |
+| `JDO_AI_PROVIDER` | `openrouter` | Provider: `openai`, `openrouter` |
+| `JDO_AI_MODEL` | `gpt-5.1-mini` | Model identifier (OpenRouter format for best pricing) |
 | `JDO_TIMEZONE` | `America/New_York` | Your local timezone |
 | `JDO_DATABASE_PATH` | *(platform default)* | Custom database location |
 
@@ -230,6 +275,38 @@ All data is stored locally using platform-appropriate directories:
 **Files:**
 - `jdo.db` — SQLite database containing all your data
 - `auth.json` — API credentials storage
+
+### Credential Management
+
+JDO supports storing API credentials securely in a local credentials file. This is the recommended approach over environment variables.
+
+**Interactive setup:**
+```bash
+jdo auth set openai      # Configure OpenAI
+jdo auth set openrouter  # Configure OpenRouter
+jdo auth set anthropic   # Configure Anthropic
+jdo auth set google      # Configure Google AI
+```
+
+**Check status:**
+```bash
+jdo auth status          # Show credential status for all providers
+```
+
+**Credentials are stored in:**
+- Linux: `~/.local/share/jdo/auth.json`
+- macOS: `~/Library/Application Support/jdo/auth.json`
+- Windows: `%LOCALAPPDATA%\jdo\auth.json`
+
+Alternatively, you can use environment variables:
+```bash
+export OPENAI_API_KEY="sk-..."
+export OPENROUTER_API_KEY="sk-or-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+export GOOGLE_API_KEY="your-google-key"
+export JDO_AI_PROVIDER="openrouter"
+export JDO_AI_MODEL="gpt-5.1-mini"
+```
 
 ---
 
@@ -265,10 +342,10 @@ src/jdo/
 ├── auth/       API key management
 ├── commands/   Command parsing and handlers
 ├── config/     Settings, paths
-├── db/         SQLite engine, migrations
+├── db/         SQLite engine, migrations, queries
 ├── models/     SQLModel entities
-├── output/     Rich formatters for CLI output
-├── repl/       REPL loop and session management
+├── output/     Rich formatters, dashboard panels
+├── repl/       REPL loop, session, dashboard display
 └── cli.py      CLI entry point
 ```
 

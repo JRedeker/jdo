@@ -17,6 +17,8 @@ sys.path.insert(0, str(project_root / "src"))
 
 # Import all models to ensure they're registered with SQLModel.metadata
 # This is required for autogenerate to detect model changes
+# Get settings for database path
+from jdo.config.settings import get_settings  # noqa: E402
 from jdo.models import (  # noqa: E402, F401
     CleanupPlan,
     Commitment,
@@ -28,9 +30,6 @@ from jdo.models import (  # noqa: E402, F401
     Task,
     Vision,
 )
-
-# Get settings for database path
-from jdo.config.settings import get_settings  # noqa: E402
 
 # Alembic Config object for access to .ini file values
 config = context.config

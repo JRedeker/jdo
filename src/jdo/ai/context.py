@@ -188,5 +188,5 @@ async def stream_response(
     # Wrap entire stream with timeout
     async with asyncio.timeout(AI_STREAM_TIMEOUT_SECONDS):
         async with agent.run_stream(prompt, deps=deps, message_history=model_history) as result:
-            async for chunk in result.stream_text():
+            async for chunk in result.stream_text(delta=True):
                 yield chunk

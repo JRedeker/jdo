@@ -59,6 +59,31 @@ def format_date(d: date | datetime | None) -> str:
     return d.strftime("%Y-%m-%d")
 
 
+def format_relative_date(d: date, today: date | None = None) -> str:
+    """Format a date as a human-friendly relative string.
+
+    Args:
+        d: The date to format.
+        today: Reference date (defaults to today).
+
+    Returns:
+        Relative date string like "Today", "Tomorrow", "Fri", "in 10 days".
+    """
+    today = today or datetime.now(tz=UTC).date()
+    delta = (d - today).days
+
+    if delta == 0:
+        return "Today"
+    if delta == 1:
+        return "Tomorrow"
+    if _RELATIVE_DATE_WEEKDAY_MIN_DAYS <= delta <= _RELATIVE_DATE_WEEKDAY_MAX_DAYS:
+        return d.strftime("%a")  # Mon, Tue, Wed, etc.
+    if delta > _RELATIVE_DATE_WEEKDAY_MAX_DAYS:
+        return f"in {delta} days"
+    # Past dates: fallback to ISO format
+    return d.strftime("%Y-%m-%d")
+
+
 def format_commitment_list(commitments: list[Commitment]) -> Table:
     """Format a list of commitments as a Rich table.
 
@@ -310,3 +335,77 @@ def format_milestones_plain(milestones: list[dict]) -> str:
         lines.append("")
 
     return "\n".join(lines)
+
+
+# Relative date formatting thresholds
+_RELATIVE_DATE_WEEKDAY_MIN_DAYS = 2  # Start showing weekday names at 2 days out
+_RELATIVE_DATE_WEEKDAY_MAX_DAYS = 6  # Stop showing weekday names at 6 days out
+
+# Maximum deliverable length for summary panel truncation
+_SUMMARY_DELIVERABLE_MAX_LENGTH = 20
+
+
+def format_commitment_summary(
+    active_count: int,
+    at_risk_count: int,
+    next_due_deliverable: str | None = None,
+    next_due_date: date | None = None,
+) -> Panel | None:
+    """Format a compact commitment summary panel.
+
+    Args:
+        active_count: Number of active commitments.
+        at_risk_count: Number of at-risk/overdue commitments.
+        next_due_deliverable: Deliverable text of next due commitment.
+        next_due_date: Due date of next due commitment.
+
+    Returns:
+        Rich Panel with summary, or None if no active commitments.
+    """
+    if active_count == 0:
+        return None
+
+    # Build content using Text.assemble for inline styling
+    parts: list[tuple[str, str]] = [
+        ("📋 ", ""),
+        (str(active_count), "bold"),
+        (" active", "dim"),
+    ]
+
+    # Add at-risk count if any
+    if at_risk_count > 0:
+        parts.extend(
+            [
+                (" (", "dim"),
+                (str(at_risk_count), "bold yellow"),
+                (" ⚠️)", ""),
+            ]
+        )
+
+    # Add next due item if available
+    if next_due_deliverable and next_due_date:
+        # Truncate deliverable if too long
+        deliverable = next_due_deliverable
+        if len(deliverable) > _SUMMARY_DELIVERABLE_MAX_LENGTH:
+            deliverable = deliverable[: _SUMMARY_DELIVERABLE_MAX_LENGTH - 3] + "..."
+
+        relative = format_relative_date(next_due_date)
+
+        parts.extend(
+            [
+                ("  │  ", "dim"),
+                ("Next: ", "dim"),
+                (deliverable, "cyan"),
+                (" → ", "dim"),
+                (relative, "bold cyan"),
+            ]
+        )
+
+    content = Text.assemble(*parts)
+
+    return Panel.fit(
+        content,
+        box=box.ROUNDED,
+        border_style="dim",
+        padding=(0, 1),
+    )

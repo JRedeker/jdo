@@ -15,11 +15,13 @@ from jdo.output.formatters import (
     format_commitment_list,
     format_commitment_list_plain,
     format_commitment_proposal,
+    format_commitment_summary,
     format_date,
     format_empty_list,
     format_error,
     format_milestones_plain,
     format_overdue_commitments_plain,
+    format_relative_date,
     format_success,
     format_visions_plain,
     get_status_color,
@@ -404,3 +406,136 @@ class TestFormatMilestonesPlain:
         assert "Complete draft" in result
         assert "2025-03-01" in result
         assert "pending" in result
+
+
+class TestFormatRelativeDate:
+    """Tests for relative date formatting."""
+
+    def test_today(self):
+        """Same day returns 'Today'."""
+        today = date(2025, 1, 15)
+        assert format_relative_date(today, today=today) == "Today"
+
+    def test_tomorrow(self):
+        """Next day returns 'Tomorrow'."""
+        today = date(2025, 1, 15)
+        tomorrow = date(2025, 1, 16)
+        assert format_relative_date(tomorrow, today=today) == "Tomorrow"
+
+    def test_same_week_shows_weekday(self):
+        """2-6 days out shows abbreviated weekday name."""
+        today = date(2025, 1, 15)  # Wednesday
+
+        # Thursday (1 day out is Tomorrow, so test 2 days)
+        friday = date(2025, 1, 17)
+        assert format_relative_date(friday, today=today) == "Fri"
+
+        # Monday (5 days out)
+        monday = date(2025, 1, 20)
+        assert format_relative_date(monday, today=today) == "Mon"
+
+        # Tuesday (6 days out - still within week range)
+        tuesday = date(2025, 1, 21)
+        assert format_relative_date(tuesday, today=today) == "Tue"
+
+    def test_beyond_week_shows_in_x_days(self):
+        """7+ days out shows 'in X days'."""
+        today = date(2025, 1, 15)
+
+        # 7 days out
+        week_later = date(2025, 1, 22)
+        assert format_relative_date(week_later, today=today) == "in 7 days"
+
+        # 10 days out
+        ten_days = date(2025, 1, 25)
+        assert format_relative_date(ten_days, today=today) == "in 10 days"
+
+    def test_past_date_shows_iso(self):
+        """Past dates fall back to ISO format."""
+        today = date(2025, 1, 15)
+        yesterday = date(2025, 1, 14)
+        assert format_relative_date(yesterday, today=today) == "2025-01-14"
+
+    def test_default_today_uses_current_date(self):
+        """Without explicit today, uses current date."""
+        # This is hard to test deterministically, but we can at least
+        # verify it doesn't crash
+        result = format_relative_date(date(2099, 12, 31))
+        assert "in " in result or result == "2099-12-31"
+
+
+class TestFormatCommitmentSummary:
+    """Tests for commitment summary panel formatting."""
+
+    def test_no_commitments_returns_none(self):
+        """Zero active commitments returns None."""
+        result = format_commitment_summary(
+            active_count=0,
+            at_risk_count=0,
+        )
+        assert result is None
+
+    def test_returns_panel_with_commitments(self):
+        """Non-zero commitments returns a Panel."""
+        result = format_commitment_summary(
+            active_count=3,
+            at_risk_count=0,
+        )
+        assert isinstance(result, Panel)
+
+    def test_contains_active_count(self):
+        """Panel contains active count."""
+        result = format_commitment_summary(
+            active_count=5,
+            at_risk_count=0,
+        )
+        content = str(result.renderable)
+        assert "5" in content
+        assert "active" in content
+
+    def test_contains_at_risk_count(self):
+        """Panel contains at-risk count when > 0."""
+        result = format_commitment_summary(
+            active_count=3,
+            at_risk_count=2,
+        )
+        content = str(result.renderable)
+        assert "2" in content
+
+    def test_contains_next_due_item(self):
+        """Panel contains next due item when provided."""
+        result = format_commitment_summary(
+            active_count=3,
+            at_risk_count=0,
+            next_due_deliverable="Send report to Sarah",
+            next_due_date=date(2025, 1, 17),
+        )
+        content = str(result.renderable)
+        assert "Send report" in content  # Truncated
+        assert "Next" in content
+
+    def test_truncates_long_deliverable(self):
+        """Long deliverables are truncated."""
+        long_deliverable = "This is a very long deliverable that should be truncated"
+        result = format_commitment_summary(
+            active_count=1,
+            at_risk_count=0,
+            next_due_deliverable=long_deliverable,
+            next_due_date=date(2025, 1, 17),
+        )
+        content = str(result.renderable)
+        # Should be truncated with ellipsis
+        assert "..." in content
+        # Should not contain full deliverable
+        assert long_deliverable not in content
+
+    def test_no_next_due_section_without_data(self):
+        """Panel omits 'Next:' section when no next due data."""
+        result = format_commitment_summary(
+            active_count=3,
+            at_risk_count=1,
+            next_due_deliverable=None,
+            next_due_date=None,
+        )
+        content = str(result.renderable)
+        assert "Next" not in content
