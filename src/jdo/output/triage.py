@@ -5,7 +5,7 @@ Provides formatting for triage items, analysis results, and progress indicators.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Group
 from rich.panel import Panel
@@ -103,7 +103,7 @@ def format_triage_item(
     Returns:
         Rich Panel with triage item and analysis.
     """
-    parts: list = []
+    parts: list[Any] = []
 
     # Progress indicator
     progress = format_triage_progress(current, total)
@@ -136,7 +136,7 @@ def format_triage_item(
     )
 
 
-def _format_analysis_section(analysis: TriageAnalysis) -> list:
+def _format_analysis_section(analysis: TriageAnalysis) -> list[Any]:
     """Format the analysis section of a triage item.
 
     Args:
@@ -145,7 +145,7 @@ def _format_analysis_section(analysis: TriageAnalysis) -> list:
     Returns:
         List of renderables for the analysis section.
     """
-    parts: list = []
+    parts: list[Any] = []
 
     if analysis.classification:
         classification = analysis.classification
@@ -244,7 +244,7 @@ def format_triage_summary(processed: int, total: int, created: dict[str, int]) -
     Returns:
         Rich Panel with triage summary.
     """
-    parts: list = []
+    parts: list[Any] = []
 
     # Header
     parts.append(Text("Triage Complete!", style="bold green"))

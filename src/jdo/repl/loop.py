@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -42,7 +43,7 @@ from jdo.output.formatters import (
     format_empty_list,
 )
 from jdo.repl.session import PendingDraft, Session
-from jdo.utils.datetime import today_date
+from jdo.utils.datetime import today_date, utc_now
 
 if TYPE_CHECKING:
     from pydantic_ai import Agent
@@ -81,9 +82,11 @@ to the people who matter.
 
 # Error message when no AI credentials are configured
 NO_CREDENTIALS_MESSAGE = """\
-[bold red]No AI credentials configured.[/bold red]
+[bold red]No AI API credentials configured.[/bold red]
 
 To use JDO, configure your credentials with: [cyan]jdo auth[/cyan]
+
+Or set the OPENAI_API_KEY or OPENROUTER_API_KEY environment variable.
 
 See /help for more information.
 """
@@ -299,7 +302,8 @@ async def process_ai_input(
                 # Render as Markdown during streaming
                 try:
                     live.update(Markdown(response_text))
-                except Exception:  # noqa: BLE001 - fallback on any markdown error
+                except (ValueError, TypeError, AttributeError) as e:
+                    logger.debug(f"Markdown rendering error, falling back to plain text: {e}")
                     live.update(Text(response_text))
 
         # Stop live display if it was started
@@ -356,9 +360,7 @@ async def handle_slash_command(
         return True
 
     if command == "complete":
-        # TODO: Implement complete command
-        console.print("[yellow]Complete command not yet implemented in REPL.[/yellow]")
-        console.print("[dim]For now, say 'mark commitment X as complete'.[/dim]")
+        _handle_complete(args, session, db_session)
         return True
 
     if command == "review":
@@ -419,9 +421,13 @@ async def _handle_commit(args: str, session: Session, _db_session: DBSession) ->
 
     except TimeoutError:
         console.print("[red]AI extraction timed out. Please try again.[/red]")
-    except (ValueError, KeyError) as e:
+    except ValueError as e:
+        logger.warning("Commitment extraction failed: {}", e)
         console.print(f"[red]Could not extract commitment details: {e}[/red]")
         console.print("[dim]Try being more specific, e.g.: 'report to Sarah by Friday'[/dim]")
+    except Exception as e:
+        logger.error("Unexpected error during commitment extraction: {}", exc_info=e)
+        console.print("[red]Could not extract commitment details. Please try again.[/red]")
 
 
 def _handle_confirmation(
@@ -479,8 +485,9 @@ def _confirm_draft(
             persistence = PersistenceService(db_session)
             commitment = persistence.save_commitment(draft.data)
             db_session.commit()
-        except Exception as e:  # noqa: BLE001 - catch-all for database errors
-            console.print(f"[red]Error creating commitment: {e}[/red]")
+        except (OSError, SQLAlchemyError) as e:
+            logger.error(f"Failed to create commitment: {e}")
+            console.print("[red]Error creating commitment. Please try again.[/red]")
             return True
         else:
             console.print(
@@ -510,12 +517,13 @@ def _handle_help() -> None:
 [cyan]/list goals[/cyan]              - List all goals
 [cyan]/list visions[/cyan]            - List all visions
 [cyan]/commit "..."[/cyan]            - Create a new commitment
+[cyan]/complete <id>[/cyan]           - Mark a commitment as complete
 [cyan]/review[/cyan]                  - Review visions due for quarterly review
-[cyan]/complete[/cyan]                - Mark an item as complete (coming soon)
 
 [bold]Examples:[/bold]
   /commit "send report to Sarah by Friday"
   /list goals
+  /complete abc123
 
 [dim]Or just type naturally - I understand plain English![/dim]
 """
@@ -577,6 +585,72 @@ def _handle_review(session: Session, db_session: DBSession) -> None:
             f"[dim]You have {remaining} more vision(s) due for review. "
             f"Type /review to continue.[/dim]"
         )
+
+
+def _handle_complete(args: str, session: Session, db_session: DBSession) -> None:
+    """Handle /complete command - mark a commitment as complete.
+
+    Args:
+        args: Optional commitment ID or partial match text.
+        session: REPL session state.
+        db_session: Database session.
+    """
+    if not args:
+        console.print("[yellow]Usage: /complete <commitment_id>[/yellow]")
+        console.print('[dim]Example: /complete 123abc or /complete "send report"[/dim]')
+        console.print("[dim]Run /list to see active commitments.[/dim]")
+        return
+
+    # Get active commitments
+    active_statuses = [
+        CommitmentStatus.PENDING,
+        CommitmentStatus.IN_PROGRESS,
+        CommitmentStatus.AT_RISK,
+    ]
+    statement = select(Commitment).where(Commitment.status.in_(active_statuses))
+    commitments = list(db_session.exec(statement).all())
+
+    if not commitments:
+        console.print("[dim]No active commitments to complete.[/dim]")
+        return
+
+    # Try to find matching commitment by ID
+    target_commitment = None
+    partial_id = args.strip().lower()
+
+    for commitment in commitments:
+        # Match by partial ID (first 6+ chars)
+        commitment_id_str = str(commitment.id)[:6].lower()
+        if commitment_id_str == partial_id[:6]:
+            target_commitment = commitment
+            break
+
+        # Match by deliverable text (substring match, case-insensitive)
+        if partial_id in commitment.deliverable.lower():
+            target_commitment = commitment
+            break
+
+    if not target_commitment:
+        console.print(f"[yellow]No commitment found matching '{args}'[/yellow]")
+        console.print("[dim]Run /list to see active commitments.[/dim]")
+        return
+
+    # Mark as complete
+    target_commitment.status = CommitmentStatus.COMPLETED
+    target_commitment.completed_at = utc_now()
+    db_session.add(target_commitment)
+    db_session.commit()
+
+    logger.info(
+        f"Completed commitment: {target_commitment.deliverable} (id={target_commitment.id})"
+    )
+
+    console.print(f"[green]Completed commitment: {target_commitment.deliverable}[/green]")
+
+    # Update cached counts after entity completion
+    session.update_cached_counts(
+        commitment_count=_get_active_commitment_count(db_session),
+    )
 
 
 def _handle_list(args: str, db_session: DBSession) -> None:
@@ -733,6 +807,124 @@ def _get_active_commitment_count(db_session: DBSession) -> int:
     return len(list(db_session.exec(statement).all()))
 
 
+def _initialize_agent() -> Agent[JDODependencies, str]:
+    """Initialize database, check credentials, and create AI agent.
+
+    Returns:
+        The created AI agent.
+
+    Raises:
+        SystemExit: If credentials are not configured.
+    """
+    create_db_and_tables()
+
+    if not check_credentials():
+        console.print(NO_CREDENTIALS_MESSAGE)
+        sys.exit(1)
+
+    return create_agent()
+
+
+def _setup_session_state(
+    db_session: DBSession,
+) -> tuple[Session, JDODependencies]:
+    """Setup session state and dependencies.
+
+    Args:
+        db_session: Database session.
+
+    Returns:
+        Tuple of (session state, agent dependencies).
+    """
+    deps = JDODependencies(session=db_session)
+    session = Session()
+
+    session.update_cached_counts(
+        commitment_count=_get_active_commitment_count(db_session),
+        triage_count=get_triage_count(db_session),
+    )
+
+    return session, deps
+
+
+def _create_toolbar_callback(session: Session) -> Callable[[], str]:
+    """Create toolbar text callback using cached session values.
+
+    Args:
+        session: Session state with cached counts.
+
+    Returns:
+        Function that generates toolbar text.
+    """
+
+    def get_toolbar_text() -> str:
+        draft_indicator = " [draft]" if session.has_pending_draft else ""
+        return (
+            f" {session.cached_commitment_count} active | "
+            f"{session.cached_triage_count} triage{draft_indicator}"
+        )
+
+    return get_toolbar_text
+
+
+def _create_prompt_session(
+    get_toolbar_text: Callable[[], str],
+) -> PromptSession[str]:
+    """Create prompt session with history, auto-completion, and toolbar.
+
+    Args:
+        get_toolbar_text: Callback function for toolbar text.
+
+    Returns:
+        Configured prompt session.
+    """
+    completer = WordCompleter(SLASH_COMMANDS, ignore_case=True)
+    return PromptSession(
+        history=InMemoryHistory(),
+        message="> ",
+        completer=completer,
+        complete_while_typing=False,
+        bottom_toolbar=get_toolbar_text,
+        refresh_interval=1.0,
+    )
+
+
+async def _main_repl_loop(
+    prompt_session: PromptSession[str],
+    session: Session,
+    db_session: DBSession,
+    agent: Agent[JDODependencies, str],
+    deps: JDODependencies,
+) -> None:
+    """Run the main REPL loop processing user input.
+
+    Args:
+        prompt_session: Prompt session for getting user input.
+        session: Current session state.
+        db_session: Database session.
+        agent: The PydanticAI agent.
+        deps: Agent dependencies.
+    """
+    while True:
+        try:
+            user_input = await prompt_session.prompt_async()
+
+            if not user_input or not user_input.strip():
+                continue
+
+            user_input = user_input.strip()
+
+            if not await _process_user_input(user_input, session, db_session, agent, deps):
+                break
+
+        except KeyboardInterrupt:
+            console.print("\n[dim]Input cancelled.[/dim]")
+            continue
+        except EOFError:
+            console.print(GOODBYE_MESSAGE)
+            break
+
+
 # Slash commands for auto-completion
 SLASH_COMMANDS = [
     "/help",
@@ -751,72 +943,17 @@ async def repl_loop() -> None:
 
     Handles user input, routes to AI or slash commands, and manages session state.
     """
-    # Initialize database
-    create_db_and_tables()
+    agent = _initialize_agent()
 
-    # Check for AI credentials
-    if not check_credentials():
-        console.print(NO_CREDENTIALS_MESSAGE)
-        return
-
-    # Create AI agent and dependencies
-    agent = create_agent()
     with get_session() as db_session:
-        deps = JDODependencies(session=db_session)
-        session = Session()
+        session, deps = _setup_session_state(db_session)
 
-        # Initialize cached counts for toolbar
-        session.update_cached_counts(
-            commitment_count=_get_active_commitment_count(db_session),
-            triage_count=get_triage_count(db_session),
-        )
+        get_toolbar_text = _create_toolbar_callback(session)
+        prompt_session = _create_prompt_session(get_toolbar_text)
 
-        # Create toolbar callback using cached values
-        def get_toolbar_text() -> str:
-            """Generate bottom toolbar text from cached counts."""
-            draft_indicator = " [draft]" if session.has_pending_draft else ""
-            return (
-                f" {session.cached_commitment_count} active | "
-                f"{session.cached_triage_count} triage{draft_indicator}"
-            )
-
-        # Create prompt session with history, auto-completion, and toolbar
-        completer = WordCompleter(SLASH_COMMANDS, ignore_case=True)
-        prompt_session: PromptSession[str] = PromptSession(
-            history=InMemoryHistory(),
-            message="> ",
-            completer=completer,
-            complete_while_typing=False,
-            bottom_toolbar=get_toolbar_text,
-            refresh_interval=1.0,
-        )
-
-        # Show startup guidance (first-run, at-risk, triage, vision review reminders)
         _show_startup_guidance(db_session, session)
 
-        while True:
-            try:
-                # Get user input
-                user_input = await prompt_session.prompt_async()
-
-                # Handle empty/whitespace input
-                if not user_input or not user_input.strip():
-                    continue
-
-                user_input = user_input.strip()
-
-                # Process input and check if we should continue
-                if not await _process_user_input(user_input, session, db_session, agent, deps):
-                    break
-
-            except KeyboardInterrupt:
-                # Ctrl+C cancels current input, doesn't exit
-                console.print("\n[dim]Input cancelled.[/dim]")
-                continue
-            except EOFError:
-                # Ctrl+D exits
-                console.print(GOODBYE_MESSAGE)
-                break
+        await _main_repl_loop(prompt_session, session, db_session, agent, deps)
 
 
 def run_repl() -> None:

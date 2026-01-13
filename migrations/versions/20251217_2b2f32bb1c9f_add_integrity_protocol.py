@@ -1,4 +1,4 @@
-"""add_integrity_protocol
+"""add_integrity_protocol.
 
 Revision ID: 2b2f32bb1c9f
 Revises:
@@ -8,10 +8,9 @@ Create Date: 2025-12-17 22:08:31.244609
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 import sqlmodel.sql.sqltypes
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "2b2f32bb1c9f"

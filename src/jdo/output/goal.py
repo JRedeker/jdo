@@ -5,7 +5,7 @@ Provides consistent formatting for goal lists, details, and proposals.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from rich import box
 from rich.panel import Panel
@@ -151,7 +151,7 @@ def format_goal_proposal(
     return Panel(content, title="[cyan]New Goal[/cyan]", border_style="cyan")
 
 
-def format_goal_list_plain(goals: list[dict]) -> str:
+def format_goal_list_plain(goals: list[dict[str, Any]]) -> str:
     """Format a list of goal dicts as plain text for AI tools.
 
     Args:

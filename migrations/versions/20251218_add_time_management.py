@@ -1,4 +1,4 @@
-"""add_time_management
+"""add_time_management.
 
 Revision ID: a1b2c3d4e5f6
 Revises: 2b2f32bb1c9f
@@ -10,10 +10,9 @@ and create task_history table for audit logging.
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 import sqlmodel.sql.sqltypes
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "a1b2c3d4e5f6"

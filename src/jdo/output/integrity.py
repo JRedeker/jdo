@@ -5,7 +5,7 @@ Provides formatting for integrity metrics, grade display, and trends.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from rich.align import Align
 from rich.console import Group
@@ -246,7 +246,7 @@ def format_integrity_dashboard(
         Rich Panel with grade, metrics, and optional affecting commitments.
     """
     # Build content as a group of renderables
-    parts: list = []
+    parts: list[Any] = []
 
     # Large grade display
     grade = metrics.letter_grade

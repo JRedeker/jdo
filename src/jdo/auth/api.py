@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
+
 from jdo.auth.models import ApiKeyCredentials
+from jdo.auth.registry import get_provider_info
 from jdo.auth.store import AuthStore
 from jdo.paths import get_auth_path
 
@@ -17,15 +20,26 @@ def get_credentials(
 ) -> ApiKeyCredentials | None:
     """Get credentials for a provider.
 
+    Checks stored credentials first, then falls back to environment variables.
+
     Args:
         provider_id: The provider identifier (e.g., "openai", "openrouter").
 
     Returns:
         Credentials if found, None otherwise.
     """
-    # Check stored credentials first
     store = _get_store()
-    return store.get(provider_id)
+    creds = store.get(provider_id)
+    if creds is not None:
+        return creds
+
+    provider_info = get_provider_info(provider_id)
+    if provider_info is not None:
+        env_value = os.environ.get(provider_info.env_var)
+        if env_value is not None:
+            return ApiKeyCredentials(api_key=env_value)
+
+    return None
 
 
 def save_credentials(
