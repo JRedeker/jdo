@@ -23,12 +23,14 @@ class CommandType(str, Enum):
     RECURRING = "recurring"
     TRIAGE = "triage"
     SHOW = "show"
+    LIST = "list"  # List entities (commitments, goals, visions)
     VIEW = "view"
     EDIT = "edit"
     TYPE = "type"
     COMPLETE = "complete"
     CANCEL = "cancel"
     HELP = "help"
+    REVIEW = "review"  # Review visions due for quarterly review
     ATRISK = "atrisk"  # Mark commitment as at-risk
     CLEANUP = "cleanup"  # View/update cleanup plan
     INTEGRITY = "integrity"  # Show integrity dashboard
@@ -75,12 +77,14 @@ _COMMAND_MAP: dict[str, CommandType] = {
     "recurring": CommandType.RECURRING,
     "triage": CommandType.TRIAGE,
     "show": CommandType.SHOW,
+    "list": CommandType.LIST,
     "view": CommandType.VIEW,
     "edit": CommandType.EDIT,
     "type": CommandType.TYPE,
     "complete": CommandType.COMPLETE,
     "cancel": CommandType.CANCEL,
     "help": CommandType.HELP,
+    "review": CommandType.REVIEW,
     "atrisk": CommandType.ATRISK,
     "cleanup": CommandType.CLEANUP,
     "integrity": CommandType.INTEGRITY,
@@ -89,9 +93,27 @@ _COMMAND_MAP: dict[str, CommandType] = {
     "recover": CommandType.RECOVER,
 }
 
+# Aliases that expand to other commands with args
+# Format: alias -> (command, args_to_prepend)
+_COMMAND_ALIASES: dict[str, tuple[str, list[str]]] = {
+    # Shortcut numbers /1 through /5 -> /view <n>
+    "1": ("view", ["1"]),
+    "2": ("view", ["2"]),
+    "3": ("view", ["3"]),
+    "4": ("view", ["4"]),
+    "5": ("view", ["5"]),
+    # Command abbreviations
+    "c": ("commit", []),
+    "l": ("list", []),
+    "v": ("view", []),
+    "h": ("help", []),
+}
+
 
 def parse_command(text: str) -> ParsedCommand:
     """Parse user input into a command or message.
+
+    Supports command aliases like /1 -> /view 1, /c -> /commit, etc.
 
     Args:
         text: The user's input text.
@@ -120,6 +142,12 @@ def parse_command(text: str) -> ParsedCommand:
 
     command_name = parts[0].lower()
     args = parts[1:]
+
+    # Check for aliases first
+    if command_name in _COMMAND_ALIASES:
+        actual_command, prepend_args = _COMMAND_ALIASES[command_name]
+        command_name = actual_command
+        args = prepend_args + args
 
     if command_name not in _COMMAND_MAP:
         msg = f"Unknown command: /{command_name}"

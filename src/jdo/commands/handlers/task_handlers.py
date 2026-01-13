@@ -10,11 +10,11 @@ from jdo.commands.parser import ParsedCommand
 
 
 class TaskHandler(CommandHandler):
-    """Handler for /task command - creates tasks for commitments."""
+    """Handler for /task command - creates tasks for commitments.
 
-    def __init__(self) -> None:
-        """Initialize the task handler."""
-        self._current_draft: dict[str, Any] | None = None
+    Stateless handler - draft data flows through HandlerResult.draft_data
+    and is tracked by Session.pending_draft.
+    """
 
     def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:  # noqa: ARG002
         """Execute /task command.
@@ -57,8 +57,6 @@ class TaskHandler(CommandHandler):
             "commitment_id": commitment_id,
             "estimated_hours": extracted.get("estimated_hours"),
         }
-
-        self._current_draft = draft_data
 
         # Build response message
         if not draft_data["title"]:

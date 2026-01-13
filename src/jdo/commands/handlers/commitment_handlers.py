@@ -16,11 +16,11 @@ from jdo.integrity import IntegrityService
 
 
 class CommitHandler(CommandHandler):
-    """Handler for /commit command - creates commitments."""
+    """Handler for /commit command - creates commitments.
 
-    def __init__(self) -> None:
-        """Initialize the commit handler."""
-        self._current_draft: dict[str, Any] | None = None
+    Stateless handler - draft data flows through HandlerResult.draft_data
+    and is tracked by Session.pending_draft.
+    """
 
     def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:  # noqa: ARG002
         """Execute /commit command.
@@ -48,8 +48,6 @@ class CommitHandler(CommandHandler):
             "goal_id": extracted.get("goal_id"),
             "milestone_id": extracted.get("milestone_id"),
         }
-
-        self._current_draft = draft_data
 
         # Check for missing required fields
         missing_fields = []
@@ -87,20 +85,6 @@ class CommitHandler(CommandHandler):
             },
             draft_data=draft_data,
             needs_confirmation=needs_confirmation,
-        )
-
-    def cancel(self) -> HandlerResult:
-        """Cancel the current draft.
-
-        Returns:
-            HandlerResult indicating cancellation.
-        """
-        self._current_draft = None
-        return HandlerResult(
-            message="Draft cancelled. What would you like to do next?",
-            panel_update={"mode": "list", "entity_type": "commitment", "items": []},
-            draft_data=None,
-            needs_confirmation=False,
         )
 
     def _extract_from_conversation(self, conversation: list[dict[str, Any]]) -> dict[str, Any]:

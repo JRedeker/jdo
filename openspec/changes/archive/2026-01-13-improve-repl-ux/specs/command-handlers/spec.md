@@ -1,74 +1,4 @@
-# command-handlers Specification
-
-## Purpose
-TBD - created by archiving change refactor-codebase-maintainability. Update Purpose after archive.
-## Requirements
-### Requirement: Handler Registry
-
-The system SHALL provide a centralized registry for command handlers with lazy instantiation.
-
-#### Scenario: Get handler by command type
-- **WHEN** `get_handler(command_type)` is called
-- **THEN** the correct handler instance is returned for that command type
-- **AND** handlers are instantiated lazily (only when first requested)
-
-#### Scenario: Handler instance caching
-- **WHEN** the same command type is requested multiple times
-- **THEN** the same handler instance is returned (singleton per type)
-
-#### Scenario: Unknown command type
-- **WHEN** `get_handler()` is called with an unregistered command type
-- **THEN** None is returned
-- **AND** caller handles with fuzzy suggestion
-
-#### Scenario: All command types registered
-- **GIVEN** REPL uses registry
-- **WHEN** any `CommandType` from parser is dispatched
-- **THEN** a handler is registered for that type
-- **AND** handler executes appropriate action
-
-### Requirement: Handler Base Classes
-
-The system SHALL provide base classes for command handlers.
-
-#### Scenario: CommandHandler abstract interface
-- **WHEN** a developer creates a new handler
-- **THEN** they extend `CommandHandler` ABC
-- **AND** implement the `execute()` method
-
-#### Scenario: HandlerResult dataclass
-- **WHEN** a handler executes a command
-- **THEN** it returns a `HandlerResult` with message, panel updates, draft data, and confirmation flag
-
-### Requirement: Domain Handler Modules
-
-The system SHALL organize handlers into domain-focused modules with enhanced utility handlers.
-
-#### Scenario: Utility handlers
-- **WHEN** utility commands are invoked (`/help`, `/show`, `/view`, `/cancel`, `/edit`, `/type`, `/hours`, `/triage`)
-- **THEN** handlers are loaded from `utility_handlers.py`
-
-#### Scenario: View handler available
-- **WHEN** `/view` command is invoked
-- **THEN** `ViewHandler` is loaded from `utility_handlers.py`
-- **AND** handler supports ID lookup and number shortcut selection
-
-#### Scenario: Help handler enhanced
-- **WHEN** `/help` or `/help <command>` is invoked
-- **THEN** `HelpHandler` provides categorized or detailed help
-
-### Requirement: Backward Compatibility
-
-The system SHALL maintain backward compatibility during the refactor.
-
-#### Scenario: Existing import paths work
-- **WHEN** code imports `get_handler` from `jdo.commands.handlers`
-- **THEN** the import succeeds
-- **AND** returns the same handler instances as before
-
-#### Scenario: All existing commands work
-- **WHEN** any existing slash command is executed
-- **THEN** it behaves identically to before the refactor
+## ADDED Requirements
 
 ### Requirement: HandlerResult Contract
 
@@ -279,3 +209,63 @@ The system SHALL provide a handler for listing entities with proper session stat
 - **AND** error is logged at ERROR level with details
 - **AND** REPL continues functioning normally
 
+## MODIFIED Requirements
+
+### Requirement: Handler Registry
+
+The system SHALL provide a centralized registry for command handlers with lazy instantiation.
+
+#### Scenario: Get handler by command type
+- **WHEN** `get_handler(command_type)` is called
+- **THEN** the correct handler instance is returned for that command type
+- **AND** handlers are instantiated lazily (only when first requested)
+
+#### Scenario: Handler instance caching
+- **WHEN** the same command type is requested multiple times
+- **THEN** the same handler instance is returned (singleton per type)
+
+#### Scenario: Unknown command type
+- **WHEN** `get_handler()` is called with an unregistered command type
+- **THEN** None is returned
+- **AND** caller handles with fuzzy suggestion
+
+#### Scenario: All command types registered
+- **GIVEN** REPL uses registry
+- **WHEN** any `CommandType` from parser is dispatched
+- **THEN** a handler is registered for that type
+- **AND** handler executes appropriate action
+
+### Requirement: Domain Handler Modules
+
+The system SHALL organize handlers into domain-focused modules with enhanced utility handlers.
+
+#### Scenario: Utility handlers
+- **WHEN** utility commands are invoked (`/help`, `/show`, `/view`, `/cancel`, `/edit`, `/type`, `/hours`, `/triage`)
+- **THEN** handlers are loaded from `utility_handlers.py`
+
+#### Scenario: View handler available
+- **WHEN** `/view` command is invoked
+- **THEN** `ViewHandler` is loaded from `utility_handlers.py`
+- **AND** handler supports ID lookup and number shortcut selection
+
+#### Scenario: Help handler enhanced
+- **WHEN** `/help` or `/help <command>` is invoked
+- **THEN** `HelpHandler` provides categorized or detailed help
+
+## Cross-Cutting Concerns
+
+### Error Handling
+
+> **Note**: All handlers return `HandlerResult` with error messages. Handlers never raise exceptions directly; they catch and convert to user-friendly messages. The fuzzy command matching provides helpful suggestions on typos.
+
+### Logging
+
+> **Note**: Handler execution is logged at DEBUG level via existing infrastructure. Failed lookups log at INFO level for observability without noise.
+
+### Performance
+
+> **Note**: Performance is not a concern. Handler dispatch via `get_handler()` is O(1) dictionary lookup. Fuzzy matching only runs for unknown commands (~20 commands, negligible).
+
+### Security
+
+> **Note**: Security is N/A. Handlers operate within existing authorization model. No elevation of privilege or new access patterns introduced.

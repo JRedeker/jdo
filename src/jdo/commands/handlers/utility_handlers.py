@@ -1,16 +1,44 @@
 """Utility command handler implementations.
 
-Includes handlers for help, show, view, cancel, edit, type, hours, and triage commands.
+Includes handlers for help, show, view, cancel, edit, type, hours, list,
+review, and triage commands.
 """
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
+
+from loguru import logger
+from rich import box
+from rich.console import Console
+from rich.table import Table
+from sqlalchemy.exc import SQLAlchemyError
+from sqlmodel import select
 
 from jdo.ai.time_parsing import format_hours, parse_time_input
 from jdo.commands.handlers.base import CommandHandler, HandlerResult
 from jdo.commands.parser import ParsedCommand
+from jdo.db.navigation import NavigationService
+from jdo.db.session import get_visions_due_for_review
+from jdo.models.commitment import Commitment, CommitmentStatus
 from jdo.models.draft import EntityType
+from jdo.models.goal import Goal
+from jdo.models.vision import Vision
+from jdo.output.formatters import (
+    MAX_LIST_SHORTCUTS,
+    format_commitment_list,
+    format_empty_list,
+)
+
+if TYPE_CHECKING:
+    from uuid import UUID
+
+    from sqlmodel import Session as DBSession
+
+    from jdo.repl.session import Session
+
+# Console instance for Rich output
+console = Console()
 
 
 class ShowHandler(CommandHandler):
@@ -307,30 +335,42 @@ class HelpHandler(CommandHandler):
                     needs_confirmation=False,
                 )
 
-        # General help
+        # General help grouped by category
         lines = [
-            "Available commands:",
+            "[bold]JDO Commands[/bold]",
             "",
-            "  /commit     - Create a new commitment",
-            "  /goal       - Create a new goal",
-            "  /task       - Add a task to a commitment",
-            "  /vision     - Manage visions",
-            "  /milestone  - Manage milestones",
-            "  /recurring  - Manage recurring commitments",
-            "  /triage     - Process captured items",
-            "  /show       - Display entity lists",
-            "  /view       - View a specific item",
-            "  /complete   - Mark item as completed",
-            "  /abandon    - Mark commitment as abandoned",
-            "  /cancel     - Cancel current draft",
-            "  /atrisk     - Mark commitment as at-risk",
-            "  /recover    - Recover at-risk commitment",
-            "  /cleanup    - View/update cleanup plan",
-            "  /integrity  - Show integrity dashboard",
-            "  /hours      - Set available hours for time coaching",
-            "  /help       - Show this help",
+            "[cyan]Creating & Managing[/cyan]",
+            "  /commit (/c)  - Create a new commitment",
+            "  /goal         - Create a new goal",
+            "  /task         - Add a task to a commitment",
+            "  /vision       - Manage visions",
+            "  /milestone    - Manage milestones",
+            "  /recurring    - Manage recurring commitments",
             "",
-            "Type /help <command> for more details on a specific command.",
+            "[cyan]Navigation[/cyan]",
+            "  /list (/l)    - List entities (commitments, goals, visions)",
+            "  /view (/v)    - View a specific item by ID",
+            "  /1 - /5       - Quick select from last list",
+            "  /show         - Display entity lists by type",
+            "",
+            "[cyan]Commitment Status[/cyan]",
+            "  /complete     - Mark item as completed",
+            "  /atrisk       - Mark commitment as at-risk",
+            "  /recover      - Recover at-risk commitment",
+            "  /abandon      - Mark commitment as abandoned",
+            "  /cleanup      - View/update cleanup plan",
+            "",
+            "[cyan]Productivity[/cyan]",
+            "  /triage       - Process captured items",
+            "  /hours        - Set available hours for time coaching",
+            "  /integrity    - Show integrity dashboard",
+            "",
+            "[cyan]Other[/cyan]",
+            "  /help (/h)    - Show this help",
+            "  /cancel       - Cancel current draft",
+            "",
+            "[dim]Shortcuts: /c=commit, /l=list, /v=view, /h=help[/dim]",
+            "[dim]Type /help <command> for details on a specific command.[/dim]",
         ]
         return HandlerResult(
             message="\n".join(lines),
@@ -340,41 +380,522 @@ class HelpHandler(CommandHandler):
         )
 
 
-class ViewHandler(CommandHandler):
-    """Handler for /view command - shows entity details."""
+class ListHandler(CommandHandler):
+    """Handler for /list command - lists entities (commitments, goals, visions).
+
+    Uses db_session from context to query entities directly and
+    renders output using Rich formatters.
+    """
+
+    def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:
+        """Execute /list command.
+
+        Args:
+            cmd: The parsed command with optional entity type arg.
+            context: Context with db_session.
+
+        Returns:
+            HandlerResult with list message.
+        """
+        db_session: DBSession | None = context.get("db_session")
+        if db_session is None:
+            return HandlerResult(
+                message="Database session not available.",
+                error=True,
+            )
+
+        entity_type = cmd.args[0].lower().strip() if cmd.args else "commitments"
+
+        if entity_type in ("commitment", "commitments"):
+            return self._list_commitments(db_session, context)
+        if entity_type in ("goal", "goals"):
+            return self._list_goals(db_session, context)
+        if entity_type in ("vision", "visions"):
+            return self._list_visions(db_session, context)
+
+        return HandlerResult(
+            message=f"Unknown entity type: {entity_type}",
+            suggestions=["/list commitments", "/list goals", "/list visions"],
+            error=True,
+        )
+
+    def _list_commitments(self, db_session: DBSession, context: dict[str, Any]) -> HandlerResult:
+        """List all active commitments."""
+        # Get active commitments (not completed or abandoned)
+        active_statuses = [
+            CommitmentStatus.PENDING,
+            CommitmentStatus.IN_PROGRESS,
+            CommitmentStatus.AT_RISK,
+        ]
+        statement = select(Commitment).where(Commitment.status.in_(active_statuses))
+        commitments = list(db_session.exec(statement).all())
+
+        # Update session's last_list_items for /1, /2 shortcuts
+        session: Session | None = context.get("session")
+        if session is not None:
+            session.set_last_list_items([("commitment", c.id) for c in commitments[:5]])
+
+        if not commitments:
+            console.print(format_empty_list("commitment"))
+            return HandlerResult(
+                message="",  # Already printed via console
+                clear_context=True,
+            )
+
+        table = format_commitment_list(commitments, show_shortcuts=True)
+        console.print(table)
+        console.print(f"[dim]{len(commitments)} active commitment(s)[/dim]")
+        return HandlerResult(
+            message="",  # Already printed via console
+            clear_context=True,
+        )
+
+    def _list_goals(self, db_session: DBSession, context: dict[str, Any]) -> HandlerResult:
+        """List all goals."""
+        goals = NavigationService.get_goals_list(db_session)
+
+        # Update session's last_list_items for /1, /2 shortcuts
+        session: Session | None = context.get("session")
+        if session is not None and goals:
+            from uuid import UUID  # noqa: PLC0415
+
+            session.set_last_list_items([("goal", UUID(g["id"])) for g in goals[:5]])
+
+        if not goals:
+            console.print(format_empty_list("goal"))
+            return HandlerResult(
+                message="",
+                clear_context=True,
+            )
+
+        table = Table(title="Goals", box=box.ROUNDED)
+        table.add_column("", style="cyan", width=4)  # Shortcut column
+        table.add_column("ID", style="dim", width=6)
+        table.add_column("Title", width=30)
+        table.add_column("Status", width=12)
+
+        for idx, g in enumerate(goals):
+            shortcut = f"[bold cyan]/[{idx + 1}][/bold cyan]" if idx < MAX_LIST_SHORTCUTS else ""
+            table.add_row(
+                shortcut,
+                g["id"][:6],
+                g["title"][:30] if g["title"] else "N/A",
+                g["status"],
+            )
+
+        console.print(table)
+        console.print(f"[dim]{len(goals)} goal(s)[/dim]")
+        if goals:
+            console.print("[dim]Use /1, /2, etc. to view details[/dim]")
+        return HandlerResult(
+            message="",
+            clear_context=True,
+        )
+
+    def _list_visions(self, db_session: DBSession, context: dict[str, Any]) -> HandlerResult:
+        """List all visions."""
+        visions = NavigationService.get_visions_list(db_session)
+
+        # Update session's last_list_items for /1, /2 shortcuts
+        session: Session | None = context.get("session")
+        if session is not None and visions:
+            from uuid import UUID  # noqa: PLC0415
+
+            session.set_last_list_items([("vision", UUID(v["id"])) for v in visions[:5]])
+
+        if not visions:
+            console.print(format_empty_list("vision"))
+            return HandlerResult(
+                message="",
+                clear_context=True,
+            )
+
+        table = Table(title="Visions", box=box.ROUNDED)
+        table.add_column("", style="cyan", width=4)  # Shortcut column
+        table.add_column("ID", style="dim", width=6)
+        table.add_column("Title", width=30)
+        table.add_column("Timeframe", width=15)
+        table.add_column("Status", width=12)
+
+        for idx, v in enumerate(visions):
+            shortcut = f"[bold cyan]/[{idx + 1}][/bold cyan]" if idx < MAX_LIST_SHORTCUTS else ""
+            table.add_row(
+                shortcut,
+                v["id"][:6],
+                v["title"][:30] if v["title"] else "N/A",
+                v.get("timeframe", "N/A") or "N/A",
+                v["status"],
+            )
+
+        console.print(table)
+        console.print(f"[dim]{len(visions)} vision(s)[/dim]")
+        if visions:
+            console.print("[dim]Use /1, /2, etc. to view details[/dim]")
+        return HandlerResult(
+            message="",
+            clear_context=True,
+        )
+
+
+class ReviewHandler(CommandHandler):
+    """Handler for /review command - reviews visions due for quarterly review.
+
+    Uses db_session from context to query visions and update review dates.
+    """
 
     def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:  # noqa: ARG002
+        """Execute /review command.
+
+        Args:
+            cmd: The parsed command.
+            context: Context with db_session and session.
+
+        Returns:
+            HandlerResult with review info.
+        """
+        db_session: DBSession | None = context.get("db_session")
+        session: Session | None = context.get("session")
+
+        if db_session is None:
+            return HandlerResult(
+                message="Database session not available.",
+                error=True,
+            )
+
+        try:
+            visions_due = get_visions_due_for_review(db_session)
+        except (OSError, SQLAlchemyError) as e:
+            logger.warning(f"Failed to get visions due for review: {e}")
+            return HandlerResult(
+                message="Error loading visions. Please try again.",
+                error=True,
+            )
+
+        if not visions_due:
+            return HandlerResult(
+                message="No visions are due for review.",
+            )
+
+        # Get the first vision that hasn't been reviewed this session
+        vision = visions_due[0]
+
+        # Display vision details
+        console.print()
+        console.print(f"[bold magenta]Vision: {vision.title}[/bold magenta]")
+        console.print()
+        console.print(f"[bold]Narrative:[/bold] {vision.narrative}")
+        if vision.timeframe:
+            console.print(f"[bold]Timeframe:[/bold] {vision.timeframe}")
+        if vision.why_it_matters:
+            console.print(f"[bold]Why it matters:[/bold] {vision.why_it_matters}")
+        if vision.metrics:
+            console.print("[bold]Success metrics:[/bold]")
+            for metric in vision.metrics:
+                console.print(f"  - {metric}")
+        console.print()
+
+        # Mark as reviewed
+        vision.complete_review()
+        db_session.add(vision)
+        db_session.commit()
+
+        # Remove from snoozed set if present
+        if session is not None:
+            session.snoozed_vision_ids.discard(vision.id)
+
+        console.print(
+            f"[green]Vision reviewed! Next review scheduled for {vision.next_review_date}.[/green]"
+        )
+
+        # Check if there are more visions to review
+        remaining = len(visions_due) - 1
+        if remaining > 0:
+            console.print(
+                f"[dim]You have {remaining} more vision(s) due for review. "
+                f"Type /review to continue.[/dim]"
+            )
+
+        return HandlerResult(
+            message="",  # Already printed via console
+        )
+
+
+class ViewHandler(CommandHandler):
+    """Handler for /view command - shows entity details.
+
+    Supports:
+    - /view <id> - view by full or partial UUID
+    - /view 1, /view 2 - view by list shortcut (from last_list_items)
+    - /1, /2 - aliases for /view 1, /view 2
+    """
+
+    def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:
         """Execute /view command.
 
         Args:
-            cmd: The parsed command with entity ID.
-            context: Context with object_data.
+            cmd: The parsed command with entity ID or shortcut number.
+            context: Context with db_session and session.
 
         Returns:
-            HandlerResult with view panel.
+            HandlerResult with entity details or error.
         """
-        object_data = context.get("object_data")
+        db_session: DBSession | None = context.get("db_session")
+        session: Session | None = context.get("session")
 
-        if not object_data:
+        if db_session is None:
             return HandlerResult(
-                message="Could not find the requested item.",
-                panel_update=None,
-                draft_data=None,
-                needs_confirmation=False,
+                message="Database session not available.",
+                error=True,
             )
 
-        entity_type = object_data.get("entity_type") or "item"
+        if not cmd.args:
+            return HandlerResult(
+                message="Usage: /view <id> or /view 1-5",
+                suggestions=["/list", "/view abc123"],
+                error=True,
+            )
+
+        id_arg = cmd.args[0]
+
+        # Check if it's a shortcut number (1-5)
+        if id_arg.isdigit():
+            shortcut_num = int(id_arg)
+            return self._view_by_shortcut(shortcut_num, session, db_session)
+
+        # Otherwise, look up by partial ID
+        return self._view_by_id(id_arg, session, db_session)
+
+    def _view_by_shortcut(
+        self,
+        shortcut_num: int,
+        session: Session | None,
+        db_session: DBSession,
+    ) -> HandlerResult:
+        """View entity by list shortcut number."""
+        if session is None:
+            return HandlerResult(
+                message="Session not available.",
+                error=True,
+            )
+
+        if not session.last_list_items:
+            return HandlerResult(
+                message="No list to select from. Use /list first.",
+                suggestions=["/list"],
+                error=True,
+            )
+
+        if shortcut_num < 1 or shortcut_num > len(session.last_list_items):
+            max_num = min(5, len(session.last_list_items))
+            return HandlerResult(
+                message=f"No item {shortcut_num}. Use /1 through /{max_num}.",
+                suggestions=["/list"],
+                error=True,
+            )
+
+        entity_type, entity_id = session.last_list_items[shortcut_num - 1]
+        return self._lookup_and_display(entity_type, entity_id, session, db_session)
+
+    def _view_by_id(
+        self,
+        partial_id: str,
+        session: Session | None,
+        db_session: DBSession,
+    ) -> HandlerResult:
+        """View entity by full or partial UUID."""
+        from uuid import UUID  # noqa: PLC0415
+
+        from jdo.models import Commitment, Goal, Vision  # noqa: PLC0415
+
+        partial_id = partial_id.lower().strip()
+
+        # Try each entity type
+        for model, entity_type in [
+            (Commitment, "commitment"),
+            (Goal, "goal"),
+            (Vision, "vision"),
+        ]:
+            try:
+                # Try exact UUID match first
+                try:
+                    full_uuid = UUID(partial_id)
+                    entity = db_session.get(model, full_uuid)
+                    if entity:
+                        return self._display_entity(entity, entity_type, session, db_session)
+                except ValueError:
+                    pass  # Not a valid UUID, try partial match
+
+                # Try partial ID match (first 6+ chars)
+                entities = list(db_session.exec(select(model)).all())
+                matches = [e for e in entities if str(e.id).lower().startswith(partial_id)]
+
+                if len(matches) == 1:
+                    return self._display_entity(matches[0], entity_type, session, db_session)
+                if len(matches) > 1:
+                    # Ambiguous - show options
+                    options = [f"{str(e.id)[:8]}" for e in matches[:5]]
+                    opts_str = ", ".join(options)
+                    msg = f"Multiple {entity_type}s match '{partial_id}': {opts_str}"
+                    return HandlerResult(
+                        message=msg,
+                        suggestions=[f"/view {options[0]}"],
+                        error=True,
+                    )
+            except (OSError, SQLAlchemyError) as e:
+                logger.warning(f"Error looking up {entity_type}: {e}")
+                continue
 
         return HandlerResult(
-            message=f"Viewing {entity_type} details.",
-            panel_update={
-                "mode": "view",
-                "entity_type": entity_type,
-                "data": object_data,
-            },
-            draft_data=None,
-            needs_confirmation=False,
+            message=f"No entity found matching '{partial_id}'.",
+            suggestions=["/list"],
+            error=True,
         )
+
+    def _lookup_and_display(
+        self,
+        entity_type: str,
+        entity_id: UUID,
+        session: Session | None,
+        db_session: DBSession,
+    ) -> HandlerResult:
+        """Look up entity by type and ID, then display."""
+        from jdo.models import Commitment, Goal, Vision  # noqa: PLC0415
+
+        model_map = {
+            "commitment": Commitment,
+            "goal": Goal,
+            "vision": Vision,
+        }
+
+        model = model_map.get(entity_type)
+        if model is None:
+            return HandlerResult(
+                message=f"Unknown entity type: {entity_type}",
+                error=True,
+            )
+
+        try:
+            entity = db_session.get(model, entity_id)
+            if entity is None:
+                return HandlerResult(
+                    message=f"{entity_type.title()} not found.",
+                    suggestions=["/list"],
+                    error=True,
+                )
+            return self._display_entity(entity, entity_type, session, db_session)
+        except (OSError, SQLAlchemyError) as e:
+            logger.warning(f"Error looking up {entity_type}: {e}")
+            return HandlerResult(
+                message=f"Error loading {entity_type}.",
+                error=True,
+            )
+
+    def _display_entity(
+        self,
+        entity: Commitment | Goal | Vision,
+        entity_type: str,
+        session: Session | None,
+        db_session: DBSession,  # noqa: ARG002
+    ) -> HandlerResult:
+        """Display entity details and update context."""
+        from jdo.repl.session import EntityContext  # noqa: PLC0415
+
+        entity_id = entity.id
+        short_id = str(entity_id)[:6]
+
+        # Get display name based on entity type
+        if entity_type == "commitment":
+            display_name = entity.deliverable[:30] if entity.deliverable else "Untitled"
+            self._print_commitment_details(entity)
+        elif entity_type == "goal":
+            display_name = entity.title[:30] if entity.title else "Untitled"
+            self._print_goal_details(entity)
+        elif entity_type == "vision":
+            display_name = entity.title[:30] if entity.title else "Untitled"
+            self._print_vision_details(entity)
+        else:
+            display_name = short_id
+
+        # Update session context
+        if session is not None:
+            session.entity_context.set(
+                entity_type=entity_type,
+                entity_id=entity_id,
+                short_id=short_id,
+                display_name=display_name,
+            )
+
+        # Build entity context for HandlerResult
+        context = EntityContext(
+            entity_type=entity_type,
+            entity_id=entity_id,
+            short_id=short_id,
+            display_name=display_name,
+        )
+
+        return HandlerResult(
+            message="",  # Already printed via console
+            entity_context=context,
+        )
+
+    def _print_commitment_details(self, commitment: Commitment) -> None:
+        """Print commitment details using Rich."""
+        from rich.panel import Panel  # noqa: PLC0415
+
+        lines = [
+            f"[bold]Deliverable:[/bold] {commitment.deliverable}",
+            f"[bold]Status:[/bold] {commitment.status.value}",
+            f"[bold]Due:[/bold] {commitment.due_date}",
+        ]
+        if commitment.due_time:
+            lines.append(f"[bold]Time:[/bold] {commitment.due_time}")
+
+        panel = Panel(
+            "\n".join(lines),
+            title=f"[cyan]Commitment {str(commitment.id)[:6]}[/cyan]",
+            border_style="cyan",
+        )
+        console.print(panel)
+
+    def _print_goal_details(self, goal: Goal) -> None:
+        """Print goal details using Rich."""
+        from rich.panel import Panel  # noqa: PLC0415
+
+        lines = [
+            f"[bold]Title:[/bold] {goal.title}",
+            f"[bold]Status:[/bold] {goal.status.value}",
+        ]
+        if goal.problem_statement:
+            lines.append(f"[bold]Problem:[/bold] {goal.problem_statement[:100]}...")
+        if goal.solution_vision:
+            lines.append(f"[bold]Vision:[/bold] {goal.solution_vision[:100]}...")
+
+        panel = Panel(
+            "\n".join(lines),
+            title=f"[green]Goal {str(goal.id)[:6]}[/green]",
+            border_style="green",
+        )
+        console.print(panel)
+
+    def _print_vision_details(self, vision: Vision) -> None:
+        """Print vision details using Rich."""
+        from rich.panel import Panel  # noqa: PLC0415
+
+        lines = [
+            f"[bold]Title:[/bold] {vision.title}",
+            f"[bold]Status:[/bold] {vision.status.value}",
+        ]
+        if vision.narrative:
+            lines.append(f"[bold]Narrative:[/bold] {vision.narrative[:100]}...")
+        if vision.timeframe:
+            lines.append(f"[bold]Timeframe:[/bold] {vision.timeframe}")
+
+        panel = Panel(
+            "\n".join(lines),
+            title=f"[magenta]Vision {str(vision.id)[:6]}[/magenta]",
+            border_style="magenta",
+        )
+        console.print(panel)
 
 
 class CancelHandler(CommandHandler):

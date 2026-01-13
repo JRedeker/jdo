@@ -170,20 +170,33 @@ The app uses a conversational REPL with hybrid input handling:
 
 | Command | Action |
 |---------|--------|
-| `/help` | Show available commands |
-| `/list` | List commitments (default) |
+| `/help` (`/h`) | Show available commands |
+| `/list` (`/l`) | List commitments (default) |
 | `/list goals` | List all goals |
-| `/commit "..."` | Create a new commitment |
+| `/list visions` | List all visions |
+| `/view <id>` (`/v`) | View entity details |
+| `/1` - `/5` | Quick-select from last list |
+| `/commit "..."` (`/c`) | Create a new commitment |
+| `/complete <id>` | Mark commitment complete |
+| `/review` | Review visions due for quarterly review |
 | `exit` or `quit` | Exit the REPL |
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| F1 | Show help |
+| F5 | Refresh dashboard |
+| Ctrl+L | Clear screen, show dashboard |
 
 ### Adding Slash Commands
 
-Edit `src/jdo/repl/loop.py` in `handle_slash_command()`:
+Commands are implemented as handlers in `src/jdo/commands/handlers/`.
+Register new handlers in `src/jdo/commands/handlers/__init__.py`:
 
 ```python
-if command == "mycommand":
-    _handle_mycommand(args, db_session)
-    return True
+# In _HANDLERS dict
+CommandType.MYCOMMAND: MyCommandHandler,
 ```
 
 ## Testing

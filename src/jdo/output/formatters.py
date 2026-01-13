@@ -20,6 +20,9 @@ if TYPE_CHECKING:
 # Shared console instance
 console = Console()
 
+# Maximum number of list shortcuts (/1 through /5)
+MAX_LIST_SHORTCUTS = 5
+
 # Status colors for commitments
 STATUS_COLORS: dict[str, str] = {
     "pending": "default",
@@ -84,23 +87,31 @@ def format_relative_date(d: date, today: date | None = None) -> str:
     return d.strftime("%Y-%m-%d")
 
 
-def format_commitment_list(commitments: list[Commitment]) -> Table:
+def format_commitment_list(
+    commitments: list[Commitment],
+    *,
+    show_shortcuts: bool = False,
+) -> Table:
     """Format a list of commitments as a Rich table.
 
     Args:
         commitments: List of commitment objects.
+        show_shortcuts: If True, show [/1], [/2] shortcuts instead of IDs.
 
     Returns:
         Rich Table ready for display.
     """
     table = Table(title="Commitments", box=box.ROUNDED)
+
+    if show_shortcuts:
+        table.add_column("", style="cyan", width=4)  # Shortcut column
     table.add_column("ID", style="dim", width=6)
     table.add_column("Deliverable", width=30)
     table.add_column("Stakeholder", width=15)
     table.add_column("Due", width=12)
     table.add_column("Status", width=12)
 
-    for c in commitments:
+    for idx, c in enumerate(commitments):
         status_color = get_status_color(c.status)
         status_text = Text(c.status.value if hasattr(c.status, "value") else str(c.status))
         if status_color != "default":
@@ -117,13 +128,28 @@ def format_commitment_list(commitments: list[Commitment]) -> Table:
         if hasattr(c, "stakeholder") and c.stakeholder is not None:
             stakeholder_name = c.stakeholder.name
 
-        table.add_row(
-            str(c.id)[:6] if c.id else "N/A",
-            c.deliverable[:30] if c.deliverable else "N/A",
-            stakeholder_name,
-            due_text,
-            status_text,
+        # Build row data
+        row_data: list[str | Text] = []
+        if show_shortcuts and idx < MAX_LIST_SHORTCUTS:
+            row_data.append(f"[bold cyan]/[{idx + 1}][/bold cyan]")
+        elif show_shortcuts:
+            row_data.append("")  # No shortcut for items beyond 5
+
+        row_data.extend(
+            [
+                str(c.id)[:6] if c.id else "N/A",
+                c.deliverable[:30] if c.deliverable else "N/A",
+                stakeholder_name,
+                due_text,
+                status_text,
+            ]
         )
+
+        table.add_row(*row_data)
+
+    # Add footer hint if showing shortcuts
+    if show_shortcuts and commitments:
+        table.caption = "[dim]Use /1, /2, etc. to view details[/dim]"
 
     return table
 

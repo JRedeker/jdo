@@ -122,24 +122,22 @@ class TestCommitHandler:
         assert result.draft_data is not None
         assert result.draft_data.get("deliverable") == "Send quarterly report"
 
-    def test_commit_cancel_discards_draft(self) -> None:
-        """Test: Cancel discards draft."""
-        from jdo.commands.handlers import CommitHandler
+    def test_cancel_handler_discards_draft(self) -> None:
+        """Test: CancelHandler discards draft from context."""
+        from jdo.commands.handlers import CancelHandler
 
-        handler = CommitHandler()
+        handler = CancelHandler()
 
-        # First create a draft
-        cmd = ParsedCommand(CommandType.COMMIT, [], "/commit")
+        # Context with a current draft (simulating pending draft state)
+        cmd = ParsedCommand(CommandType.CANCEL, [], "/cancel")
         context = {
-            "extracted": {
+            "current_draft": {
                 "deliverable": "Test deliverable",
                 "stakeholder": "Test stakeholder",
+                "entity_type": "commitment",
             }
         }
-        handler.execute(cmd, context)
-
-        # Now cancel
-        cancel_result = handler.cancel()
+        cancel_result = handler.execute(cmd, context)
 
         assert cancel_result.message is not None
         assert (
@@ -780,27 +778,41 @@ class TestHelpHandler:
 class TestViewHandler:
     """Tests for the /view command handler."""
 
-    def test_view_shows_object_in_panel(self) -> None:
-        """Test: /view <id> shows object in data panel."""
+    def test_view_requires_db_session(self) -> None:
+        """Test: /view <id> requires db_session in context."""
         from jdo.commands.handlers import ViewHandler
 
         handler = ViewHandler()
         obj_id = uuid4()
         cmd = ParsedCommand(CommandType.VIEW, [str(obj_id)], f"/view {obj_id}")
 
+        context: dict[str, object] = {}
+
+        result = handler.execute(cmd, context)
+
+        assert result.error is True
+        assert "Database session not available" in result.message
+
+    def test_view_shortcut_requires_list_context(self) -> None:
+        """Test: /view 1 requires previous list items."""
+        from unittest.mock import MagicMock
+
+        from jdo.commands.handlers import ViewHandler
+        from jdo.repl.session import Session
+
+        handler = ViewHandler()
+        cmd = ParsedCommand(CommandType.VIEW, ["1"], "/view 1")
+        mock_db_session = MagicMock()
+        session = Session()
         context = {
-            "object_data": {
-                "id": obj_id,
-                "entity_type": "commitment",
-                "deliverable": "Send report",
-                "status": "pending",
-            }
+            "db_session": mock_db_session,
+            "session": session,
         }
 
         result = handler.execute(cmd, context)
 
-        assert result.panel_update is not None
-        assert result.panel_update["mode"] == "view"
+        assert result.error is True
+        assert "No list to select from" in result.message
 
 
 class TestCancelHandler:

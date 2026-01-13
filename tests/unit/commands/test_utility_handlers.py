@@ -230,7 +230,8 @@ class TestHelpHandler:
 
         result = handler.execute(cmd, context)
 
-        assert "Available commands" in result.message
+        # Shows grouped help when command unknown
+        assert "JDO Commands" in result.message
 
     def test_help_general(self) -> None:
         """Test /help without arguments."""
@@ -240,7 +241,8 @@ class TestHelpHandler:
 
         result = handler.execute(cmd, context)
 
-        assert "Available commands" in result.message
+        # Shows grouped command list
+        assert "JDO Commands" in result.message
         assert "/commit" in result.message
         assert "/goal" in result.message
         assert "/help" in result.message
@@ -249,45 +251,79 @@ class TestHelpHandler:
 class TestViewHandler:
     """Tests for ViewHandler."""
 
-    def test_view_with_object_data(self) -> None:
-        """Test /view with valid object data."""
-        handler = ViewHandler()
-        cmd = make_command("view", ["123"])
-        context: dict[str, object] = {
-            "object_data": {
-                "entity_type": "commitment",
-                "id": "123",
-                "deliverable": "Test",
-            }
-        }
-
-        result = handler.execute(cmd, context)
-
-        assert "Viewing commitment details" in result.message
-        assert result.panel_update is not None
-        assert result.panel_update["mode"] == "view"
-        assert result.panel_update["entity_type"] == "commitment"
-
-    def test_view_without_object_data(self) -> None:
-        """Test /view without object data."""
+    def test_view_requires_db_session(self) -> None:
+        """Test /view requires db_session in context."""
         handler = ViewHandler()
         cmd = make_command("view", ["123"])
         context: dict[str, object] = {}
 
         result = handler.execute(cmd, context)
 
-        assert "Could not find" in result.message
-        assert result.panel_update is None
+        assert result.error is True
+        assert "Database session not available" in result.message
 
-    def test_view_with_missing_entity_type(self) -> None:
-        """Test /view when entity type is missing."""
+    def test_view_requires_id_argument(self) -> None:
+        """Test /view requires an ID argument."""
+        from unittest.mock import MagicMock
+
         handler = ViewHandler()
-        cmd = make_command("view", ["123"])
-        context: dict[str, object] = {"object_data": {"id": "123"}}
+        cmd = make_command("view", [])  # No args
+        mock_db_session = MagicMock()
+        context: dict[str, object] = {"db_session": mock_db_session}
 
         result = handler.execute(cmd, context)
 
-        assert "Viewing item details" in result.message
+        assert result.error is True
+        assert "Usage:" in result.message
+
+    def test_view_shortcut_without_list_context(self) -> None:
+        """Test /view 1 without previous list shows error."""
+        from unittest.mock import MagicMock
+
+        from jdo.repl.session import Session
+
+        handler = ViewHandler()
+        cmd = make_command("view", ["1"])
+        mock_db_session = MagicMock()
+        session = Session()
+        context: dict[str, object] = {
+            "db_session": mock_db_session,
+            "session": session,
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert result.error is True
+        assert "No list to select from" in result.message
+
+    def test_view_shortcut_out_of_range(self) -> None:
+        """Test /view 7 when only 3 items in list shows error."""
+        from unittest.mock import MagicMock
+        from uuid import uuid4
+
+        from jdo.repl.session import Session
+
+        handler = ViewHandler()
+        cmd = make_command("view", ["7"])
+        mock_db_session = MagicMock()
+        session = Session()
+        # Populate with 3 items
+        session.set_last_list_items(
+            [
+                ("commitment", uuid4()),
+                ("commitment", uuid4()),
+                ("commitment", uuid4()),
+            ]
+        )
+        context: dict[str, object] = {
+            "db_session": mock_db_session,
+            "session": session,
+        }
+
+        result = handler.execute(cmd, context)
+
+        assert result.error is True
+        assert "No item 7" in result.message
 
 
 class TestCancelHandler:

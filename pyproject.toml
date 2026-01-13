@@ -246,6 +246,15 @@ matches = "src/jdo/repl/loop.py"
 missing-attribute = false
 
 [[tool.pyrefly.sub-config]]
+# SQLAlchemy/SQLModel patterns: .in_(), db.get() with union types, entity type narrowing
+# Entity has deliverable/title attributes after type narrowing - pyrefly doesn't track if/elif branches
+matches = "src/jdo/commands/handlers/utility_handlers.py"
+[tool.pyrefly.sub-config.errors]
+missing-attribute = false
+bad-argument-type = false
+bad-index = false
+
+[[tool.pyrefly.sub-config]]
 # SQLModel model initialization in hypothesis tests
 matches = "tests/unit/recurrence/test_calculator_hypothesis.py"
 [tool.pyrefly.sub-config.errors]

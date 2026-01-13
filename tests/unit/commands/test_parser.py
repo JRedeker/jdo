@@ -193,3 +193,69 @@ class TestParsedCommand:
 
         assert cmd.is_command() is True
         assert msg.is_command() is False
+
+
+class TestCommandAliases:
+    """Tests for command aliases (/1, /c, /l, etc.)."""
+
+    def test_shortcut_1_maps_to_view_1(self) -> None:
+        """/1 is parsed as /view 1."""
+        result = parse_command("/1")
+
+        assert result.command_type == CommandType.VIEW
+        assert result.args == ["1"]
+
+    def test_shortcut_5_maps_to_view_5(self) -> None:
+        """/5 is parsed as /view 5."""
+        result = parse_command("/5")
+
+        assert result.command_type == CommandType.VIEW
+        assert result.args == ["5"]
+
+    def test_alias_c_maps_to_commit(self) -> None:
+        """/c is parsed as /commit."""
+        result = parse_command("/c")
+
+        assert result.command_type == CommandType.COMMIT
+        assert result.args == []
+
+    def test_alias_c_with_args(self) -> None:
+        """/c with args passes them to commit."""
+        result = parse_command('/c "send report"')
+
+        assert result.command_type == CommandType.COMMIT
+        assert result.args == ['"send', 'report"']
+
+    def test_alias_l_maps_to_list(self) -> None:
+        """/l is parsed as /list."""
+        result = parse_command("/l")
+
+        assert result.command_type == CommandType.LIST
+        assert result.args == []
+
+    def test_alias_l_with_args(self) -> None:
+        """/l goals passes args to list."""
+        result = parse_command("/l goals")
+
+        assert result.command_type == CommandType.LIST
+        assert result.args == ["goals"]
+
+    def test_alias_v_maps_to_view(self) -> None:
+        """/v is parsed as /view."""
+        result = parse_command("/v abc123")
+
+        assert result.command_type == CommandType.VIEW
+        assert result.args == ["abc123"]
+
+    def test_alias_h_maps_to_help(self) -> None:
+        """/h is parsed as /help."""
+        result = parse_command("/h")
+
+        assert result.command_type == CommandType.HELP
+        assert result.args == []
+
+    def test_alias_preserves_raw_text(self) -> None:
+        """Aliases preserve original raw_text."""
+        result = parse_command("/1")
+
+        assert result.raw_text == "/1"

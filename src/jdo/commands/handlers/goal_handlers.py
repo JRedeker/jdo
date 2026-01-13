@@ -9,11 +9,11 @@ from jdo.commands.parser import ParsedCommand
 
 
 class GoalHandler(CommandHandler):
-    """Handler for /goal command - creates goals."""
+    """Handler for /goal command - creates goals.
 
-    def __init__(self) -> None:
-        """Initialize the goal handler."""
-        self._current_draft: dict[str, Any] | None = None
+    Stateless handler - draft data flows through HandlerResult.draft_data
+    and is tracked by Session.pending_draft.
+    """
 
     def execute(self, cmd: ParsedCommand, context: dict[str, Any]) -> HandlerResult:  # noqa: ARG002
         """Execute /goal command.
@@ -39,8 +39,6 @@ class GoalHandler(CommandHandler):
             "motivation": extracted.get("motivation"),
             "vision_id": extracted.get("vision_id"),
         }
-
-        self._current_draft = draft_data
 
         # Check for missing required fields
         missing_fields = []

@@ -204,17 +204,26 @@ Does this look right?
 
 For power users who prefer instant, deterministic actions:
 
-| Command | Description |
-|---------|-------------|
-| `/help` | Show available commands |
-| `/list` | List commitments (default) |
-| `/list goals` | List all goals |
-| `/list visions` | List all visions |
-| `/commit "..."` | Create a new commitment |
-| `/complete <id>` | Mark a commitment as complete |
-| `/review` | Review visions due for quarterly review |
-| `/exit` | Exit the REPL |
-| `/quit` | Exit the REPL |
+| Command | Shortcut | Description |
+|---------|----------|-------------|
+| `/help` | `/h` | Show available commands |
+| `/list` | `/l` | List commitments (default) |
+| `/list goals` | | List all goals |
+| `/list visions` | | List all visions |
+| `/view <id>` | `/v` | View entity details |
+| `/1` - `/5` | | Quick-select from last list |
+| `/commit "..."` | `/c` | Create a new commitment |
+| `/complete <id>` | | Mark a commitment as complete |
+| `/review` | | Review visions due for quarterly review |
+| `/exit` | | Exit the REPL |
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| F1 | Show help |
+| F5 | Refresh dashboard |
+| Ctrl+L | Clear screen, show dashboard |
 
 Or just type naturally—the AI understands plain English.
 

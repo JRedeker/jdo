@@ -158,7 +158,7 @@ class TestSlashCommands:
 
         assert result is True
 
-    @patch("jdo.repl.loop.get_visions_due_for_review")
+    @patch("jdo.commands.handlers.utility_handlers.get_visions_due_for_review")
     async def test_review_command_with_vision(self, mock_visions, mock_db_session):
         """Review command with vision due displays and marks reviewed."""
         from uuid import uuid4
@@ -181,6 +181,50 @@ class TestSlashCommands:
         mock_vision.complete_review.assert_called_once()
         mock_db_session.add.assert_called_with(mock_vision)
         mock_db_session.commit.assert_called_once()
+
+
+class TestFuzzySuggestions:
+    """Tests for fuzzy command suggestions."""
+
+    def test_fuzzy_suggestion_for_typo(self):
+        """Typo 'comit' should suggest '/commit'."""
+        from jdo.repl.loop import _get_fuzzy_suggestions
+
+        suggestions = _get_fuzzy_suggestions("comit")
+        assert len(suggestions) > 0
+        assert any("/commit" in s for s in suggestions)
+
+    def test_fuzzy_suggestion_for_close_match(self):
+        """Close match 'lis' should suggest '/list'."""
+        from jdo.repl.loop import _get_fuzzy_suggestions
+
+        suggestions = _get_fuzzy_suggestions("lis")
+        assert len(suggestions) > 0
+        assert any("/list" in s for s in suggestions)
+
+    def test_fuzzy_suggestion_includes_description(self):
+        """Suggestions should include command descriptions."""
+        from jdo.repl.loop import _get_fuzzy_suggestions
+
+        suggestions = _get_fuzzy_suggestions("comit")
+        assert len(suggestions) > 0
+        # Description should be in parentheses
+        assert any("(" in s and ")" in s for s in suggestions)
+
+    def test_no_suggestion_for_unrelated_input(self):
+        """Completely unrelated input should return no suggestions."""
+        from jdo.repl.loop import _get_fuzzy_suggestions
+
+        suggestions = _get_fuzzy_suggestions("xyz123")
+        assert len(suggestions) == 0
+
+    def test_max_three_suggestions(self):
+        """Should return at most 3 suggestions."""
+        from jdo.repl.loop import _get_fuzzy_suggestions
+
+        # 'co' could match multiple commands
+        suggestions = _get_fuzzy_suggestions("co")
+        assert len(suggestions) <= 3
 
 
 class TestMessages:
@@ -911,3 +955,96 @@ class TestProcessUserInputEdgeCases:
 
         assert result is True
         assert len(session.message_history) == 0
+
+
+class TestKeyBindings:
+    """Tests for keyboard shortcuts (F1, F5, Ctrl+L)."""
+
+    @pytest.fixture
+    def mock_db_session(self):
+        """Create a mock database session."""
+        return MagicMock()
+
+    def test_create_key_bindings_returns_keybindings(self, mock_db_session):
+        """_create_key_bindings returns a KeyBindings instance."""
+        from prompt_toolkit.key_binding import KeyBindings
+
+        from jdo.repl.loop import _create_key_bindings
+
+        session = Session()
+        kb = _create_key_bindings(session, mock_db_session)
+
+        assert isinstance(kb, KeyBindings)
+
+    def test_key_bindings_has_f1(self, mock_db_session):
+        """KeyBindings includes F1 binding."""
+        from jdo.repl.loop import _create_key_bindings
+
+        session = Session()
+        kb = _create_key_bindings(session, mock_db_session)
+
+        # Check that at least one binding exists
+        bindings = list(kb.bindings)
+        assert len(bindings) >= 1
+
+    @patch("jdo.repl.loop.console")
+    @patch("jdo.repl.loop._handle_help")
+    def test_f1_shows_help(self, mock_help, mock_console, mock_db_session):
+        """F1 key press shows help."""
+        from jdo.repl.loop import _create_key_bindings
+
+        session = Session()
+        kb = _create_key_bindings(session, mock_db_session)
+
+        # Find F1 binding and execute it
+        for binding in kb.bindings:
+            # Check if this binding handles f1
+            key_str = str(binding.keys)
+            if "f1" in key_str.lower():
+                # Create mock event
+                mock_event = MagicMock()
+                binding.handler(mock_event)
+                break
+
+        mock_help.assert_called_once()
+
+    @patch("jdo.repl.loop.console")
+    @patch("jdo.repl.loop._update_dashboard_cache")
+    @patch("jdo.repl.loop._show_dashboard")
+    def test_f5_refreshes_dashboard(self, mock_show, mock_update, mock_console, mock_db_session):
+        """F5 key press refreshes dashboard."""
+        from jdo.repl.loop import _create_key_bindings
+
+        session = Session()
+        kb = _create_key_bindings(session, mock_db_session)
+
+        # Find F5 binding and execute it
+        for binding in kb.bindings:
+            key_str = str(binding.keys)
+            if "f5" in key_str.lower():
+                mock_event = MagicMock()
+                binding.handler(mock_event)
+                break
+
+        mock_update.assert_called_once_with(session, mock_db_session)
+        mock_show.assert_called_once_with(session)
+
+    @patch("jdo.repl.loop.console")
+    @patch("jdo.repl.loop._show_dashboard")
+    def test_ctrl_l_clears_and_shows_dashboard(self, mock_show, mock_console, mock_db_session):
+        """Ctrl+L clears screen and shows dashboard."""
+        from jdo.repl.loop import _create_key_bindings
+
+        session = Session()
+        kb = _create_key_bindings(session, mock_db_session)
+
+        # Find Ctrl+L binding and execute it
+        for binding in kb.bindings:
+            key_str = str(binding.keys)
+            if "c-l" in key_str.lower():
+                mock_event = MagicMock()
+                binding.handler(mock_event)
+                break
+
+        mock_console.clear.assert_called_once()
+        mock_show.assert_called_once_with(session)

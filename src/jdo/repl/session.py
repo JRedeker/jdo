@@ -31,21 +31,35 @@ class EntityContext:
 
     entity_type: str | None = None
     entity_id: UUID | None = None
+    short_id: str | None = None  # First 6 chars of UUID for display
+    display_name: str | None = None  # Truncated deliverable/title
 
-    def set(self, entity_type: str, entity_id: UUID) -> None:
+    def set(
+        self,
+        entity_type: str,
+        entity_id: UUID,
+        short_id: str | None = None,
+        display_name: str | None = None,
+    ) -> None:
         """Set the current entity context.
 
         Args:
             entity_type: Type of entity (e.g., "commitment", "goal").
             entity_id: UUID of the entity.
+            short_id: First 6 chars of UUID for display.
+            display_name: Truncated deliverable/title for toolbar.
         """
         self.entity_type = entity_type
         self.entity_id = entity_id
+        self.short_id = short_id or str(entity_id)[:6]
+        self.display_name = display_name
 
     def clear(self) -> None:
         """Clear the current entity context."""
         self.entity_type = None
         self.entity_id = None
+        self.short_id = None
+        self.display_name = None
 
     @property
     def is_set(self) -> bool:
@@ -112,6 +126,9 @@ class Session:
         self.cached_integrity_score: int = 0
         self.cached_integrity_trend: str = "stable"
         self.cached_streak_weeks: int = 0
+        # Last list items for /1, /2, etc. shortcuts
+        # List of (entity_type, entity_id) tuples in display order
+        self.last_list_items: list[tuple[str, UUID]] = []
 
     def add_user_message(self, content: str) -> None:
         """Add a user message to history.
@@ -269,3 +286,28 @@ class Session:
             self.cached_streak_weeks = update.streak_weeks
         if update.triage_count is not None:
             self.cached_triage_count = update.triage_count
+
+    def set_last_list_items(self, items: list[tuple[str, UUID]]) -> None:
+        """Set the last displayed list items for /1, /2 shortcuts.
+
+        Args:
+            items: List of (entity_type, entity_id) tuples in display order.
+        """
+        self.last_list_items = items
+
+    def clear_last_list_items(self) -> None:
+        """Clear the last list items."""
+        self.last_list_items = []
+
+    def get_list_item(self, index: int) -> tuple[str, UUID] | None:
+        """Get a list item by 1-based index.
+
+        Args:
+            index: 1-based index (1 = first item).
+
+        Returns:
+            (entity_type, entity_id) tuple or None if index out of range.
+        """
+        if index < 1 or index > len(self.last_list_items):
+            return None
+        return self.last_list_items[index - 1]

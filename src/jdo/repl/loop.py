@@ -9,12 +9,14 @@ from __future__ import annotations
 import asyncio
 import sys
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.key_binding.key_processor import KeyPressEvent
 from rich import box
 from rich.console import Console
 from rich.live import Live
@@ -357,7 +359,10 @@ async def handle_slash_command(
     session: Session,
     db_session: DBSession,
 ) -> bool:
-    """Handle slash commands (bypass AI for queries, use AI for extraction).
+    """Handle slash commands via handler registry.
+
+    Uses parse_command() and get_handler() to route commands to their handlers.
+    Special handling for async commands like /commit.
 
     Args:
         user_input: The user's input starting with '/'.
@@ -365,36 +370,135 @@ async def handle_slash_command(
         db_session: Database session for queries.
 
     Returns:
-        True if command was handled, False if unknown command.
+        True (commands are always considered handled).
     """
-    parts = user_input[1:].split(maxsplit=1)
-    command = parts[0].lower() if parts else ""
-    args = parts[1] if len(parts) > 1 else ""
+    from jdo.commands.handlers import get_handler  # noqa: PLC0415
+    from jdo.commands.parser import CommandType, ParseError, parse_command  # noqa: PLC0415
 
-    if command == "help":
-        _handle_help()
+    try:
+        parsed = parse_command(user_input)
+    except ParseError as e:
+        _show_unknown_command_error(str(e))
         return True
 
-    if command == "list":
-        _handle_list(args, db_session)
-        return True
-
-    if command == "commit":
+    # Handle async /commit command specially (uses AI extraction)
+    if parsed.command_type == CommandType.COMMIT:
+        args = " ".join(parsed.args) if parsed.args else ""
         await _handle_commit(args, session, db_session)
         return True
 
-    if command == "complete":
+    # Handle /complete specially (existing inline implementation)
+    if parsed.command_type == CommandType.COMPLETE:
+        args = " ".join(parsed.args) if parsed.args else ""
         _handle_complete(args, session, db_session)
         return True
 
-    if command == "review":
-        _handle_review(session, db_session)
+    # Get handler from registry
+    handler = get_handler(parsed.command_type)
+    if handler is None:
+        _show_unknown_command_error(f"Unknown command: {user_input}")
         return True
 
-    console.print(
-        f"[yellow]Unknown command: /{command}. Type /help for available commands.[/yellow]"
-    )
+    # Build context for handler
+    context: dict[str, Any] = {
+        "db_session": db_session,
+        "session": session,
+    }
+
+    # Execute handler
+    result = handler.execute(parsed, context)
+
+    # Display message if present and non-empty
+    if result.message:
+        if result.error:
+            console.print(f"[red]{result.message}[/red]")
+        else:
+            console.print(result.message)
+
+    # Show suggestions if present
+    if result.suggestions:
+        suggestions_text = ", ".join(result.suggestions)
+        console.print(f"[dim]Try: {suggestions_text}[/dim]")
+
+    # Handle context updates
+    if result.clear_context:
+        session.clear_entity_context()
+
     return True
+
+
+# Command descriptions for fuzzy suggestions
+_COMMAND_DESCRIPTIONS: dict[str, str] = {
+    "commit": "create a new commitment",
+    "goal": "create a new goal",
+    "task": "add a task to a commitment",
+    "vision": "manage visions",
+    "milestone": "manage milestones",
+    "recurring": "manage recurring commitments",
+    "triage": "process captured items",
+    "show": "display entity lists",
+    "list": "list entities (commitments, goals, visions)",
+    "view": "view a specific item",
+    "complete": "mark item as completed",
+    "abandon": "mark commitment as abandoned",
+    "cancel": "cancel current draft",
+    "atrisk": "mark commitment as at-risk",
+    "recover": "recover at-risk commitment",
+    "cleanup": "view/update cleanup plan",
+    "integrity": "show integrity dashboard",
+    "hours": "set available hours for time coaching",
+    "review": "review visions due for quarterly review",
+    "edit": "edit an existing item",
+    "help": "show available commands",
+}
+
+# Fuzzy matching threshold (75% per research)
+_FUZZY_THRESHOLD = 75
+
+
+def _get_fuzzy_suggestions(user_cmd: str) -> list[str]:
+    """Get fuzzy command suggestions for an unknown command.
+
+    Args:
+        user_cmd: The unknown command the user typed.
+
+    Returns:
+        List of suggestion strings with format "/<cmd> (<description>)".
+    """
+    from rapidfuzz import fuzz  # noqa: PLC0415
+
+    suggestions = []
+    for cmd, description in _COMMAND_DESCRIPTIONS.items():
+        score = fuzz.ratio(user_cmd.lower(), cmd.lower())
+        if score >= _FUZZY_THRESHOLD:
+            suggestions.append((score, cmd, description))
+
+    # Sort by score descending, take top 3
+    suggestions.sort(key=lambda x: x[0], reverse=True)
+    return [f"/{cmd} ({desc})" for _score, cmd, desc in suggestions[:3]]
+
+
+def _show_unknown_command_error(error_msg: str) -> None:
+    """Display error for unknown command with fuzzy suggestions.
+
+    Args:
+        error_msg: The error message from parsing.
+    """
+    console.print(f"[yellow]{error_msg}[/yellow]")
+
+    # Try to extract the command name from error message (e.g. "Unknown command: /xyz")
+    import re  # noqa: PLC0415
+
+    match = re.search(r"/(\w+)", error_msg)
+    if match:
+        user_cmd = match.group(1)
+        suggestions = _get_fuzzy_suggestions(user_cmd)
+        if suggestions:
+            console.print(f"[dim]Did you mean: {', '.join(suggestions)}?[/dim]")
+        else:
+            console.print("[dim]Type /help for available commands.[/dim]")
+    else:
+        console.print("[dim]Type /help for available commands.[/dim]")
 
 
 async def _handle_commit(args: str, session: Session, _db_session: DBSession) -> None:
@@ -990,6 +1094,47 @@ def _setup_session_state(
     return session, deps
 
 
+def _create_key_bindings(
+    session: Session,
+    db_session: DBSession,
+) -> KeyBindings:
+    """Create keyboard shortcuts for the REPL.
+
+    Args:
+        session: Session state for dashboard refresh.
+        db_session: Database session for refreshing data.
+
+    Returns:
+        KeyBindings instance with F1, F5, and Ctrl+L bindings.
+    """
+    kb = KeyBindings()
+
+    @kb.add("f1")
+    def handle_f1(event: KeyPressEvent) -> None:
+        """Show help when F1 is pressed."""
+        del event  # unused
+        console.print()
+        _handle_help()
+
+    @kb.add("f5")
+    def handle_f5(event: KeyPressEvent) -> None:
+        """Refresh dashboard data when F5 is pressed."""
+        del event  # unused
+        _update_dashboard_cache(session, db_session)
+        console.print()
+        console.print("[dim]Dashboard refreshed.[/dim]")
+        _show_dashboard(session)
+
+    @kb.add("c-l")
+    def handle_ctrl_l(event: KeyPressEvent) -> None:
+        """Clear screen and redisplay dashboard when Ctrl+L is pressed."""
+        del event  # unused
+        console.clear()
+        _show_dashboard(session)
+
+    return kb
+
+
 def _create_toolbar_callback(session: Session) -> Callable[[], str]:
     """Create toolbar text callback using cached session values.
 
@@ -1005,7 +1150,21 @@ def _create_toolbar_callback(session: Session) -> Callable[[], str]:
             f"{session.cached_commitment_count} active",
             f"{session.cached_triage_count} triage",
         ]
-        if session.current_activity:
+        # Show current entity context if set
+        if session.entity_context.is_set:
+            ctx = session.entity_context
+            entity_display = f"{ctx.entity_type}:{ctx.short_id}"
+            if ctx.display_name:
+                # Truncate display name if too long (toolbar has limited space)
+                max_name_len = 20
+                name = (
+                    ctx.display_name[:max_name_len] + "..."
+                    if len(ctx.display_name) > max_name_len
+                    else ctx.display_name
+                )
+                entity_display = f"{ctx.entity_type}:{ctx.short_id} '{name}'"
+            parts.append(f"[{entity_display}]")
+        elif session.current_activity:
             parts.append(f"[{session.current_activity}]")
         return " | ".join(parts)
 
@@ -1014,11 +1173,13 @@ def _create_toolbar_callback(session: Session) -> Callable[[], str]:
 
 def _create_prompt_session(
     get_toolbar_text: Callable[[], str],
+    key_bindings: KeyBindings,
 ) -> PromptSession[str]:
-    """Create prompt session with history, auto-completion, and toolbar.
+    """Create prompt session with history, auto-completion, toolbar, and key bindings.
 
     Args:
         get_toolbar_text: Callback function for toolbar text.
+        key_bindings: Keyboard shortcuts (F1, F5, Ctrl+L).
 
     Returns:
         Configured prompt session.
@@ -1031,6 +1192,7 @@ def _create_prompt_session(
         complete_while_typing=False,
         bottom_toolbar=get_toolbar_text,
         refresh_interval=1.0,
+        key_bindings=key_bindings,
     )
 
 
@@ -1105,7 +1267,8 @@ async def repl_loop() -> None:
         session, deps = _setup_session_state(db_session)
 
         get_toolbar_text = _create_toolbar_callback(session)
-        prompt_session = _create_prompt_session(get_toolbar_text)
+        key_bindings = _create_key_bindings(session, db_session)
+        prompt_session = _create_prompt_session(get_toolbar_text, key_bindings)
 
         _show_startup_guidance(db_session, session)
 
