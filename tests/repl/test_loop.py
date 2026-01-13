@@ -541,3 +541,150 @@ class TestProactiveGuidance:
         mock_logger.warning.assert_called_once()
         # Welcome message should still be printed
         mock_console.print.assert_called()
+
+
+class TestUpdateDashboardCacheIntegrity:
+    """Tests for IntegrityService integration in dashboard cache updates."""
+
+    @patch("jdo.repl.loop.IntegrityService")
+    @patch("jdo.repl.loop.get_triage_count")
+    @patch("jdo.repl.loop.get_dashboard_goals")
+    @patch("jdo.repl.loop.get_dashboard_commitments")
+    def test_fetches_integrity_metrics(
+        self, mock_commitments, mock_goals, mock_triage, mock_service_class
+    ):
+        """Dashboard cache fetches integrity metrics from IntegrityService."""
+        from jdo.models.integrity_metrics import TrendDirection
+        from jdo.repl.loop import _update_dashboard_cache
+
+        # Setup mocks
+        mock_commitments.return_value = []
+        mock_goals.return_value = []
+        mock_triage.return_value = 0
+
+        mock_metrics = MagicMock()
+        mock_metrics.letter_grade = "A-"
+        mock_metrics.composite_score = 91.5
+        mock_metrics.overall_trend = TrendDirection.UP
+        mock_metrics.current_streak_weeks = 3
+
+        mock_service = MagicMock()
+        mock_service.calculate_integrity_metrics_with_trends.return_value = mock_metrics
+        mock_service_class.return_value = mock_service
+
+        session = Session()
+        mock_db_session = MagicMock()
+
+        _update_dashboard_cache(session, mock_db_session)
+
+        # Verify IntegrityService was called
+        mock_service.calculate_integrity_metrics_with_trends.assert_called_once_with(
+            mock_db_session
+        )
+
+        # Verify session cache was updated with integrity data
+        assert session.cached_integrity_grade == "A-"
+        assert session.cached_integrity_score == 91
+        assert session.cached_integrity_trend == "up"
+        assert session.cached_streak_weeks == 3
+
+    @patch("jdo.repl.loop.logger")
+    @patch("jdo.repl.loop.IntegrityService")
+    @patch("jdo.repl.loop.get_triage_count")
+    @patch("jdo.repl.loop.get_dashboard_goals")
+    @patch("jdo.repl.loop.get_dashboard_commitments")
+    def test_handles_integrity_service_error_gracefully(
+        self, mock_commitments, mock_goals, mock_triage, mock_service_class, mock_logger
+    ):
+        """Dashboard cache handles IntegrityService errors without crashing."""
+        from jdo.repl.loop import _update_dashboard_cache
+
+        # Setup mocks
+        mock_commitments.return_value = []
+        mock_goals.return_value = []
+        mock_triage.return_value = 0
+
+        mock_service = MagicMock()
+        mock_service.calculate_integrity_metrics_with_trends.side_effect = Exception("DB error")
+        mock_service_class.return_value = mock_service
+
+        session = Session()
+        mock_db_session = MagicMock()
+
+        # Should not raise
+        _update_dashboard_cache(session, mock_db_session)
+
+        # Verify fallback values are used
+        assert session.cached_integrity_grade == ""
+        assert session.cached_integrity_score == 0
+        assert session.cached_integrity_trend == "stable"
+        assert session.cached_streak_weeks == 0
+
+        # Verify error was logged
+        mock_logger.warning.assert_called_once()
+
+    @patch("jdo.repl.loop.IntegrityService")
+    @patch("jdo.repl.loop.get_triage_count")
+    @patch("jdo.repl.loop.get_dashboard_goals")
+    @patch("jdo.repl.loop.get_dashboard_commitments")
+    def test_handles_none_trend_gracefully(
+        self, mock_commitments, mock_goals, mock_triage, mock_service_class
+    ):
+        """Dashboard cache handles None trend direction."""
+        from jdo.repl.loop import _update_dashboard_cache
+
+        # Setup mocks
+        mock_commitments.return_value = []
+        mock_goals.return_value = []
+        mock_triage.return_value = 0
+
+        mock_metrics = MagicMock()
+        mock_metrics.letter_grade = "A+"
+        mock_metrics.composite_score = 100.0
+        mock_metrics.overall_trend = None  # New user with no trend data
+        mock_metrics.current_streak_weeks = 0
+
+        mock_service = MagicMock()
+        mock_service.calculate_integrity_metrics_with_trends.return_value = mock_metrics
+        mock_service_class.return_value = mock_service
+
+        session = Session()
+        mock_db_session = MagicMock()
+
+        _update_dashboard_cache(session, mock_db_session)
+
+        # Should use "stable" as fallback for None trend
+        assert session.cached_integrity_trend == "stable"
+
+    @patch("jdo.repl.loop.IntegrityService")
+    @patch("jdo.repl.loop.get_triage_count")
+    @patch("jdo.repl.loop.get_dashboard_goals")
+    @patch("jdo.repl.loop.get_dashboard_commitments")
+    def test_composite_score_truncated_to_int(
+        self, mock_commitments, mock_goals, mock_triage, mock_service_class
+    ):
+        """Dashboard cache truncates composite_score to integer (91.9 -> 91)."""
+        from jdo.repl.loop import _update_dashboard_cache
+
+        # Setup mocks
+        mock_commitments.return_value = []
+        mock_goals.return_value = []
+        mock_triage.return_value = 0
+
+        mock_metrics = MagicMock()
+        mock_metrics.letter_grade = "A-"
+        mock_metrics.composite_score = 91.9  # Should become 91, not 92
+        mock_metrics.overall_trend = None
+        mock_metrics.current_streak_weeks = 2
+
+        mock_service = MagicMock()
+        mock_service.calculate_integrity_metrics_with_trends.return_value = mock_metrics
+        mock_service_class.return_value = mock_service
+
+        session = Session()
+        mock_db_session = MagicMock()
+
+        _update_dashboard_cache(session, mock_db_session)
+
+        # Verify truncation (not rounding)
+        assert session.cached_integrity_score == 91

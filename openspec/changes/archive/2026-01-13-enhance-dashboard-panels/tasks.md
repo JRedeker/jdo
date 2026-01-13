@@ -59,9 +59,11 @@
   - Includes review due status
   - Calculates completion percentage from linked commitments
 
-- [ ] 3.3 Add `get_dashboard_integrity(db_session) -> dict`:
-  - DEFERRED: Implement when IntegrityService is ready
-  - Currently using placeholder data
+- [x] 3.3 Integrate IntegrityService for dashboard integrity metrics:
+  - Calls `IntegrityService.calculate_integrity_metrics_with_trends()`
+  - Extracts `letter_grade`, `composite_score`, `overall_trend`, `current_streak_weeks`
+  - Handles errors gracefully with fallback values
+  - Maps `TrendDirection` enum to string for status bar display
 
 ## 4. Extend Session Caching
 

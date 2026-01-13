@@ -1,14 +1,16 @@
 """Stakeholder SQLModel entity."""
 
-from __future__ import annotations
-
 from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Relationship, SQLModel
 
 from jdo.utils.datetime import utc_now
+
+if TYPE_CHECKING:
+    from jdo.models.commitment import Commitment
 
 
 class StakeholderType(str, Enum):
@@ -36,3 +38,6 @@ class Stakeholder(SQLModel, table=True):
     notes: str | None = Field(default=None)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+    # Relationships - use List["ClassName"] syntax without __future__ annotations
+    commitments: list["Commitment"] = Relationship(back_populates="stakeholder")

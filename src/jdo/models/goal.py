@@ -1,17 +1,18 @@
 """Goal SQLModel entity."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import Enum
-from typing import Self
+from typing import TYPE_CHECKING, Self
 from uuid import UUID, uuid4
 
 from pydantic import model_validator
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Relationship, SQLModel
 
 from jdo.utils.datetime import today_date, utc_now
+
+if TYPE_CHECKING:
+    from jdo.models.commitment import Commitment
 
 __all__ = ["INTERVAL_LABELS", "VALID_REVIEW_INTERVALS", "Goal", "GoalProgress", "GoalStatus"]
 
@@ -83,6 +84,9 @@ class Goal(SQLModel, table=True):
     last_reviewed_at: datetime | None = Field(default=None)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+    # Relationships - use List["ClassName"] syntax without __future__ annotations
+    commitments: list["Commitment"] = Relationship(back_populates="goal")
 
     @model_validator(mode="after")
     def validate_review_interval(self) -> Self:

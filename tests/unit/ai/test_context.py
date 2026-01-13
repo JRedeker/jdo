@@ -91,51 +91,117 @@ class TestSystemPrompt:
 
 
 class TestStreamingSupport:
-    """Tests for streaming response support."""
+    """Tests for streaming response support.
+
+    Note: stream_response uses agent.iter() for proper tool call handling.
+    These tests mock the iter() protocol including is_model_request_node checks.
+    """
 
     async def test_stream_response_yields_chunks(self) -> None:
         """stream_response yields text chunks as they arrive."""
+        from pydantic_ai import Agent
+        from pydantic_graph import End
+
         from jdo.ai.context import stream_response
 
-        # Mock the agent's run_stream - stream_text returns an async iterator directly
-        mock_result = MagicMock()
-        mock_result.stream_text = MagicMock(return_value=async_iter(["Hello", " ", "world", "!"]))
+        # Create async iterator helper for chunks
+        async def async_text_iter(items: list[str]) -> Any:
+            for item in items:
+                yield item
+
+        # Mock the request stream context manager
+        mock_request_stream = MagicMock()
+        mock_request_stream.stream_text = MagicMock(
+            return_value=async_text_iter(["Hello", " ", "world", "!"])
+        )
+        mock_request_stream.__aenter__ = AsyncMock(return_value=mock_request_stream)
+        mock_request_stream.__aexit__ = AsyncMock(return_value=None)
+
+        # Create a mock node that will be identified as a model request node
+        mock_node = MagicMock()
+        mock_node.stream = MagicMock(return_value=mock_request_stream)
+
+        # Create the End node
+        end_node = End(data=MagicMock())
+
+        # Create async iterator for nodes
+        async def async_node_iter() -> Any:
+            yield mock_node
+            yield end_node
+
+        # Mock the agent run context manager
+        mock_run = MagicMock()
+        mock_run.ctx = MagicMock()
+        mock_run.__aiter__ = lambda self: async_node_iter()
+        mock_run.__aenter__ = AsyncMock(return_value=mock_run)
+        mock_run.__aexit__ = AsyncMock(return_value=None)
 
         mock_agent = MagicMock()
-        mock_agent.run_stream = MagicMock(return_value=async_context_manager(mock_result))
+        mock_agent.iter = MagicMock(return_value=mock_run)
 
-        chunks = []
-        async for chunk in stream_response(mock_agent, "Test prompt", MagicMock()):
-            chunks.append(chunk)
+        # Patch is_model_request_node to return True only for mock_node, not End
+        def is_model_request(node: Any) -> bool:
+            return node is mock_node
+
+        with patch.object(Agent, "is_model_request_node", side_effect=is_model_request):
+            chunks = []
+            async for chunk in stream_response(mock_agent, "Test prompt", MagicMock()):
+                chunks.append(chunk)
 
         assert len(chunks) == 4
         assert "".join(chunks) == "Hello world!"
 
     async def test_stream_response_passes_message_history(self) -> None:
         """stream_response converts and passes message history to agent."""
+        from pydantic_ai import Agent
         from pydantic_ai.messages import ModelRequest, ModelResponse
+        from pydantic_graph import End
 
         from jdo.ai.context import stream_response
 
-        mock_result = MagicMock()
-        mock_result.stream_text = MagicMock(return_value=async_iter(["Response"]))
+        async def async_text_iter(items: list[str]) -> Any:
+            for item in items:
+                yield item
+
+        mock_request_stream = MagicMock()
+        mock_request_stream.stream_text = MagicMock(return_value=async_text_iter(["Response"]))
+        mock_request_stream.__aenter__ = AsyncMock(return_value=mock_request_stream)
+        mock_request_stream.__aexit__ = AsyncMock(return_value=None)
+
+        mock_node = MagicMock()
+        mock_node.stream = MagicMock(return_value=mock_request_stream)
+
+        end_node = End(data=MagicMock())
+
+        async def async_node_iter() -> Any:
+            yield mock_node
+            yield end_node
+
+        mock_run = MagicMock()
+        mock_run.ctx = MagicMock()
+        mock_run.__aiter__ = lambda self: async_node_iter()
+        mock_run.__aenter__ = AsyncMock(return_value=mock_run)
+        mock_run.__aexit__ = AsyncMock(return_value=None)
 
         mock_agent = MagicMock()
-        mock_agent.run_stream = MagicMock(return_value=async_context_manager(mock_result))
+        mock_agent.iter = MagicMock(return_value=mock_run)
 
         history = [
             {"role": "user", "content": "Previous question"},
             {"role": "assistant", "content": "Previous answer"},
         ]
 
-        # Consume the stream
-        chunks = []
-        async for chunk in stream_response(mock_agent, "New prompt", MagicMock(), history):
-            chunks.append(chunk)
+        def is_model_request(node: Any) -> bool:
+            return node is mock_node
 
-        # Verify run_stream was called with converted history
-        mock_agent.run_stream.assert_called_once()
-        call_kwargs = mock_agent.run_stream.call_args.kwargs
+        with patch.object(Agent, "is_model_request_node", side_effect=is_model_request):
+            chunks = []
+            async for chunk in stream_response(mock_agent, "New prompt", MagicMock(), history):
+                chunks.append(chunk)
+
+        # Verify iter was called with converted history
+        mock_agent.iter.assert_called_once()
+        call_kwargs = mock_agent.iter.call_args.kwargs
         assert "message_history" in call_kwargs
         model_history = call_kwargs["message_history"]
         assert len(model_history) == 2
@@ -144,17 +210,45 @@ class TestStreamingSupport:
 
     async def test_stream_response_handles_empty_response(self) -> None:
         """stream_response handles empty AI response gracefully."""
+        from pydantic_ai import Agent
+        from pydantic_graph import End
+
         from jdo.ai.context import stream_response
 
-        mock_result = MagicMock()
-        mock_result.stream_text = MagicMock(return_value=async_iter([]))
+        async def async_text_iter(items: list[str]) -> Any:
+            for item in items:
+                yield item
+
+        mock_request_stream = MagicMock()
+        mock_request_stream.stream_text = MagicMock(return_value=async_text_iter([]))
+        mock_request_stream.__aenter__ = AsyncMock(return_value=mock_request_stream)
+        mock_request_stream.__aexit__ = AsyncMock(return_value=None)
+
+        mock_node = MagicMock()
+        mock_node.stream = MagicMock(return_value=mock_request_stream)
+
+        end_node = End(data=MagicMock())
+
+        async def async_node_iter() -> Any:
+            yield mock_node
+            yield end_node
+
+        mock_run = MagicMock()
+        mock_run.ctx = MagicMock()
+        mock_run.__aiter__ = lambda self: async_node_iter()
+        mock_run.__aenter__ = AsyncMock(return_value=mock_run)
+        mock_run.__aexit__ = AsyncMock(return_value=None)
 
         mock_agent = MagicMock()
-        mock_agent.run_stream = MagicMock(return_value=async_context_manager(mock_result))
+        mock_agent.iter = MagicMock(return_value=mock_run)
 
-        chunks = []
-        async for chunk in stream_response(mock_agent, "Test prompt", MagicMock()):
-            chunks.append(chunk)
+        def is_model_request(node: Any) -> bool:
+            return node is mock_node
+
+        with patch.object(Agent, "is_model_request_node", side_effect=is_model_request):
+            chunks = []
+            async for chunk in stream_response(mock_agent, "Test prompt", MagicMock()):
+                chunks.append(chunk)
 
         assert len(chunks) == 0
 

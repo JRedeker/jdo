@@ -25,8 +25,16 @@ from jdo.utils.datetime import DEFAULT_TIMEZONE
 MIN_API_KEY_LENGTH = 10
 
 # System prompt for the commitment integrity coach
-SYSTEM_PROMPT = """You are a commitment integrity coach for JDO. Your primary goal is to help \
-users maintain their integrity by keeping commitments and being honest about their capacity.
+SYSTEM_PROMPT_TEMPLATE = """\
+You are a commitment integrity coach for JDO. Your primary goal is to help users maintain \
+their integrity by keeping commitments and being honest about their capacity.
+
+## Current Context
+- **Today's date**: {current_date}
+- **Current time**: {current_time}
+- **Day of week**: {day_of_week}
+
+Use this to interpret relative dates like "Friday", "end of the week", "next Monday", etc.
 
 ## Core Principles
 1. **Integrity over productivity** - It's better to make fewer commitments and keep them all than \
@@ -95,6 +103,17 @@ Help users improve their time estimates:
 - For similar past tasks: "A similar task took longer than estimated. Consider 2.5h instead of 2h."
 - Infer similarity from title keywords and same commitment.
 
+### Commitment-First Coaching
+When user describes work without a stakeholder or deliverable (e.g., "write tests", "gather data"):
+1. Ask ONE clarifying question: "What will you deliver, and who needs it?"
+2. If they provide context, propose a commitment with the work as a task
+3. If they provide partial context (e.g., stakeholder but no deliverable), ask ONE follow-up
+4. If they decline, acknowledge and offer to help link to a commitment later (don't block)
+
+Examples:
+- User: "I need to write unit tests" → Ask: "What feature or deliverable do these tests support?"
+- User: "Gather sales data" → Ask: "What will you deliver with this data, and who needs it?"
+
 ## Response Style
 - Be concise and direct
 - Lead with action items
@@ -102,6 +121,11 @@ Help users improve their time estimates:
 - NEVER block user actions - always allow them to proceed after your coaching
 - If they ignore your advice, acknowledge and continue helping
 - Use plain text formatting; the output will be rendered in a terminal
+
+## Conversation Flow
+- **Ask ONE question at a time** - Do not overwhelm users with multiple questions. Ask the most \
+important clarifying question first, wait for the answer, then ask the next if needed.
+- Keep the conversation focused and natural, like a helpful colleague.
 
 ## What You Help With
 - Creating and tracking commitments and tasks
@@ -111,11 +135,31 @@ Help users improve their time estimates:
 - Celebrating wins and progress"""
 
 
+def get_agent_system_prompt() -> str:
+    """Generate the agent system prompt with current date/time context.
+
+    Returns:
+        System prompt with current date/time injected.
+    """
+    from jdo.utils.datetime import utc_now
+
+    now = utc_now()
+    return SYSTEM_PROMPT_TEMPLATE.format(
+        current_date=now.strftime("%Y-%m-%d"),
+        current_time=now.strftime("%H:%M"),
+        day_of_week=now.strftime("%A"),
+    )
+
+
 @dataclass
 class JDODependencies:
     """Runtime dependencies for the AI agent.
 
-    Provides access to database session and user context.
+    Provides access to database session factory and user context.
+
+    Note: Tools should use `get_session()` to create their own sessions rather than
+    sharing a single session, because PydanticAI runs tools concurrently in separate
+    threads and SQLAlchemy sessions are not thread-safe.
     """
 
     session: Session
@@ -175,7 +219,7 @@ def create_agent_with_model(
     agent = Agent(
         model,
         deps_type=JDODependencies,
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=get_agent_system_prompt(),
     )
     if with_tools:
         # Late import to avoid circular dependency

@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Commitment Summary Panel (Enhanced)
 
@@ -183,3 +183,41 @@ The system SHALL format progress as a visual bar using Unicode block characters.
 - **GIVEN** progress is 0%
 - **WHEN** bar is rendered with width 16
 - **THEN** returns "░░░░░░░░░░░░░░░░" (16 empty blocks)
+
+### Requirement: IntegrityService Dashboard Integration
+
+The system SHALL integrate with IntegrityService to display real-time integrity metrics in the dashboard status bar.
+
+#### Scenario: Fetch integrity metrics on dashboard cache update
+- **GIVEN** dashboard cache is being refreshed
+- **WHEN** `_update_dashboard_cache()` is called in the REPL loop
+- **THEN** system calls `IntegrityService.calculate_integrity_metrics_with_trends()`
+- **AND** extracts `letter_grade`, `composite_score`, `overall_trend`, and `current_streak_weeks`
+- **AND** stores values in session cache fields
+
+#### Scenario: Display live integrity grade in status bar
+- **GIVEN** integrity metrics have been fetched from IntegrityService
+- **WHEN** status bar is rendered
+- **THEN** displays the actual letter grade (A+, B-, etc.) instead of placeholder
+- **AND** displays the actual composite score (0-100)
+- **AND** displays the actual trend arrow based on `overall_trend`
+
+#### Scenario: Handle new user with no commitment history
+- **GIVEN** user has no completed commitments
+- **WHEN** IntegrityService calculates metrics
+- **THEN** metrics default to perfect scores (100%, grade A+)
+- **AND** trend shows as stable (→)
+- **AND** streak shows as 0 weeks
+
+#### Scenario: Handle IntegrityService calculation errors gracefully
+- **GIVEN** IntegrityService encounters a database error during calculation
+- **WHEN** `_update_dashboard_cache()` catches the exception
+- **THEN** logs the error for debugging
+- **AND** uses fallback values (empty grade, score 0, stable trend, 0 streak)
+- **AND** dashboard continues to render without crashing
+
+#### Scenario: Map TrendDirection enum to display string
+- **GIVEN** IntegrityService returns `TrendDirection.UP`, `DOWN`, or `STABLE`
+- **WHEN** storing in session cache
+- **THEN** converts enum to lowercase string: "up", "down", or "stable"
+- **AND** status bar formatter uses string to select arrow and color

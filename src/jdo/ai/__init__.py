@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from jdo.ai.agent import (
-    SYSTEM_PROMPT,
+    SYSTEM_PROMPT_TEMPLATE,
     JDODependencies,
     create_agent,
     create_agent_with_model,
+    get_agent_system_prompt,
     get_model_identifier,
 )
 from jdo.ai.context import (
@@ -64,7 +65,7 @@ __all__ = [
     "MILESTONE_LINKAGE_PROMPT",
     "SUGGEST_METRICS_PROMPT",
     "SUGGEST_MILESTONES_PROMPT",
-    "SYSTEM_PROMPT",
+    "SYSTEM_PROMPT_TEMPLATE",
     "VISION_EXTRACTION_PROMPT",
     "VISION_LINKAGE_PROMPT",
     "ClarifyingQuestion",
@@ -91,6 +92,7 @@ __all__ = [
     "extract_vision",
     "format_conversation",
     "format_message",
+    "get_agent_system_prompt",
     "get_missing_fields",
     "get_model_identifier",
     "get_system_prompt",

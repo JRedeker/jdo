@@ -39,6 +39,7 @@ from jdo.db.session import (
     get_triage_count,
     get_visions_due_for_review,
 )
+from jdo.integrity.service import IntegrityService
 from jdo.models.commitment import Commitment, CommitmentStatus
 from jdo.models.goal import Goal
 from jdo.models.vision import Vision
@@ -63,6 +64,17 @@ if TYPE_CHECKING:
 
 # Console instance for Rich output
 console = Console()
+
+
+def _show_activity_heading(session: Session) -> None:
+    """Display the current activity heading if set.
+
+    Args:
+        session: REPL session state.
+    """
+    if session.current_activity:
+        console.print(f"\n[bold blue]{session.current_activity}[/bold blue]")
+
 
 # Welcome message shown on REPL start
 WELCOME_MESSAGE = """\
@@ -399,6 +411,9 @@ async def _handle_commit(args: str, session: Session, _db_session: DBSession) ->
         console.print('[dim]Example: /commit "send report to Sarah by Friday"[/dim]')
         return
 
+    # Set activity for user visibility
+    session.set_activity("Drafting New Commitment")
+
     # Strip quotes if present
     text = args.strip("\"'")
 
@@ -431,15 +446,21 @@ async def _handle_commit(args: str, session: Session, _db_session: DBSession) ->
         )
         console.print(panel)
 
+        # Update activity to indicate awaiting confirmation
+        session.set_activity("Confirm Commitment")
+
     except TimeoutError:
         console.print("[red]AI extraction timed out. Please try again.[/red]")
+        session.clear_activity()
     except ValueError as e:
         logger.warning("Commitment extraction failed: {}", e)
         console.print(f"[red]Could not extract commitment details: {e}[/red]")
         console.print("[dim]Try being more specific, e.g.: 'report to Sarah by Friday'[/dim]")
+        session.clear_activity()
     except Exception as e:
-        logger.error("Unexpected error during commitment extraction: {}", exc_info=e)
+        logger.error("Unexpected error during commitment extraction: {}", e)
         console.print("[red]Could not extract commitment details. Please try again.[/red]")
+        session.clear_activity()
 
 
 def _handle_confirmation(
@@ -470,6 +491,7 @@ def _handle_confirmation(
     # Check for negative responses
     if lower_input in ("no", "n", "cancel", "never mind", "nope"):
         session.clear_pending_draft()
+        session.clear_activity()
         console.print("[dim]Cancelled.[/dim]")
         return True
 
@@ -509,6 +531,7 @@ def _confirm_draft(
             # Update cached dashboard data after entity creation
             _update_dashboard_cache(session, db_session)
             session.clear_pending_draft()
+            session.clear_activity()
             return True
 
     console.print(f"[yellow]Unknown draft type: {draft.entity_type}[/yellow]")
@@ -829,16 +852,32 @@ def _update_dashboard_cache(session: Session, db_session: DBSession) -> None:
     goals = get_dashboard_goals(db_session)
     triage_count = get_triage_count(db_session)
 
+    # Fetch integrity metrics from IntegrityService
+    integrity_grade = ""
+    integrity_score = 0
+    integrity_trend = "stable"
+    streak_weeks = 0
+
+    try:
+        service = IntegrityService()
+        metrics = service.calculate_integrity_metrics_with_trends(db_session)
+        integrity_grade = metrics.letter_grade
+        integrity_score = int(metrics.composite_score)
+        integrity_trend = metrics.overall_trend.value if metrics.overall_trend else "stable"
+        streak_weeks = metrics.current_streak_weeks
+    except Exception:
+        # Log error but continue with fallback values - dashboard should not crash
+        logger.warning("Failed to calculate integrity metrics for dashboard")
+
     # Update session cache
     update = DashboardCacheUpdate(
         commitments=commitments,
         goals=goals,
         triage_count=triage_count,
-        # Integrity data placeholder - implement when IntegrityService is ready
-        integrity_grade="",
-        integrity_score=0,
-        integrity_trend="stable",
-        streak_weeks=0,
+        integrity_grade=integrity_grade,
+        integrity_score=integrity_score,
+        integrity_trend=integrity_trend,
+        streak_weeks=streak_weeks,
     )
     session.update_dashboard_cache(update)
 
@@ -953,11 +992,13 @@ def _create_toolbar_callback(session: Session) -> Callable[[], str]:
     """
 
     def get_toolbar_text() -> str:
-        draft_indicator = " [draft]" if session.has_pending_draft else ""
-        return (
-            f" {session.cached_commitment_count} active | "
-            f"{session.cached_triage_count} triage{draft_indicator}"
-        )
+        parts = [
+            f"{session.cached_commitment_count} active",
+            f"{session.cached_triage_count} triage",
+        ]
+        if session.current_activity:
+            parts.append(f"[{session.current_activity}]")
+        return " | ".join(parts)
 
     return get_toolbar_text
 
@@ -1005,6 +1046,9 @@ async def _main_repl_loop(
 
     while True:
         try:
+            # Show activity heading if we're in the middle of something
+            _show_activity_heading(session)
+
             user_input = await prompt_session.prompt_async()
 
             if not user_input or not user_input.strip():

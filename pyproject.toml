@@ -143,6 +143,14 @@ ignore = [
 "src/jdo/repl/loop.py" = [
     "BLE001",  # Catch Exception for unexpected AI extraction errors - provides graceful user feedback
 ]
+"src/jdo/uat/harness.py" = [
+    "PLC0415", # Late import of repl.loop to avoid circular dependency
+    "BLE001",  # Catch Exception to capture any REPL errors during UAT
+]
+"src/jdo/uat/cleanup.py" = [
+    "C901",    # cleanup_test_entities complexity needed to delete entities in correct order
+    "PLR0912", # Branches needed for proper foreign key ordering
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["jdo"]

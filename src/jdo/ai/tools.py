@@ -20,6 +20,7 @@ from sqlmodel import Session, select
 
 from jdo.ai.agent import JDODependencies
 from jdo.ai.time_context import format_time_context_for_ai, get_time_context
+from jdo.db.session import get_session
 from jdo.db.task_history_service import TaskHistoryService
 from jdo.db.time_rollup_service import TimeRollupService
 from jdo.integrity.service import IntegrityService
@@ -206,68 +207,76 @@ def get_visions_due_for_review(session: Session) -> list[dict[str, Any]]:
 def _register_commitment_tools(agent: Agent[JDODependencies, str]) -> None:
     """Register commitment-related query tools."""
 
-    @agent.tool
-    def query_current_commitments(ctx: RunContext[JDODependencies]) -> str:
+    @agent.tool_plain
+    def query_current_commitments() -> str:
         """Get all pending and in-progress commitments.
 
         Returns a list of current commitments with deliverable, stakeholder, due date, and status.
         """
-        result = get_current_commitments(ctx.deps.session)
-        return format_commitment_list_plain(result)
+        # Use a dedicated session to avoid concurrency issues with parallel tool calls
+        with get_session() as session:
+            result = get_current_commitments(session)
+            return format_commitment_list_plain(result)
 
-    @agent.tool
-    def query_overdue_commitments(ctx: RunContext[JDODependencies]) -> str:
+    @agent.tool_plain
+    def query_overdue_commitments() -> str:
         """Get all commitments that are past their due date.
 
         Returns a list of overdue commitments with days overdue.
         """
-        result = get_overdue_commitments(ctx.deps.session)
-        return format_overdue_commitments_plain(result)
+        # Use a dedicated session to avoid concurrency issues with parallel tool calls
+        with get_session() as session:
+            result = get_overdue_commitments(session)
+            return format_overdue_commitments_plain(result)
 
-    @agent.tool
-    def query_commitments_for_goal(ctx: RunContext[JDODependencies], goal_id: str) -> str:
+    @agent.tool_plain
+    def query_commitments_for_goal(goal_id: str) -> str:
         """Get all commitments linked to a specific goal.
 
         Args:
-            ctx: Runtime context with database session.
             goal_id: The UUID of the goal to query commitments for.
 
         Returns:
             Commitments for the specified goal as a string.
         """
-        result = get_commitments_for_goal(ctx.deps.session, goal_id)
-        if not result:
-            return f"No commitments found for goal {goal_id}."
-        return format_commitment_list_plain(result)
+        # Use a dedicated session to avoid concurrency issues with parallel tool calls
+        with get_session() as session:
+            result = get_commitments_for_goal(session, goal_id)
+            if not result:
+                return f"No commitments found for goal {goal_id}."
+            return format_commitment_list_plain(result)
 
 
 def _register_milestone_vision_tools(agent: Agent[JDODependencies, str]) -> None:
     """Register milestone and vision-related query tools."""
 
-    @agent.tool
-    def query_milestones_for_goal(ctx: RunContext[JDODependencies], goal_id: str) -> str:
+    @agent.tool_plain
+    def query_milestones_for_goal(goal_id: str) -> str:
         """Get all milestones for a specific goal.
 
         Args:
-            ctx: Runtime context with database session.
             goal_id: The UUID of the goal to query milestones for.
 
         Returns:
             Milestones for the specified goal sorted by target date.
         """
-        result = get_milestones_for_goal(ctx.deps.session, goal_id)
-        if not result:
-            return f"No milestones found for goal {goal_id}."
-        return format_milestones_plain(result)
+        # Use a dedicated session to avoid concurrency issues with parallel tool calls
+        with get_session() as session:
+            result = get_milestones_for_goal(session, goal_id)
+            if not result:
+                return f"No milestones found for goal {goal_id}."
+            return format_milestones_plain(result)
 
-    @agent.tool
-    def query_visions_due_for_review(ctx: RunContext[JDODependencies]) -> str:
+    @agent.tool_plain
+    def query_visions_due_for_review() -> str:
         """Get all visions that are due for review.
 
         Returns visions where next_review_date is today or in the past.
         """
-        result = get_visions_due_for_review(ctx.deps.session)
-        return format_visions_plain(result)
+        # Use a dedicated session to avoid concurrency issues with parallel tool calls
+        with get_session() as session:
+            result = get_visions_due_for_review(session)
+            return format_visions_plain(result)
 
 
 def _get_recent_task_history(session: Session, limit: int = 20) -> list[TaskHistoryEntry]:
@@ -345,15 +354,16 @@ def _register_time_coaching_tools(agent: Agent[JDODependencies, str]) -> None:
         Returns available hours, allocated hours, remaining capacity, and utilization.
         Use this to check if user is over-committed before accepting new tasks.
         """
-        context = get_time_context(
-            ctx.deps.session,
-            available_hours=ctx.deps.available_hours_remaining,
-        )
-        return format_time_context_for_ai(context)
+        # Use a dedicated session to avoid concurrency issues with parallel tool calls
+        with get_session() as session:
+            context = get_time_context(
+                session,
+                available_hours=ctx.deps.available_hours_remaining,
+            )
+            return format_time_context_for_ai(context)
 
-    @agent.tool
+    @agent.tool_plain
     def query_task_history(
-        ctx: RunContext[JDODependencies],
         commitment_id: str | None = None,
         limit: int = 20,
     ) -> str:
@@ -363,62 +373,66 @@ def _register_time_coaching_tools(agent: Agent[JDODependencies, str]) -> None:
         Can filter by commitment_id for commitment-specific history.
 
         Args:
-            ctx: Runtime context with database session.
             commitment_id: Optional commitment UUID to filter history.
             limit: Maximum entries to return (default 20).
 
         Returns:
             Task history with timestamps, estimates, and actual hours categories.
         """
-        service = TaskHistoryService(ctx.deps.session)
+        # Use a dedicated session to avoid concurrency issues with parallel tool calls
+        with get_session() as session:
+            service = TaskHistoryService(session)
 
-        if commitment_id:
-            entries = service.get_history_for_commitment(UUID(commitment_id))
-        else:
-            entries = _get_recent_task_history(ctx.deps.session, limit)
+            if commitment_id:
+                entries = service.get_history_for_commitment(UUID(commitment_id))
+            else:
+                entries = _get_recent_task_history(session, limit)
 
-        if not entries:
-            return "No task history found."
+            if not entries:
+                return "No task history found."
 
-        return _format_task_history_entries(entries, limit)
+            return _format_task_history_entries(entries, limit)
 
-    @agent.tool
-    def query_commitment_time_rollup(ctx: RunContext[JDODependencies], commitment_id: str) -> str:
+    @agent.tool_plain
+    def query_commitment_time_rollup(commitment_id: str) -> str:
         """Get time rollup for a specific commitment.
 
         Shows total/remaining/completed estimated hours and task counts.
         Use this to understand workload breakdown for a commitment.
 
         Args:
-            ctx: Runtime context with database session.
             commitment_id: UUID of the commitment.
 
         Returns:
             Time breakdown including estimate coverage percentage.
         """
-        service = TimeRollupService(ctx.deps.session)
-        rollup = service.get_rollup(UUID(commitment_id))
+        # Use a dedicated session to avoid concurrency issues with parallel tool calls
+        with get_session() as session:
+            service = TimeRollupService(session)
+            rollup = service.get_rollup(UUID(commitment_id))
 
-        lines = [
-            f"Total estimated hours: {rollup.total_estimated_hours:.1f}",
-            f"Remaining estimated hours: {rollup.remaining_estimated_hours:.1f}",
-            f"Completed estimated hours: {rollup.completed_estimated_hours:.1f}",
-            f"Tasks: {rollup.task_count} total, {rollup.completed_task_count} completed",
-            f"Tasks with estimates: {rollup.tasks_with_estimates}/{rollup.task_count} "
-            f"({rollup.estimate_coverage * 100:.0f}% coverage)",
-        ]
+            lines = [
+                f"Total estimated hours: {rollup.total_estimated_hours:.1f}",
+                f"Remaining estimated hours: {rollup.remaining_estimated_hours:.1f}",
+                f"Completed estimated hours: {rollup.completed_estimated_hours:.1f}",
+                f"Tasks: {rollup.task_count} total, {rollup.completed_task_count} completed",
+                f"Tasks with estimates: {rollup.tasks_with_estimates}/{rollup.task_count} "
+                f"({rollup.estimate_coverage * 100:.0f}% coverage)",
+            ]
 
-        return "\n".join(lines)
+            return "\n".join(lines)
 
-    @agent.tool
-    def query_integrity_with_context(ctx: RunContext[JDODependencies]) -> str:
+    @agent.tool_plain
+    def query_integrity_with_context() -> str:
         """Get user's integrity metrics with coaching context.
 
         Returns letter grade, component scores, and areas needing attention.
         Use this to provide integrity-based coaching and feedback.
         """
-        service = IntegrityService()
-        metrics = service.calculate_integrity_metrics(ctx.deps.session)
+        # Use a dedicated session to avoid concurrency issues with parallel tool calls
+        with get_session() as session:
+            service = IntegrityService()
+            metrics = service.calculate_integrity_metrics(session)
 
         notification_pct = metrics.notification_timeliness * 100
         lines = [

@@ -166,7 +166,11 @@ async def stream_response(
     deps: JDODependencies,
     message_history: list[dict[str, str]] | None = None,
 ) -> AsyncIterator[str]:
-    """Stream AI response chunks.
+    """Stream AI response chunks, properly handling tool calls.
+
+    Uses agent.iter() to iterate over the agent graph, which properly handles
+    tool calls and streams all text output including responses generated after
+    tool execution.
 
     Args:
         agent: The PydanticAI agent to use.
@@ -180,6 +184,8 @@ async def stream_response(
     Raises:
         TimeoutError: If streaming exceeds timeout.
     """
+    from pydantic_graph import End
+
     # Convert message history to PydanticAI format if provided
     model_history = None
     if message_history:
@@ -187,6 +193,18 @@ async def stream_response(
 
     # Wrap entire stream with timeout
     async with asyncio.timeout(AI_STREAM_TIMEOUT_SECONDS):
-        async with agent.run_stream(prompt, deps=deps, message_history=model_history) as result:
-            async for chunk in result.stream_text(delta=True):
-                yield chunk
+        # Use agent.iter() for proper handling of tool calls during streaming
+        # This ensures we get all text output including responses after tool execution
+        async with agent.iter(prompt, deps=deps, message_history=model_history) as run:
+            async for node in run:
+                # Check if this is a model request node (where we can stream text)
+                if Agent.is_model_request_node(node):
+                    # Stream text from this node
+                    async with node.stream(run.ctx) as request_stream:
+                        async for chunk in request_stream.stream_text(delta=True):
+                            yield chunk
+                elif isinstance(node, End):
+                    # Run complete - no more output
+                    pass
+                # Other node types (UserPromptNode, CallToolsNode) don't produce
+                # streamable text output - they handle tool execution internally

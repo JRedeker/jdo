@@ -59,15 +59,30 @@ class TestCreateAgent:
 
     def test_agent_has_system_prompt(self) -> None:
         """Agent has system prompt for commitment tracking."""
-        from jdo.ai.agent import SYSTEM_PROMPT, create_agent_with_model
+        from jdo.ai.agent import create_agent_with_model
 
         agent = create_agent_with_model(TestModel())
 
         # Verify system prompt is set (accessing internal _system_prompts)
         assert agent._system_prompts is not None
         assert len(agent._system_prompts) > 0
-        # The first system prompt should be our SYSTEM_PROMPT
-        assert SYSTEM_PROMPT in agent._system_prompts
+        # The system prompt should contain key coaching content
+        system_prompt = agent._system_prompts[0]
+        assert "commitment integrity coach" in system_prompt
+        assert "Today's date" in system_prompt  # Dynamic date injection
+
+    def test_agent_has_commitment_first_coaching(self) -> None:
+        """Agent system prompt contains Commitment-First Coaching section."""
+        from jdo.ai.agent import create_agent_with_model
+
+        agent = create_agent_with_model(TestModel())
+
+        system_prompt = agent._system_prompts[0]
+        # Verify the Commitment-First Coaching section exists
+        assert "Commitment-First Coaching" in system_prompt
+        # Verify key coaching behaviors are present
+        assert "What will you deliver" in system_prompt
+        assert "who needs it" in system_prompt
 
     async def test_agent_can_run_with_test_model(self) -> None:
         """Agent can be run with TestModel for testing."""

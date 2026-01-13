@@ -1,13 +1,16 @@
 """Commitment SQLModel entity."""
 
-from __future__ import annotations
-
 from datetime import date, datetime, time
 from enum import Enum
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import Column, ForeignKey, Uuid
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Relationship, SQLModel
+
+if TYPE_CHECKING:
+    from jdo.models.goal import Goal
+    from jdo.models.stakeholder import Stakeholder
 
 from jdo.utils.datetime import DEFAULT_DUE_TIME, DEFAULT_TIMEZONE, utc_now
 
@@ -55,6 +58,17 @@ class Commitment(SQLModel, table=True):
     completed_on_time: bool | None = Field(default=None)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+    # Relationships - use string class name only (not Optional) to avoid SQLAlchemy parsing issues
+    # The default=None handles the nullable aspect
+    stakeholder: "Stakeholder" = Relationship(  # type: ignore[assignment]
+        back_populates="commitments",
+        sa_relationship_kwargs={"lazy": "joined"},
+    )
+    goal: "Goal" = Relationship(  # type: ignore[assignment]
+        back_populates="commitments",
+        sa_relationship_kwargs={"lazy": "joined"},
+    )
 
     @property
     def is_recurring(self) -> bool:

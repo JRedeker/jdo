@@ -96,6 +96,8 @@ class Session:
         self.entity_context = EntityContext()
         self.pending_draft: PendingDraft | None = None
         self.snoozed_vision_ids: set[UUID] = set()
+        # Current activity being worked on (shown as heading)
+        self.current_activity: str | None = None
         # Cached counts for bottom toolbar (avoid DB queries per keystroke)
         self.cached_commitment_count: int = 0
         self.cached_triage_count: int = 0
@@ -196,6 +198,18 @@ class Session:
     def has_pending_draft(self) -> bool:
         """Check if there's a pending draft."""
         return self.pending_draft is not None
+
+    def set_activity(self, activity: str) -> None:
+        """Set the current activity being worked on.
+
+        Args:
+            activity: Description of what user and AI are working on.
+        """
+        self.current_activity = activity
+
+    def clear_activity(self) -> None:
+        """Clear the current activity."""
+        self.current_activity = None
 
     def get_history_for_ai(self) -> list[dict[str, str]]:
         """Get message history in format suitable for AI.

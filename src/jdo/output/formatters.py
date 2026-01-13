@@ -112,10 +112,15 @@ def format_commitment_list(commitments: list[Commitment]) -> Table:
         if c.due_date and c.due_date < today:
             due_text = f"[red]{due_text}[/red]"
 
+        # Get stakeholder name - handle case where relationship isn't loaded
+        stakeholder_name = "N/A"
+        if hasattr(c, "stakeholder") and c.stakeholder is not None:
+            stakeholder_name = c.stakeholder.name
+
         table.add_row(
             str(c.id)[:6] if c.id else "N/A",
             c.deliverable[:30] if c.deliverable else "N/A",
-            c.stakeholder.name if c.stakeholder else "N/A",
+            stakeholder_name,
             due_text,
             status_text,
         )
@@ -141,13 +146,18 @@ def format_commitment_detail(commitment: Commitment) -> Panel:
     content.append("Deliverable: ", style="bold")
     content.append(f"{commitment.deliverable or 'N/A'}\n")
     content.append("Stakeholder: ", style="bold")
-    content.append(f"{commitment.stakeholder.name if commitment.stakeholder else 'N/A'}\n")
+    # Handle case where stakeholder relationship isn't loaded
+    stakeholder_name = "N/A"
+    if hasattr(commitment, "stakeholder") and commitment.stakeholder is not None:
+        stakeholder_name = commitment.stakeholder.name
+    content.append(f"{stakeholder_name}\n")
     content.append("Due Date: ", style="bold")
     content.append(f"{format_date(commitment.due_date)}\n")
     content.append("Status: ", style="bold")
     content.append(status_value, style=status_color)
 
-    if commitment.goal:
+    # Handle case where goal relationship isn't loaded
+    if hasattr(commitment, "goal") and commitment.goal is not None:
         content.append("\nGoal: ", style="bold")
         content.append(commitment.goal.title or "N/A")
 

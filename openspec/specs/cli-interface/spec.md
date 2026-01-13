@@ -348,3 +348,113 @@ The system SHALL display an always-visible status bar at the bottom of the termi
 - **THEN** session cache is updated
 - **AND** toolbar reflects new values on next render
 
+### Requirement: Dashboard Data Caching
+
+The system SHALL cache dashboard data in session state for efficient display.
+
+#### Scenario: Cache includes commitment list
+- **GIVEN** dashboard is being prepared
+- **WHEN** session cache is updated
+- **THEN** cache includes up to 5 upcoming commitments with display data
+- **AND** commitments are ordered by due date ascending
+
+#### Scenario: Cache includes goal progress
+- **GIVEN** dashboard is being prepared
+- **WHEN** session cache is updated
+- **THEN** cache includes active goals with progress percentages
+- **AND** goals include review due status
+
+#### Scenario: Cache includes integrity summary
+- **GIVEN** dashboard is being prepared
+- **WHEN** session cache is updated
+- **THEN** cache includes integrity grade, score, and trend
+- **AND** cache includes current streak in weeks
+
+#### Scenario: Cache updated on commitment changes
+- **GIVEN** user creates or completes a commitment
+- **WHEN** commitment is saved to database
+- **THEN** dashboard cache is refreshed with new data
+
+#### Scenario: Cache updated on goal changes
+- **GIVEN** goal progress changes (via commitment completion)
+- **WHEN** change is saved
+- **THEN** dashboard cache is refreshed with new goal progress
+
+### Requirement: Display Level Selection
+
+The system SHALL automatically select display level based on data volume.
+
+#### Scenario: Select minimal display
+- **GIVEN** user has 0 commitments AND 0 goals
+- **WHEN** display level is determined
+- **THEN** returns MINIMAL (status bar only)
+
+#### Scenario: Select compact display
+- **GIVEN** user has 1-2 commitments
+- **WHEN** display level is determined
+- **THEN** returns COMPACT (merged panel)
+
+#### Scenario: Select standard display
+- **GIVEN** user has 3+ commitments AND 0 goals
+- **WHEN** display level is determined
+- **THEN** returns STANDARD (commitments + status bar)
+
+#### Scenario: Select full display
+- **GIVEN** user has 3+ commitments AND 1+ goals
+- **WHEN** display level is determined
+- **THEN** returns FULL (all panels)
+
+### Requirement: Commitment Summary Display
+
+The system SHALL display a commitment summary panel before each REPL prompt to keep users informed of their current obligations.
+
+#### Scenario: Summary shown after startup
+- **GIVEN** the REPL has started
+- **WHEN** startup guidance messages complete
+- **THEN** commitment summary panel is displayed (if user has commitments)
+- **AND** the prompt appears below the summary
+
+#### Scenario: Summary shown after command completion
+- **GIVEN** user has executed a command or received AI response
+- **WHEN** command processing completes
+- **THEN** commitment summary panel is displayed (if user has commitments)
+- **AND** the prompt appears below the summary
+
+#### Scenario: Summary updates after commitment changes
+- **GIVEN** user creates or completes a commitment
+- **WHEN** the operation succeeds
+- **THEN** the next summary panel reflects the updated counts
+- **AND** next due item is updated if changed
+
+#### Scenario: Summary hidden when no commitments
+- **GIVEN** user has no active commitments
+- **WHEN** summary would be displayed
+- **THEN** no summary panel is shown
+- **AND** prompt appears without preceding panel
+
+#### Scenario: Summary uses cached data for performance
+- **GIVEN** summary panel is being rendered
+- **WHEN** displaying commitment counts and next due item
+- **THEN** data is retrieved from session cache (not live DB query)
+- **AND** cache is updated only when commitments change
+
+### Requirement: Summary Panel Session Caching
+
+The system SHALL cache commitment summary data in session state for efficient display.
+
+#### Scenario: Cache includes next due commitment
+- **GIVEN** user has active commitments
+- **WHEN** session cache is updated
+- **THEN** cache includes: active_count, at_risk_count, overdue_count
+- **AND** cache includes next_due commitment info (deliverable, due_date)
+
+#### Scenario: Cache updated on commitment creation
+- **GIVEN** user confirms a new commitment
+- **WHEN** commitment is saved to database
+- **THEN** session cache is updated with new summary data
+
+#### Scenario: Cache updated on commitment completion
+- **GIVEN** user completes a commitment
+- **WHEN** commitment status is updated to completed
+- **THEN** session cache is updated with new summary data
+

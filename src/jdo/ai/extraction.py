@@ -11,9 +11,15 @@ from typing import Any
 from pydantic import BaseModel, Field, model_validator
 from pydantic_ai import Agent
 from pydantic_ai.models import Model
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openrouter import OpenRouterModel
+from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from jdo.ai.context import get_system_prompt
 from jdo.ai.timeout import AI_TIMEOUT_SECONDS, with_ai_timeout
+from jdo.auth.api import get_credentials
+from jdo.config import get_settings
 
 # Extraction prompts
 COMMITMENT_EXTRACTION_PROMPT = """\
@@ -263,6 +269,34 @@ class ExtractedRecurringCommitment(BaseModel):
             raise ValueError(msg)
 
 
+def _create_model_with_credentials() -> Model:
+    """Create a PydanticAI model with credentials from settings.
+
+    Returns:
+        A configured Model instance.
+
+    Raises:
+        ValueError: If provider is not supported or credentials are missing.
+    """
+    settings = get_settings()
+    provider_id = settings.ai_provider
+    model_name = settings.ai_model
+
+    creds = get_credentials(provider_id)
+    if creds is None or not creds.api_key:
+        msg = f"No credentials found for provider: {provider_id}"
+        raise ValueError(msg)
+
+    if provider_id == "openrouter":
+        provider = OpenRouterProvider(api_key=creds.api_key)
+        return OpenRouterModel(model_name, provider=provider)
+    if provider_id == "openai":
+        provider = OpenAIProvider(api_key=creds.api_key)
+        return OpenAIChatModel(model_name, provider=provider)
+    msg = f"Unsupported AI provider: {provider_id}"
+    raise ValueError(msg)
+
+
 def create_extraction_agent(
     model: Model | str,
     output_type: type[BaseModel],
@@ -271,13 +305,18 @@ def create_extraction_agent(
     """Create an agent for extracting structured data.
 
     Args:
-        model: The model to use for extraction.
+        model: The model to use for extraction. If a string is passed,
+               credentials will be loaded from settings automatically.
         output_type: The Pydantic model type to extract.
         extraction_prompt: Additional prompt for extraction guidance.
 
     Returns:
         A configured Agent for extraction.
     """
+    # If model is a string identifier (not "test"), create a proper model with credentials
+    if isinstance(model, str) and model != "test":
+        model = _create_model_with_credentials()
+
     system_prompt = f"{get_system_prompt()}\n\n{extraction_prompt}"
 
     return Agent(
