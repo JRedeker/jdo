@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from sqlmodel import SQLModel, select
@@ -504,3 +504,307 @@ class TestTimeRollupServiceBatch:
                 assert result[commitment2_id].total_estimated_hours == 3.0
 
         reset_engine()
+
+
+class TestTimeRollupEdgeCases:
+    """Additional edge case tests for TimeRollupService."""
+
+    def test_rollup_with_zero_hours_tasks(self, tmp_path: Path) -> None:
+        """Rollup handles tasks with 0.0 estimated hours."""
+        from jdo.db.engine import get_engine, reset_engine
+        from jdo.db.session import get_session
+        from jdo.db.time_rollup_service import TimeRollupService
+        from jdo.models.commitment import Commitment
+        from jdo.models.stakeholder import Stakeholder, StakeholderType
+        from jdo.models.task import Task, TaskStatus
+
+        reset_engine()
+        db_path = tmp_path / "test.db"
+
+        with patch("jdo.db.engine.get_settings") as mock_settings:
+            mock_settings.return_value.database_path = db_path
+            engine = get_engine()
+            SQLModel.metadata.create_all(engine)
+
+            stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+            stakeholder_id = stakeholder.id
+
+            with get_session() as session:
+                session.add(stakeholder)
+
+            commitment = Commitment(
+                deliverable="Test",
+                stakeholder_id=stakeholder_id,
+                due_date=date(2025, 12, 31),
+            )
+            commitment_id = commitment.id
+
+            with get_session() as session:
+                session.add(commitment)
+
+            tasks = [
+                Task(
+                    commitment_id=commitment_id,
+                    title="Zero estimate",
+                    scope="Scope",
+                    order=1,
+                    estimated_hours=0.0,
+                ),
+                Task(
+                    commitment_id=commitment_id,
+                    title="Normal estimate",
+                    scope="Scope",
+                    order=2,
+                    estimated_hours=2.0,
+                    status=TaskStatus.COMPLETED,
+                ),
+            ]
+
+            with get_session() as session:
+                for task in tasks:
+                    session.add(task)
+
+            with get_session() as session:
+                service = TimeRollupService(session)
+                rollup = service.get_rollup(commitment_id)
+
+                assert rollup.total_estimated_hours == 2.0
+                assert rollup.tasks_with_estimates == 2
+                assert rollup.estimate_coverage == 1.0
+
+        reset_engine()
+
+    def test_rollup_mixed_status_tasks(self, tmp_path: Path) -> None:
+        """Rollup correctly categorizes tasks by status."""
+        from jdo.db.engine import get_engine, reset_engine
+        from jdo.db.session import get_session
+        from jdo.db.time_rollup_service import TimeRollupService
+        from jdo.models.commitment import Commitment
+        from jdo.models.stakeholder import Stakeholder, StakeholderType
+        from jdo.models.task import Task, TaskStatus
+
+        reset_engine()
+        db_path = tmp_path / "test.db"
+
+        with patch("jdo.db.engine.get_settings") as mock_settings:
+            mock_settings.return_value.database_path = db_path
+            engine = get_engine()
+            SQLModel.metadata.create_all(engine)
+
+            stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+            stakeholder_id = stakeholder.id
+
+            with get_session() as session:
+                session.add(stakeholder)
+
+            commitment = Commitment(
+                deliverable="Test",
+                stakeholder_id=stakeholder_id,
+                due_date=date(2025, 12, 31),
+            )
+            commitment_id = commitment.id
+
+            with get_session() as session:
+                session.add(commitment)
+
+            tasks = [
+                Task(
+                    commitment_id=commitment_id,
+                    title="Pending",
+                    scope="Scope",
+                    order=1,
+                    estimated_hours=1.0,
+                    status=TaskStatus.PENDING,
+                ),
+                Task(
+                    commitment_id=commitment_id,
+                    title="In Progress",
+                    scope="Scope",
+                    order=2,
+                    estimated_hours=2.0,
+                    status=TaskStatus.IN_PROGRESS,
+                ),
+                Task(
+                    commitment_id=commitment_id,
+                    title="Completed",
+                    scope="Scope",
+                    order=3,
+                    estimated_hours=3.0,
+                    status=TaskStatus.COMPLETED,
+                ),
+                Task(
+                    commitment_id=commitment_id,
+                    title="Skipped",
+                    scope="Scope",
+                    order=4,
+                    estimated_hours=4.0,
+                    status=TaskStatus.SKIPPED,
+                ),
+            ]
+
+            with get_session() as session:
+                for task in tasks:
+                    session.add(task)
+
+            with get_session() as session:
+                service = TimeRollupService(session)
+                rollup = service.get_rollup(commitment_id)
+
+                assert rollup.total_estimated_hours == 10.0
+                assert rollup.remaining_estimated_hours == 3.0
+                assert rollup.completed_estimated_hours == 3.0
+                assert rollup.task_count == 4
+                assert rollup.completed_task_count == 1
+
+        reset_engine()
+
+    def test_rollup_all_completed_tasks(self, tmp_path: Path) -> None:
+        """Rollup with all completed tasks."""
+        from jdo.db.engine import get_engine, reset_engine
+        from jdo.db.session import get_session
+        from jdo.db.time_rollup_service import TimeRollupService
+        from jdo.models.commitment import Commitment
+        from jdo.models.stakeholder import Stakeholder, StakeholderType
+        from jdo.models.task import Task, TaskStatus
+
+        reset_engine()
+        db_path = tmp_path / "test.db"
+
+        with patch("jdo.db.engine.get_settings") as mock_settings:
+            mock_settings.return_value.database_path = db_path
+            engine = get_engine()
+            SQLModel.metadata.create_all(engine)
+
+            stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+            stakeholder_id = stakeholder.id
+
+            with get_session() as session:
+                session.add(stakeholder)
+
+            commitment = Commitment(
+                deliverable="Test",
+                stakeholder_id=stakeholder_id,
+                due_date=date(2025, 12, 31),
+            )
+            commitment_id = commitment.id
+
+            with get_session() as session:
+                session.add(commitment)
+
+            tasks = [
+                Task(
+                    commitment_id=commitment_id,
+                    title="Done 1",
+                    scope="Scope",
+                    order=1,
+                    estimated_hours=1.0,
+                    status=TaskStatus.COMPLETED,
+                ),
+                Task(
+                    commitment_id=commitment_id,
+                    title="Done 2",
+                    scope="Scope",
+                    order=2,
+                    estimated_hours=2.0,
+                    status=TaskStatus.COMPLETED,
+                ),
+            ]
+
+            with get_session() as session:
+                for task in tasks:
+                    session.add(task)
+
+            with get_session() as session:
+                service = TimeRollupService(session)
+                rollup = service.get_rollup(commitment_id)
+
+                assert rollup.total_estimated_hours == 3.0
+                assert rollup.remaining_estimated_hours == 0.0
+                assert rollup.completed_estimated_hours == 3.0
+                assert rollup.task_count == 2
+                assert rollup.completed_task_count == 2
+
+        reset_engine()
+
+    def test_rollup_all_pending_tasks(self, tmp_path: Path) -> None:
+        """Rollup with all pending tasks."""
+        from jdo.db.engine import get_engine, reset_engine
+        from jdo.db.session import get_session
+        from jdo.db.time_rollup_service import TimeRollupService
+        from jdo.models.commitment import Commitment
+        from jdo.models.stakeholder import Stakeholder, StakeholderType
+        from jdo.models.task import Task, TaskStatus
+
+        reset_engine()
+        db_path = tmp_path / "test.db"
+
+        with patch("jdo.db.engine.get_settings") as mock_settings:
+            mock_settings.return_value.database_path = db_path
+            engine = get_engine()
+            SQLModel.metadata.create_all(engine)
+
+            stakeholder = Stakeholder(name="Test", type=StakeholderType.PERSON)
+            stakeholder_id = stakeholder.id
+
+            with get_session() as session:
+                session.add(stakeholder)
+
+            commitment = Commitment(
+                deliverable="Test",
+                stakeholder_id=stakeholder_id,
+                due_date=date(2025, 12, 31),
+            )
+            commitment_id = commitment.id
+
+            with get_session() as session:
+                session.add(commitment)
+
+            tasks = [
+                Task(
+                    commitment_id=commitment_id,
+                    title="Pending 1",
+                    scope="Scope",
+                    order=1,
+                    estimated_hours=1.0,
+                    status=TaskStatus.PENDING,
+                ),
+                Task(
+                    commitment_id=commitment_id,
+                    title="Pending 2",
+                    scope="Scope",
+                    order=2,
+                    estimated_hours=2.0,
+                    status=TaskStatus.PENDING,
+                ),
+            ]
+
+            with get_session() as session:
+                for task in tasks:
+                    session.add(task)
+
+            with get_session() as session:
+                service = TimeRollupService(session)
+                rollup = service.get_rollup(commitment_id)
+
+                assert rollup.total_estimated_hours == 3.0
+                assert rollup.remaining_estimated_hours == 3.0
+                assert rollup.completed_estimated_hours == 0.0
+                assert rollup.task_count == 2
+                assert rollup.completed_task_count == 0
+
+        reset_engine()
+
+    def test_calculate_rollup_for_tasks_empty_list(self) -> None:
+        """_calculate_rollup_for_tasks handles empty list."""
+        from jdo.db.time_rollup_service import TimeRollupService
+
+        service = TimeRollupService(MagicMock())
+        rollup = service._calculate_rollup_for_tasks([])
+
+        assert rollup.total_estimated_hours == 0.0
+        assert rollup.remaining_estimated_hours == 0.0
+        assert rollup.completed_estimated_hours == 0.0
+        assert rollup.task_count == 0
+        assert rollup.tasks_with_estimates == 0
+        assert rollup.completed_task_count == 0
+        assert rollup.estimate_coverage == 0.0

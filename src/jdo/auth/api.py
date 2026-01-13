@@ -2,17 +2,9 @@
 
 from __future__ import annotations
 
-import os
-
 from jdo.auth.models import ApiKeyCredentials
 from jdo.auth.store import AuthStore
 from jdo.paths import get_auth_path
-
-# Environment variable mapping for providers
-ENV_VAR_MAP = {
-    "openai": "OPENAI_API_KEY",
-    "openrouter": "OPENROUTER_API_KEY",
-}
 
 
 def _get_store() -> AuthStore:
@@ -20,29 +12,10 @@ def _get_store() -> AuthStore:
     return AuthStore(get_auth_path())
 
 
-def _get_env_credentials(provider_id: str) -> ApiKeyCredentials | None:
-    """Get credentials from environment variable fallback.
-
-    Args:
-        provider_id: The provider identifier.
-
-    Returns:
-        ApiKeyCredentials if env var is set, None otherwise.
-    """
-    env_var = ENV_VAR_MAP.get(provider_id)
-    if env_var:
-        api_key = os.environ.get(env_var)
-        if api_key:
-            return ApiKeyCredentials(api_key=api_key)
-    return None
-
-
 def get_credentials(
     provider_id: str,
 ) -> ApiKeyCredentials | None:
     """Get credentials for a provider.
-
-    Checks stored credentials first, then falls back to environment variables.
 
     Args:
         provider_id: The provider identifier (e.g., "openai", "openrouter").
@@ -52,12 +25,7 @@ def get_credentials(
     """
     # Check stored credentials first
     store = _get_store()
-    stored = store.get(provider_id)
-    if stored is not None:
-        return stored
-
-    # Fall back to environment variable
-    return _get_env_credentials(provider_id)
+    return store.get(provider_id)
 
 
 def save_credentials(
@@ -88,8 +56,6 @@ def clear_credentials(provider_id: str) -> None:
 
 def is_authenticated(provider_id: str) -> bool:
     """Check if a provider has valid credentials.
-
-    Checks both stored credentials and environment variables.
 
     Args:
         provider_id: The provider identifier.

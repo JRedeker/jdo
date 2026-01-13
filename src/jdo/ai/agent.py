@@ -4,12 +4,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from loguru import logger
 from pydantic_ai import Agent
 from pydantic_ai.models import Model
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openrouter import OpenRouterModel
+from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.providers.openrouter import OpenRouterProvider
 from sqlmodel import Session
 
+from jdo.auth.api import get_credentials
 from jdo.config import get_settings
+from jdo.exceptions import (
+    InvalidCredentialsError,
+    MissingCredentialsError,
+    UnsupportedProviderError,
+)
 from jdo.utils.datetime import DEFAULT_TIMEZONE
+
+MIN_API_KEY_LENGTH = 10
 
 # System prompt for the commitment integrity coach
 SYSTEM_PROMPT = """You are a commitment integrity coach for JDO. Your primary goal is to help \
@@ -173,5 +186,41 @@ def create_agent_with_model(
 
 
 def create_agent() -> Agent[JDODependencies, str]:
-    """Create a PydanticAI agent configured for commitment tracking."""
-    return create_agent_with_model(get_model_identifier())
+    """Create a PydanticAI agent configured for commitment tracking.
+
+    Returns:
+        A configured Agent instance with tools registered.
+
+    Raises:
+        MissingCredentialsError: No credentials configured for the AI provider.
+        InvalidCredentialsError: Credentials have invalid format.
+        UnsupportedProviderError: Provider is not supported.
+    """
+    settings = get_settings()
+    provider_id = settings.ai_provider
+    model_name = settings.ai_model
+
+    logger.debug("Creating agent with provider: {}", provider_id)
+
+    creds = get_credentials(provider_id)
+    if creds is None:
+        logger.error("No credentials found for provider: {}", provider_id)
+        raise MissingCredentialsError(provider_id)
+
+    logger.debug("Credentials retrieved for provider: {}", provider_id)
+
+    if not creds.api_key or len(creds.api_key) < MIN_API_KEY_LENGTH:
+        logger.error("Invalid credential format for provider: {}", provider_id)
+        raise InvalidCredentialsError(provider_id)
+
+    if provider_id == "openrouter":
+        provider = OpenRouterProvider(api_key=creds.api_key)
+        model: Model = OpenRouterModel(model_name, provider=provider)
+    elif provider_id == "openai":
+        provider = OpenAIProvider(api_key=creds.api_key)
+        model = OpenAIChatModel(model_name, provider=provider)
+    else:
+        logger.error("Unsupported AI provider: {}", provider_id)
+        raise UnsupportedProviderError(provider_id)
+
+    return create_agent_with_model(model)

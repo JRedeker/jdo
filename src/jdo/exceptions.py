@@ -206,6 +206,103 @@ class AuthError(JDOError):
     """
 
 
+class MissingCredentialsError(AuthError):
+    """Exception raised when no credentials are available for the configured provider.
+
+    Raised when:
+    - No stored credentials exist for the configured AI provider
+    - Environment variable fallback is disabled
+    - User needs to configure credentials via 'jdo auth'
+    """
+
+    def __init__(
+        self,
+        provider: str,
+        *,
+        recovery_hint: str | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize missing credentials error.
+
+        Args:
+            provider: The AI provider that lacks credentials.
+            recovery_hint: Optional hint for users on how to resolve the error.
+            context: Optional dictionary of additional context for debugging.
+        """
+        msg = f"No credentials configured for AI provider: {provider}"
+        hint = recovery_hint or f"Run 'jdo auth' to configure your {provider} API key."
+        ctx = context or {}
+        ctx["provider"] = provider
+
+        super().__init__(msg, recovery_hint=hint, context=ctx)
+        self.provider = provider
+
+
+class InvalidCredentialsError(AuthError):
+    """Exception raised when credentials have invalid format.
+
+    Raised when:
+    - API key format is invalid for the provider
+    - Credential validation fails
+    """
+
+    def __init__(
+        self,
+        provider: str,
+        *,
+        recovery_hint: str | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize invalid credentials error.
+
+        Args:
+            provider: The AI provider with invalid credentials.
+            recovery_hint: Optional hint for users on how to resolve the error.
+            context: Optional dictionary of additional context for debugging.
+        """
+        msg = f"Invalid credentials format for AI provider: {provider}"
+        hint = recovery_hint or f"Run 'jdo auth' to reconfigure your {provider} API key."
+        ctx = context or {}
+        ctx["provider"] = provider
+
+        super().__init__(msg, recovery_hint=hint, context=ctx)
+        self.provider = provider
+
+
+class UnsupportedProviderError(ConfigError):
+    """Exception raised when an unsupported AI provider is configured.
+
+    Raised when:
+    - Provider is not in the supported list (openai, anthropic, google, openrouter)
+    - Provider configuration is invalid
+    """
+
+    def __init__(
+        self,
+        provider: str,
+        *,
+        recovery_hint: str | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize unsupported provider error.
+
+        Args:
+            provider: The unsupported provider name.
+            recovery_hint: Optional hint for users on how to resolve the error.
+            context: Optional dictionary of additional context for debugging.
+        """
+        supported = ["openai", "anthropic", "google", "openrouter"]
+        msg = f"Unsupported AI provider: {provider}. Supported: {', '.join(supported)}"
+        hint = recovery_hint or f"Set JDO_AI_PROVIDER to one of: {', '.join(supported)}"
+        ctx = context or {}
+        ctx["provider"] = provider
+        ctx["supported_providers"] = supported
+
+        super().__init__(msg, recovery_hint=hint, context=ctx)
+        self.provider = provider
+        self.supported_providers = supported
+
+
 # TUI Errors
 
 

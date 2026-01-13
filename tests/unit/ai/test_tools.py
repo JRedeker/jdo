@@ -755,3 +755,131 @@ class TestGetCoachingAreas:
         result = _get_coaching_areas(metrics)
 
         assert "estimation accuracy" not in result
+
+
+class TestToolFunctionsAdditional:
+    """Additional tests for AI tool functions."""
+
+    def test_get_commitments_for_goal_empty_result(self) -> None:
+        """get_commitments_for_goal returns empty list when no commitments."""
+        from jdo.ai.tools import get_commitments_for_goal
+        from jdo.db.engine import reset_engine
+
+        reset_engine()
+
+        mock_session = MagicMock()
+        mock_session.exec.return_value.all.return_value = []
+
+        result = get_commitments_for_goal(mock_session, str(uuid4()))
+
+        assert result == []
+
+    def test_get_milestones_for_goal_empty_result(self) -> None:
+        """get_milestones_for_goal returns empty list when no milestones."""
+        from jdo.ai.tools import get_milestones_for_goal
+
+        mock_session = MagicMock()
+        mock_session.exec.return_value.all.return_value = []
+
+        result = get_milestones_for_goal(mock_session, str(uuid4()))
+
+        assert result == []
+
+    def test_get_visions_due_for_review_empty_result(self) -> None:
+        """get_visions_due_for_review returns empty list when no visions due."""
+        from jdo.ai.tools import get_visions_due_for_review
+
+        mock_session = MagicMock()
+        mock_session.exec.return_value.all.return_value = []
+
+        result = get_visions_due_for_review(mock_session)
+
+        assert result == []
+
+    def test_get_overdue_commitments_empty_result(self) -> None:
+        """get_overdue_commitments returns empty list when none overdue."""
+        from jdo.ai.tools import get_overdue_commitments
+
+        mock_session = MagicMock()
+        mock_session.exec.return_value.all.return_value = []
+
+        result = get_overdue_commitments(mock_session)
+
+        assert result == []
+
+    def test_format_task_history_entries_with_hours(self) -> None:
+        """_format_task_history_entries includes hours when present."""
+        from jdo.ai.tools import _format_task_history_entries
+        from jdo.models.task_history import TaskEventType, TaskHistoryEntry
+
+        entries = [
+            TaskHistoryEntry(
+                event_type=TaskEventType.COMPLETED,
+                created_at=datetime.now(),
+                estimated_hours=2.0,
+                actual_hours_category=None,
+            )
+        ]
+
+        result = _format_task_history_entries(entries, 20)
+
+        assert "2.0h" in result
+        assert "est:" in result
+
+    def test_format_task_history_entries_with_actual_category(self) -> None:
+        """_format_task_history_entries includes actual category when present."""
+        from jdo.ai.tools import _format_task_history_entries
+        from jdo.models.task import ActualHoursCategory
+        from jdo.models.task_history import TaskEventType, TaskHistoryEntry
+
+        entries = [
+            TaskHistoryEntry(
+                event_type=TaskEventType.COMPLETED,
+                created_at=datetime.now(),
+                estimated_hours=2.0,
+                actual_hours_category=ActualHoursCategory.ON_TARGET,
+            )
+        ]
+
+        result = _format_task_history_entries(entries, 20)
+
+        assert "actual:" in result
+        assert "on_target" in result
+
+    def test_format_task_history_respects_limit(self) -> None:
+        """_format_task_history_entries respects limit parameter."""
+        from jdo.ai.tools import _format_task_history_entries
+        from jdo.models.task_history import TaskEventType, TaskHistoryEntry
+
+        entries = [
+            TaskHistoryEntry(
+                event_type=TaskEventType.COMPLETED,
+                created_at=datetime.now(),
+            )
+            for _ in range(10)
+        ]
+
+        result = _format_task_history_entries(entries, 5)
+
+        lines = result.split("\n")
+        assert len(lines) == 5
+
+    def test_format_task_history_empty_list(self) -> None:
+        """_format_task_history_entries handles empty list."""
+        from jdo.ai.tools import _format_task_history_entries
+
+        result = _format_task_history_entries([], 10)
+
+        assert result == ""
+
+    def test_get_recent_task_history_limit(self) -> None:
+        """_get_recent_task_history respects limit parameter."""
+        from jdo.ai.tools import _get_recent_task_history
+
+        mock_session = MagicMock()
+        mock_session.exec.return_value.all.return_value = []
+
+        result = _get_recent_task_history(mock_session, limit=10)
+
+        assert result == []
+        mock_session.exec.assert_called_once()

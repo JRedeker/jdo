@@ -83,9 +83,9 @@ to the people who matter.
 NO_CREDENTIALS_MESSAGE = """\
 [bold red]No AI credentials configured.[/bold red]
 
-To use JDO, you need to configure an AI provider. Set one of:
-  - OPENAI_API_KEY environment variable
-  - OPENROUTER_API_KEY environment variable
+To use JDO, configure your credentials with: [cyan]jdo auth[/cyan]
+
+See /help for more information.
 """
 
 
