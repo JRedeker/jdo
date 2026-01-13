@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from enum import Enum
 from typing import Self
 from uuid import UUID, uuid4
@@ -11,12 +11,9 @@ from uuid import UUID, uuid4
 from pydantic import model_validator
 from sqlmodel import Field, SQLModel
 
+from jdo.utils.datetime import today_date, utc_now
+
 __all__ = ["INTERVAL_LABELS", "VALID_REVIEW_INTERVALS", "Goal", "GoalProgress", "GoalStatus"]
-
-
-def today_date() -> date:
-    """Get current date in UTC."""
-    return datetime.now(UTC).date()
 
 
 @dataclass
@@ -53,11 +50,6 @@ class GoalStatus(str, Enum):
     ON_HOLD = "on_hold"
     ACHIEVED = "achieved"
     ABANDONED = "abandoned"
-
-
-def utc_now() -> datetime:
-    """Get current UTC datetime."""
-    return datetime.now(UTC)
 
 
 # Valid review intervals and their labels

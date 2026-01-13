@@ -9,8 +9,9 @@ This document captures our Textual implementation patterns, common pitfalls, and
 3. [Message Handling](#message-handling)
 4. [Screen Navigation](#screen-navigation)
 5. [Focus Management](#focus-management)
-6. [Common Pitfalls](#common-pitfalls)
-7. [Testing Patterns](#testing-patterns)
+6. [Visual Design System](#visual-design-system)
+7. [Common Pitfalls](#common-pitfalls)
+8. [Testing Patterns](#testing-patterns)
 
 ---
 
@@ -399,6 +400,221 @@ class NavSidebar(Widget):
 | `option_count` | Count of selectable options only (excludes separators) |
 | `get_option_at_index(i)` | Returns option at selectable index `i` |
 | `add_option(None)` | Adds a visual separator (not selectable, not indexed) |
+
+---
+
+## Visual Design System
+
+JDO uses a comprehensive visual design system for consistent, professional styling across the TUI.
+
+### Theme Structure
+
+**Files**:
+- `src/jdo/theme.py` - Theme definitions (JDO_DARK_THEME, JDO_LIGHT_THEME)
+- `src/jdo/app.tcss` - Centralized external stylesheet
+- Widget `DEFAULT_CSS` - Widget-specific encapsulated styles
+
+**Key Colors**:
+
+| Color | Dark Theme | Light Theme | Usage |
+|-------|-----------|-------------|-------|
+| Primary | #5B8DEE (calm blue) | #3B6BC9 | Trust, stability, active states |
+| Accent | #F5A623 (warm amber) | #D4850F | Attention, CTAs, focus |
+| Success | #4CAF50 (green) | #388E3C | Completion, healthy status |
+| Warning | #FFB74D (orange) | #F57C00 | Caution, at-risk states |
+| Error | #E57373 (soft red) | #D32F2F | Errors, abandoned items |
+| Secondary | #7C8FA6 (steel) | #5A6A7A | Secondary actions, drafts |
+
+### Border Hierarchy
+
+Visual importance is communicated through border styles:
+
+| Level | Style | Color | Usage | Example |
+|-------|-------|-------|-------|---------|
+| 1 - Primary | `round` | `$primary` | Main content containers | ChatContainer |
+| 2 - Secondary | `tall` | `$surface-lighten-1` | Panels, separators | DataPanel, NavSidebar |
+| 3 - Focus | `heavy` | `$accent` | Focused interactive elements | Active input |
+| 4 - Modal | `double` | `$accent` | Dialog overlays | SettingsScreen |
+| 5 - Error | `round` | `$error` | Error states | AiRequiredScreen |
+
+### Background Depth System
+
+Create visual hierarchy through 4-layer background depth:
+
+```
+Layer 0: $background       - Screen/app base
+Layer 1: $surface          - Primary content containers
+Layer 2: $surface-lighten-1 - Raised elements (cards, hover)
+Layer 3: $panel            - Distinct panels
+Recessed: $surface-darken-1 - Sunken elements (NavSidebar)
+```
+
+### Status Colors
+
+Consistent semantic colors across all entity types:
+
+```css
+.status-pending      { color: $text-muted; }           /* Dim, low priority */
+.status-in-progress  { color: $primary; }              /* Active, prominent */
+.status-completed    { color: $success; }              /* Green, satisfied */
+.status-at-risk      { color: $warning; text-style: bold; }  /* Orange, bold */
+.status-abandoned    { color: $error; }                /* Red, distinct */
+.status-draft        { color: $secondary; text-style: italic; }  /* Muted, temporary */
+```
+
+### Utility Classes
+
+Available CSS utility classes in `app.tcss`:
+
+**Surface Depth**:
+```css
+.surface        /* Standard surface background */
+.surface-raised /* Elevated elements */
+.surface-sunken /* Recessed elements */
+```
+
+**Status Indicators**:
+```css
+.status-pending, .status-in-progress, .status-completed
+.status-at-risk, .status-abandoned, .status-draft
+```
+
+**Badges**:
+```css
+.badge-success  /* Green badge */
+.badge-warning  /* Orange badge */
+.badge-error    /* Red badge */
+.badge-info     /* Blue badge */
+```
+
+**Grades** (for IntegritySummary):
+```css
+.grade-a  /* Green (success) */
+.grade-b  /* Blue (primary) */
+.grade-c  /* Orange (warning) */
+.grade-d, .grade-f  /* Red (error) */
+```
+
+**Spacing**:
+```css
+.p-1, .p-2      /* Padding */
+.m-1            /* Margin */
+.mb-1, .mb-2    /* Margin bottom */
+```
+
+### Theme Usage
+
+**Registering Themes**:
+```python
+from jdo.theme import JDO_DARK_THEME, JDO_LIGHT_THEME
+
+class JdoApp(App):
+    CSS_PATH = "app.tcss"  # Load external stylesheet
+    
+    def __init__(self) -> None:
+        super().__init__()
+        self.register_theme(JDO_DARK_THEME)
+        self.register_theme(JDO_LIGHT_THEME)
+        self.theme = "jdo-dark"  # Set default
+```
+
+**Theme Toggle**:
+- Keyboard: `Ctrl+D` toggles between jdo-dark and jdo-light
+- Code: `app.theme = "jdo-dark"` or `"jdo-light"`
+
+### Widget Styling Pattern
+
+Widgets define encapsulated styles in `DEFAULT_CSS`:
+
+```python
+class MyWidget(Widget):
+    DEFAULT_CSS = """
+    MyWidget {
+        border: round $primary;      /* Use theme variables */
+        background: $surface;
+        padding: 1;
+    }
+    
+    MyWidget:focus {
+        border: heavy $accent;       /* Focus state */
+        background-tint: $accent 5%;
+    }
+    
+    MyWidget.-active {
+        border-left: heavy $accent;  /* Custom modifier class */
+        background: $primary 20%;
+    }
+    """
+```
+
+**Guidelines**:
+1. Always use theme variables (`$primary`, `$surface`, etc.)
+2. Never hardcode colors (except in `theme.py`)
+3. Define focus states for interactive widgets
+4. Use modifier classes (prefixed with `-`) for variants
+
+### Component Styling Reference
+
+| Component | Background | Border | Focus |
+|-----------|------------|--------|-------|
+| Screen | `$background` | none | n/a |
+| MainScreen | `$surface` | none | n/a |
+| ChatContainer | `$surface` | `round $primary` | n/a |
+| ChatMessage.-user | `$surface` | `left: heavy $accent` | n/a |
+| ChatMessage.-assistant | `$panel` | `left: heavy $primary` | n/a |
+| ChatMessage.-system | `$warning 10%` | `round $warning` | n/a |
+| DataPanel | `$surface` | `tall $surface-lighten-1` | n/a |
+| NavSidebar | `$surface-darken-1` | `right: tall $surface-lighten-1` | n/a |
+| NavSidebar (active item) | `$primary 20%` | `left: heavy $accent` | n/a |
+| PromptInput | `$surface` | `round $primary` | `round $accent` + tint |
+| Modal dialogs | `$surface` | `double $accent` | n/a |
+| IntegritySummary | `$surface-darken-1` | `top: tall $primary` | n/a |
+
+### Live CSS Editing
+
+Use the `--dev` flag for live CSS editing during development:
+
+```bash
+textual run src/jdo/app.py --dev
+```
+
+Changes to `app.tcss` will reload automatically. Widget `DEFAULT_CSS` requires app restart.
+
+### Testing Themes
+
+**Unit Tests** (`tests/unit/test_theme.py`):
+- Verify theme properties (name, colors, dark mode flag)
+- Ensure both themes have matching variable keys
+- Validate color formats
+
+**Integration Tests** (`tests/tui/test_styling.py`):
+- Verify CSS_PATH is set
+- Check themes are registered on init
+- Test theme toggle functionality
+
+**Snapshot Tests**:
+- Visual regression testing for styled components
+- Run with: `pytest tests/tui/test_snapshots.py`
+- Update with: `pytest tests/tui/test_snapshots.py --snapshot-update`
+
+### Design Decisions
+
+**Why external CSS + widget CSS?**
+- **External (`app.tcss`)**: Shared styles, utility classes, live reload capability
+- **Widget (`DEFAULT_CSS`)**: Encapsulation, distribution, component-specific styles
+- **Precedence**: app.tcss < DEFAULT_CSS < inline styles
+
+**Why custom themes vs Textual defaults?**
+- Brand identity and visual cohesion
+- Semantic color palette for domain entities
+- Light/dark mode support with custom colors
+- Fine-grained control via `variables` dict
+
+**Why this color palette?**
+- **Blue primary**: Conveys trust, stability, professionalism
+- **Amber accent**: Warm, attention-getting, distinct from primary
+- **Semantic colors**: Standard meanings (green=success, red=error, orange=warning)
+- **Accessibility**: Sufficient contrast in both light and dark modes
 
 ---
 

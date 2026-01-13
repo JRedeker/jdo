@@ -1,11 +1,10 @@
 [project]
 name = "jdo"
 version = "0.1.0"
-description = "A terminal application built with Textual"
+description = "A conversational CLI for commitment tracking"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "textual>=0.89.1",
     "rich>=13.9.4",
     "pydantic>=2.10.3",
     "sqlmodel>=0.0.24",
@@ -19,6 +18,7 @@ dependencies = [
     "sentry-sdk>=2.0.0",
     "alembic>=1.13.0",
     "tenacity>=8.2.0",
+    "prompt_toolkit>=3.0.50",
 ]
 
 [project.scripts]
@@ -36,7 +36,6 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=4.0.0",
-    "pytest-textual-snapshot>=1.0.0",
     "pytest-httpx>=0.30.0",
     "ruff>=0.8.0",
     "lizard>=1.17.0",
@@ -105,24 +104,11 @@ ignore = [
     "EM101",   # String literals in OAuth exceptions
     "EM102",   # f-strings in OAuth exceptions
 ]
-"src/jdo/auth/screens.py" = [
-    "RUF012",  # BINDINGS - Textual requires this exact pattern
-    "FBT003",  # dismiss(True/False) - Textual API
-]
+
 "src/jdo/auth/store.py" = [
     "BLE001",  # Catching Exception for JSON parse failures is intentional
 ]
-"src/jdo/widgets/**/*.py" = [
-    "A002",    # 'id' parameter - Textual widget convention, cannot change
-    "RUF012",  # BINDINGS/DEFAULT_CSS - Textual patterns
-    "FBT001",  # Boolean params in widget methods (set_thinking, etc.) - clear API
-]
-"src/jdo/screens/**/*.py" = [
-    "A002",    # 'id' parameter - Textual widget convention, cannot change
-    "RUF012",  # BINDINGS/DEFAULT_CSS - Textual patterns
-    "FBT001",  # push_screen callbacks require positional bool - Textual API
-    "BLE001",  # Catch Exception for database errors in _check_triage_count
-]
+
 "src/jdo/db/task_history_service.py" = [
     "PLR0913", # log_event needs 8 args for complete event context (task, commitment, status, etc.)
 ]
@@ -149,10 +135,7 @@ ignore = [
     "C901",    # _calculate_streak_weeks complexity justified for clarity of logic
     "PLR0912", # _calculate_streak_weeks branches needed for complete streak tracking
 ]
-"src/jdo/app.py" = [
-    "C901",    # _navigate_to_view dispatcher complexity (11) justified - maps all navigation items
-    "BLE001",  # Catch Exception for navigation errors - provides graceful fallback
-]
+
 "src/jdo/db/navigation.py" = [
     "TRY300",  # Return in try block is clearer than else for early-return pattern
     "BLE001",  # Catch Exception for database errors - provides graceful fallback with empty lists
@@ -212,12 +195,6 @@ bad-argument-type = false
 missing-attribute = false
 
 [[tool.pyrefly.sub-config]]
-# Rich Text.append() with VisualType - pyrefly has incorrect type narrowing for Rich
-matches = "src/jdo/widgets/chat_message.py"
-[tool.pyrefly.sub-config.errors]
-bad-argument-type = false
-
-[[tool.pyrefly.sub-config]]
 # len() on Optional value that's already been checked - pyrefly doesn't narrow correctly
 matches = "src/jdo/commands/handlers.py"
 [tool.pyrefly.sub-config.errors]
@@ -244,6 +221,18 @@ matches = "src/jdo/db/persistence.py"
 missing-attribute = false
 unsupported-operation = false
 
+[[tool.pyrefly.sub-config]]
+# SQLModel relationships (stakeholder, goal) - pyrefly doesn't understand SQLModel relationship attributes
+matches = "src/jdo/output/formatters.py"
+[tool.pyrefly.sub-config.errors]
+missing-attribute = false
+
+[[tool.pyrefly.sub-config]]
+# SQLAlchemy column .in_() method - pyrefly doesn't understand SQLModel column descriptors
+matches = "src/jdo/repl/loop.py"
+[tool.pyrefly.sub-config.errors]
+missing-attribute = false
+
 # ------------------------------------------------------------------------------
 # Pytest
 # ------------------------------------------------------------------------------
@@ -259,7 +248,7 @@ addopts = [
 markers = [
     "unit: Unit tests (fast, no external dependencies)",
     "integration: Integration tests (database, file system)",
-    "tui: TUI tests (Textual Pilot-based)",
+    "repl: REPL tests (prompt_toolkit based)",
 ]
 
 # ------------------------------------------------------------------------------

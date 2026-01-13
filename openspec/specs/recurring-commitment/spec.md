@@ -1,7 +1,7 @@
 # recurring-commitment Specification
 
 ## Purpose
-TBD - created by archiving change add-recurring-commitments. Update Purpose after archive.
+Define recurring commitments that automatically generate commitment instances on a schedule.
 ## Requirements
 ### Requirement: RecurringCommitment Model
 
@@ -223,39 +223,39 @@ The system SHALL calculate the next due date based on recurrence pattern.
 
 ### Requirement: Recurring Commitment Management Commands
 
-The system SHALL provide commands for managing recurring commitments in the conversational TUI. Recurring commitments use their own `/recurring` namespace (not `/show recurring`) because they are templates that generate commitments, not commitments themselves.
+The system SHALL provide commands for managing recurring commitments via conversation or slash commands.
 
 #### Scenario: List recurring commitments
-- **WHEN** user types `/recurring`
-- **THEN** data panel shows list of all recurring commitment templates with pattern summary and status
+- **WHEN** user asks about recurring commitments or types `/list recurring`
+- **THEN** system shows list of all recurring commitment templates with pattern summary and status
 
 #### Scenario: Create recurring commitment
-- **WHEN** user types `/recurring new` and describes a recurring commitment
+- **WHEN** user describes a recurring commitment (e.g., "I need to submit a weekly report every Friday")
 - **THEN** AI guides creation of RecurringCommitment with pattern selection
 
 #### Scenario: Edit recurring commitment pattern
-- **WHEN** user types `/recurring edit <id>`
+- **WHEN** user asks to edit a recurring commitment
 - **THEN** user can modify recurrence pattern, end conditions, and task templates
 
 #### Scenario: Pause recurring commitment
-- **WHEN** user types `/recurring pause <id>`
+- **WHEN** user asks to pause a recurring commitment
 - **THEN** RecurringCommitment.is_active is set to false
 
 #### Scenario: Resume recurring commitment
-- **WHEN** user types `/recurring resume <id>`
+- **WHEN** user asks to resume a recurring commitment
 - **THEN** RecurringCommitment.is_active is set to true
 
 #### Scenario: Delete recurring commitment
-- **WHEN** user types `/recurring delete <id>` and confirms
+- **WHEN** user asks to delete a recurring commitment and confirms
 - **THEN** RecurringCommitment is deleted, existing instances remain
 
 ### Requirement: Recurring Commitment Display
 
-The system SHALL display recurring commitment information clearly in the TUI.
+The system SHALL display recurring commitment information clearly.
 
 #### Scenario: Show recurring indicator on instances
 - **WHEN** displaying a Commitment that has a recurring_commitment_id
-- **THEN** a recurring indicator (↻) is shown with pattern summary
+- **THEN** a recurring indicator is shown with pattern summary
 
 #### Scenario: Show next due date in recurring list
 - **WHEN** displaying a RecurringCommitment in the list

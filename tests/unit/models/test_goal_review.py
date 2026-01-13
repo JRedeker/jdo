@@ -270,9 +270,9 @@ class TestGetGoalsDueForReview:
 
             with (
                 get_session() as session,
-                patch("jdo.db.session.datetime") as mock_dt,
+                patch("jdo.db.session.today_date") as mock_today,
             ):
-                mock_dt.now.return_value = datetime(2025, 12, 16, 10, 0, 0, tzinfo=UTC)
+                mock_today.return_value = date(2025, 12, 16)
 
                 due_goals = get_goals_due_for_review(session)
 
@@ -312,9 +312,9 @@ class TestGetGoalsDueForReview:
 
             with (
                 get_session() as session,
-                patch("jdo.db.session.datetime") as mock_dt,
+                patch("jdo.db.session.today_date") as mock_today,
             ):
-                mock_dt.now.return_value = datetime(2025, 12, 16, 10, 0, 0, tzinfo=UTC)
+                mock_today.return_value = date(2025, 12, 16)
 
                 due_goals = get_goals_due_for_review(session)
 

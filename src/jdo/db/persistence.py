@@ -6,7 +6,7 @@ Handlers return draft_data dicts, and this service converts them to database ent
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date, time, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -30,6 +30,7 @@ from jdo.models.recurring_commitment import RecurrenceType
 from jdo.models.task import ActualHoursCategory, TaskStatus
 from jdo.recurrence.calculator import get_next_due_date
 from jdo.recurrence.generator import generate_instance
+from jdo.utils.datetime import DEFAULT_DUE_TIME, today_date, utc_now
 
 
 class PersistenceError(JDOError):
@@ -139,7 +140,7 @@ class PersistenceService:
             deliverable=draft_data["deliverable"],
             stakeholder_id=stakeholder.id,
             due_date=due_date,
-            due_time=due_time if due_time else time(9, 0),  # Default 9am
+            due_time=due_time if due_time else DEFAULT_DUE_TIME,
             goal_id=self._parse_uuid(draft_data.get("goal_id")),
             milestone_id=self._parse_uuid(draft_data.get("milestone_id")),
         )
@@ -406,7 +407,7 @@ class PersistenceService:
         # This also validates the recurrence pattern end-to-end.
         # Use a reference date of "yesterday" so the first instance can be today
         # (matches the logic used by recurring instance generation elsewhere).
-        today = datetime.now(UTC).date()
+        today = today_date()
         reference_date = recurring.last_generated_date or (today - timedelta(days=1))
         due_date = get_next_due_date(recurring, after_date=reference_date)
         if due_date is None:
@@ -439,7 +440,7 @@ class PersistenceService:
         Returns:
             Tuple of (created_count, completed_count) for the time window.
         """
-        cutoff = datetime.now(UTC) - timedelta(days=days)
+        cutoff = utc_now() - timedelta(days=days)
 
         # Count created commitments
         created_statement = (

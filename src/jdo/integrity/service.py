@@ -18,6 +18,7 @@ from jdo.models.integrity_metrics import (
 from jdo.models.stakeholder import Stakeholder
 from jdo.models.task import Task, TaskStatus
 from jdo.models.task_history import TaskEventType, TaskHistoryEntry
+from jdo.utils.datetime import today_date, utc_now
 
 # Constants for risk detection
 HOURS_24 = 24
@@ -178,8 +179,8 @@ class IntegrityService:
 
         # Update commitment status
         commitment.status = CommitmentStatus.AT_RISK
-        commitment.marked_at_risk_at = datetime.now(UTC)
-        commitment.updated_at = datetime.now(UTC)
+        commitment.marked_at_risk_at = utc_now()
+        commitment.updated_at = utc_now()
         session.add(commitment)
 
         # Get or create cleanup plan
@@ -274,7 +275,7 @@ class IntegrityService:
 
         # Update commitment status
         commitment.status = CommitmentStatus.IN_PROGRESS
-        commitment.updated_at = datetime.now(UTC)
+        commitment.updated_at = utc_now()
         session.add(commitment)
 
         # Get cleanup plan and cancel it
@@ -287,7 +288,7 @@ class IntegrityService:
 
         if cleanup_plan:
             cleanup_plan.status = CleanupPlanStatus.CANCELLED
-            cleanup_plan.updated_at = datetime.now(UTC)
+            cleanup_plan.updated_at = utc_now()
             session.add(cleanup_plan)
 
             # Handle notification task
@@ -300,7 +301,7 @@ class IntegrityService:
                         notification_task.scope = (
                             notification_task.scope or ""
                         ) + "\n\n[Skipped: Situation resolved]"
-                        notification_task.updated_at = datetime.now(UTC)
+                        notification_task.updated_at = utc_now()
                         session.add(notification_task)
                     else:
                         # User still needs to decide about notification
@@ -438,8 +439,8 @@ Mark this task complete after you've sent the notification."""
         Returns:
             RiskSummary with categorized at-risk commitments
         """
-        today = datetime.now(UTC).date()
-        now = datetime.now(UTC)
+        today = today_date()
+        now = utc_now()
         in_24_hours = today + timedelta(days=1)  # Tomorrow
         in_48_hours = today + timedelta(days=2)  # Day after tomorrow
         hours_24_ago = now - timedelta(hours=HOURS_24)
@@ -636,7 +637,7 @@ Mark this task complete after you've sent the notification."""
         Returns:
             Tuple of (accuracy score 0.0-1.0, count of tasks with estimates)
         """
-        now = datetime.now(UTC)
+        now = utc_now()
         cutoff = now - timedelta(days=ACCURACY_MAX_AGE_DAYS)
 
         # Get completed task history entries with both estimate and actual
@@ -702,7 +703,7 @@ Mark this task complete after you've sent the notification."""
         current = self.calculate_integrity_metrics(session)
 
         # Calculate previous period metrics for comparison
-        now = datetime.now(UTC)
+        now = utc_now()
         cutoff = now - timedelta(days=TREND_PERIOD_DAYS)
         prev_cutoff = cutoff - timedelta(days=TREND_PERIOD_DAYS)
 
@@ -903,7 +904,7 @@ Mark this task complete after you've sent the notification."""
         Returns:
             List of AffectingCommitment with reason for each
         """
-        now = datetime.now(UTC)
+        now = utc_now()
         cutoff = now - timedelta(days=AFFECTING_SCORE_DAYS)
 
         # Get late completions

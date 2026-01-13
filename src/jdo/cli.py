@@ -1,6 +1,6 @@
 """CLI entry point with subcommands for JDO.
 
-Provides both interactive TUI (default) and fire-and-forget CLI commands
+Provides both interactive REPL (default) and fire-and-forget CLI commands
 like `jdo capture "text"` for quick capture from scripts and shortcuts.
 """
 
@@ -23,14 +23,14 @@ from jdo.models.draft import Draft, EntityType
 def cli(ctx: click.Context) -> None:
     """JDO - Just Do One thing at a time.
 
-    Run without arguments to launch the interactive TUI.
+    Run without arguments to launch the interactive REPL.
     Use subcommands for fire-and-forget operations.
     """
     if ctx.invoked_subcommand is None:
-        # No subcommand provided, launch the TUI
-        from jdo.app import main
+        # No subcommand provided, launch the REPL
+        from jdo.repl import run_repl
 
-        main()
+        run_repl()
 
 
 @cli.command()

@@ -1,0 +1,245 @@
+# ai-conversation Specification
+
+## Requirements
+
+### Requirement: Intent-Based Interaction
+
+The system SHALL use AI to parse user intent from natural language rather than requiring explicit commands.
+
+#### Scenario: Create commitment from natural language
+- **GIVEN** the REPL is running and awaiting input
+- **WHEN** user says "I need to send the report to Sarah by Friday"
+- **THEN** AI extracts: deliverable="send the report", stakeholder="Sarah", due_date=Friday
+- **AND** AI proposes the commitment for confirmation
+
+#### Scenario: Create goal from natural language
+- **GIVEN** the REPL is running and awaiting input
+- **WHEN** user says "I want to get better at public speaking"
+- **THEN** AI extracts goal details from context
+- **AND** AI may ask clarifying questions if needed
+- **AND** AI proposes the goal for confirmation
+
+#### Scenario: Query from natural language
+- **GIVEN** the REPL is running and awaiting input
+- **WHEN** user says "what commitments do I have?" or "show my stuff"
+- **THEN** AI shows relevant list(s)
+- **AND** no specific command syntax required
+
+#### Scenario: Ambiguous intent prompts clarification
+- **GIVEN** the REPL is running and awaiting input
+- **WHEN** user says something unclear like "add that thing"
+- **THEN** AI asks for clarification
+- **AND** does not make assumptions about user intent
+
+### Requirement: Conversational Confirmation Flow
+
+The system SHALL use natural conversation for confirmations rather than modal dialogs.
+
+#### Scenario: AI proposes action and awaits confirmation
+- **GIVEN** user has expressed intent to create/modify/delete an entity
+- **WHEN** AI determines user wants to create/modify/delete an entity
+- **THEN** AI displays the proposed action with details
+- **AND** AI asks for confirmation (e.g., "Does this look right?")
+
+#### Scenario: User confirms with affirmative
+- **GIVEN** AI has proposed an action and is awaiting confirmation
+- **WHEN** user responds with "yes", "y", "correct", "do it", etc.
+- **THEN** AI executes the proposed action
+- **AND** AI confirms completion
+
+#### Scenario: User refines before confirming
+- **GIVEN** AI has proposed an action and is awaiting confirmation
+- **WHEN** user responds with a modification (e.g., "change the date to Monday")
+- **THEN** AI updates the proposal
+- **AND** AI shows updated proposal and asks for confirmation again
+
+#### Scenario: User cancels with negative
+- **GIVEN** AI has proposed an action and is awaiting confirmation
+- **WHEN** user responds with "no", "n", "cancel", "never mind", etc.
+- **THEN** AI cancels the pending action
+- **AND** AI acknowledges cancellation
+- **AND** conversation continues normally
+
+#### Scenario: User provides unrelated input during confirmation
+- **GIVEN** AI has proposed an action and is awaiting confirmation
+- **WHEN** user asks something unrelated while confirmation is pending
+- **THEN** AI answers the unrelated question
+- **AND** confirmation state may be cleared or preserved based on context
+
+### Requirement: Contextual Data Display
+
+The system SHALL show relevant data at appropriate times without explicit requests.
+
+#### Scenario: Show created entity after creation
+- **GIVEN** AI has proposed an entity and user has confirmed
+- **WHEN** user confirms entity creation
+- **THEN** AI displays the created entity details
+- **AND** AI may show related context (e.g., "You now have 5 active commitments")
+
+#### Scenario: Show list when contextually relevant
+- **GIVEN** the REPL is running
+- **WHEN** user mentions viewing or checking on entities
+- **THEN** AI shows the relevant list
+- **AND** format is appropriate for the data type
+
+#### Scenario: Show integrity impact
+- **GIVEN** user has completed or abandoned a commitment
+- **WHEN** user completes or abandons a commitment
+- **THEN** AI may mention integrity score impact
+- **AND** guidance is provided if score is declining
+
+### Requirement: Conversation History Context
+
+The system SHALL provide conversation history to AI for contextual understanding.
+
+#### Scenario: AI references earlier conversation
+- **GIVEN** user and AI have been discussing an entity
+- **WHEN** user says "actually, make that for Monday instead"
+- **THEN** AI understands what "that" refers to from context
+- **AND** updates accordingly
+
+#### Scenario: History pruning for long conversations
+- **GIVEN** a conversation has been ongoing
+- **WHEN** conversation history exceeds token budget (e.g., 8000 tokens)
+- **THEN** oldest messages are pruned
+- **AND** most recent context is preserved
+- **AND** AI behavior remains coherent
+
+> **Supersedes tui-chat**: The deployed `tui-chat` spec uses a 50-message limit.
+> This change updates to token-based limits (8000 tokens) per research findings.
+> Token-based pruning is more accurate for context window management.
+
+#### Scenario: Entity context persists in conversation
+- **GIVEN** user has created or viewed an entity in the current session
+- **WHEN** user creates or views an entity
+- **THEN** subsequent references like "edit it" or "delete this" resolve correctly
+
+### Requirement: Error Communication
+
+The system SHALL communicate errors in a user-friendly, conversational manner.
+
+#### Scenario: Validation error
+- **GIVEN** user has provided input for entity creation
+- **WHEN** user input would create invalid entity (e.g., past due date)
+- **THEN** AI explains the issue in natural language
+- **AND** AI suggests how to fix it
+
+#### Scenario: Database error
+- **GIVEN** user has confirmed an action requiring database operation
+- **WHEN** a database operation fails
+- **THEN** AI explains something went wrong
+- **AND** AI suggests retrying or provides guidance
+
+#### Scenario: AI provider error
+- **GIVEN** user has sent a message to AI
+- **WHEN** AI provider returns an error
+- **THEN** user sees a friendly message (not technical error)
+- **AND** specific guidance is provided (rate limit → wait, auth → check key)
+
+#### Scenario: AI timeout error
+- **GIVEN** user has sent a message to AI
+- **WHEN** AI response times out (no response within 120 seconds)
+- **THEN** user sees message: "The AI took too long to respond. Please try again."
+- **AND** REPL returns to prompt for retry
+
+#### Scenario: Network connection error
+- **GIVEN** user has sent a message to AI
+- **WHEN** network connection to AI provider fails
+- **THEN** user sees message: "Couldn't reach the AI service. Check your internet connection."
+- **AND** REPL returns to prompt
+
+### Requirement: Proactive Guidance
+
+The system SHALL provide helpful guidance at appropriate moments.
+
+#### Scenario: First-run guidance
+- **GIVEN** the database has no entities
+- **WHEN** user starts JDO with no data
+- **THEN** AI provides brief intro: "I'm JDO, your commitment assistant. Tell me what you need to do and I'll help you track it."
+
+#### Scenario: At-risk commitment notification
+- **GIVEN** user has overdue or soon-due commitments in the database
+- **WHEN** user has overdue or soon-due commitments
+- **THEN** AI may mention them at session start
+- **AND** offers to help address them
+
+#### Scenario: Triage reminder
+- **GIVEN** user starts a new REPL session
+- **WHEN** user has items in triage queue
+- **THEN** AI may mention them
+- **AND** offers to process them
+
+#### Scenario: Session returning user
+- **GIVEN** user has used JDO before
+- **WHEN** user starts a new REPL session
+- **THEN** AI may provide a brief status summary (e.g., "You have 3 active commitments, 1 due tomorrow")
+- **AND** AI asks how it can help
+
+## Requirements (Modified)
+
+### Requirement: AI Message Handling
+
+The system SHALL invoke the AI agent for natural language input in the REPL (slash commands bypass AI).
+
+#### Scenario: User sends natural language in REPL
+- **GIVEN** the REPL is running and awaiting input
+- **WHEN** user submits text not starting with `/`
+- **THEN** the message is sent to the AI agent
+- **AND** AI response streams to the console
+
+#### Scenario: AI response completes
+- **GIVEN** AI is processing a user request
+- **WHEN** AI agent finishes responding
+- **THEN** the complete response is displayed
+- **AND** the prompt reappears for next input
+
+#### Scenario: AI uses tools to fulfill requests
+- **GIVEN** AI is processing a user request
+- **WHEN** AI determines a tool call is needed
+- **THEN** the tool is invoked
+- **AND** tool results are incorporated into AI response
+
+### Requirement: Hybrid Input Handling
+
+The system SHALL support both natural language and slash commands as input methods.
+
+<!-- Research Note: Industry pattern (Aider, GitHub Copilot) uses hybrid approaches.
+     OWASP LLM08 "Excessive Agency" recommends deterministic escape hatches.
+     Power users prefer instant slash commands for frequent operations.
+     Source: aider.chat/docs/usage/commands, OWASP Top 10 for LLMs 2025 -->
+
+#### Scenario: Natural language input (primary)
+- **GIVEN** the REPL is running and awaiting input
+- **WHEN** user enters text not starting with `/`
+- **THEN** input is sent to AI agent for intent parsing
+- **AND** AI determines appropriate tool call
+
+#### Scenario: Slash command input (escape hatch)
+- **GIVEN** the REPL is running and awaiting input
+- **WHEN** user enters text starting with `/`
+- **THEN** input is parsed as a slash command
+- **AND** corresponding handler is invoked directly (no AI)
+- **AND** response is instant (no AI latency)
+
+#### Scenario: Both paths use same handlers
+- **GIVEN** the system has handlers for entity operations
+- **WHEN** either natural language or slash command triggers an action
+- **THEN** the same underlying handler is invoked
+- **AND** the same validation and business logic applies
+
+#### Supported Slash Commands
+- `/commit [text]` - Create commitment with optional description
+- `/list [type]` - List entities (commitments, goals, tasks)
+- `/complete [id]` - Mark entity complete
+- `/help` - Show available commands
+
+## Requirements (Retained)
+
+### Requirement: Slash Command Parsing
+**Original reason for removal**: All interaction was to be via natural language.
+**Research finding**: Hybrid approach is industry best practice; deterministic fallback reduces risk.
+**New status**: RETAINED with reduced scope. Basic CRUD commands available as power-user shortcuts.
+
+### Requirement: Command Type Enumeration
+**Status**: Reduced in scope but not removed.
+**Rationale**: Limited set of common commands; AI handles complex/ambiguous requests.

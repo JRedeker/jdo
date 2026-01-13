@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from loguru import logger
@@ -21,6 +21,7 @@ from jdo.models.task import Task
 from jdo.models.vision import VisionStatus
 from jdo.recurrence.calculator import get_next_due_date
 from jdo.recurrence.generator import generate_instance, should_generate_instance
+from jdo.utils.datetime import today_date, utc_now
 
 
 @contextmanager
@@ -60,7 +61,7 @@ def get_visions_due_for_review(session: Session) -> list[Vision]:
     Returns:
         List of visions due for review.
     """
-    today = datetime.now(UTC).date()
+    today = today_date()
     statement = select(Vision).where(
         Vision.status == VisionStatus.ACTIVE,
         Vision.next_review_date <= today,
@@ -81,7 +82,7 @@ def get_overdue_milestones(session: Session) -> list[Milestone]:
     Returns:
         List of overdue milestones.
     """
-    today = datetime.now(UTC).date()
+    today = today_date()
     statement = select(Milestone).where(
         Milestone.status.in_([MilestoneStatus.PENDING, MilestoneStatus.IN_PROGRESS]),
         Milestone.target_date < today,
@@ -148,7 +149,7 @@ def get_goals_due_for_review(session: Session) -> list[Goal]:
     Returns:
         List of goals due for review.
     """
-    today = datetime.now(UTC).date()
+    today = today_date()
     statement = select(Goal).where(
         Goal.status == GoalStatus.ACTIVE,
         Goal.next_review_date <= today,
@@ -189,7 +190,7 @@ def check_and_generate_recurring_instances(
         List of (Commitment, list[Task]) tuples for generated instances.
     """
     if current_date is None:
-        current_date = datetime.now(UTC)
+        current_date = utc_now()
 
     today = current_date.date()
     generated: list[tuple[Commitment, list[Task]]] = []
@@ -247,7 +248,7 @@ def generate_next_instance_for_recurring(
         Tuple of (Commitment, list[Task]) if generated, None otherwise.
     """
     if current_date is None:
-        current_date = datetime.now(UTC)
+        current_date = utc_now()
 
     today = current_date.date()
 

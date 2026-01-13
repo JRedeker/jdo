@@ -17,12 +17,10 @@ from jdo.auth.registry import (
     get_provider_info,
     list_providers,
 )
-from jdo.auth.screens import ApiKeyScreen
 from jdo.auth.store import AuthStore
 
 __all__ = [
     "ApiKeyCredentials",
-    "ApiKeyScreen",
     "AuthMethod",
     "AuthStore",
     "ProviderAuth",

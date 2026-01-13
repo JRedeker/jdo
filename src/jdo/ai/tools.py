@@ -6,8 +6,9 @@ to help users manage their commitments, goals, milestones, and visions.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
+
+from jdo.utils.datetime import today_date
 
 if TYPE_CHECKING:
     pass
@@ -32,6 +33,12 @@ from jdo.models import (
 )
 from jdo.models.integrity_metrics import IntegrityMetrics
 from jdo.models.task_history import TaskEventType, TaskHistoryEntry
+from jdo.output.formatters import (
+    format_commitment_list_plain,
+    format_milestones_plain,
+    format_overdue_commitments_plain,
+    format_visions_plain,
+)
 
 # Coaching threshold constants
 COACHING_ON_TIME_THRESHOLD = 0.8
@@ -83,7 +90,7 @@ def get_overdue_commitments(session: Session) -> list[dict[str, Any]]:
     Returns:
         List of overdue commitment dicts.
     """
-    today = datetime.now(UTC).date()
+    today = today_date()
     commitments = session.exec(
         select(Commitment, Stakeholder)
         .join(Stakeholder, Commitment.stakeholder_id == Stakeholder.id)
@@ -173,7 +180,7 @@ def get_visions_due_for_review(session: Session) -> list[dict[str, Any]]:
     Returns:
         List of vision dicts due for review.
     """
-    today = datetime.now(UTC).date()
+    today = today_date()
     visions = session.exec(
         select(Vision)
         .where(
@@ -206,9 +213,7 @@ def _register_commitment_tools(agent: Agent[JDODependencies, str]) -> None:
         Returns a list of current commitments with deliverable, stakeholder, due date, and status.
         """
         result = get_current_commitments(ctx.deps.session)
-        if not result:
-            return "No pending or in-progress commitments found."
-        return str(result)
+        return format_commitment_list_plain(result)
 
     @agent.tool
     def query_overdue_commitments(ctx: RunContext[JDODependencies]) -> str:
@@ -217,9 +222,7 @@ def _register_commitment_tools(agent: Agent[JDODependencies, str]) -> None:
         Returns a list of overdue commitments with days overdue.
         """
         result = get_overdue_commitments(ctx.deps.session)
-        if not result:
-            return "No overdue commitments found."
-        return str(result)
+        return format_overdue_commitments_plain(result)
 
     @agent.tool
     def query_commitments_for_goal(ctx: RunContext[JDODependencies], goal_id: str) -> str:
@@ -235,7 +238,7 @@ def _register_commitment_tools(agent: Agent[JDODependencies, str]) -> None:
         result = get_commitments_for_goal(ctx.deps.session, goal_id)
         if not result:
             return f"No commitments found for goal {goal_id}."
-        return str(result)
+        return format_commitment_list_plain(result)
 
 
 def _register_milestone_vision_tools(agent: Agent[JDODependencies, str]) -> None:
@@ -255,7 +258,7 @@ def _register_milestone_vision_tools(agent: Agent[JDODependencies, str]) -> None
         result = get_milestones_for_goal(ctx.deps.session, goal_id)
         if not result:
             return f"No milestones found for goal {goal_id}."
-        return str(result)
+        return format_milestones_plain(result)
 
     @agent.tool
     def query_visions_due_for_review(ctx: RunContext[JDODependencies]) -> str:
@@ -264,9 +267,7 @@ def _register_milestone_vision_tools(agent: Agent[JDODependencies, str]) -> None
         Returns visions where next_review_date is today or in the past.
         """
         result = get_visions_due_for_review(ctx.deps.session)
-        if not result:
-            return "No visions are due for review."
-        return str(result)
+        return format_visions_plain(result)
 
 
 def _get_recent_task_history(session: Session, limit: int = 20) -> list[TaskHistoryEntry]:

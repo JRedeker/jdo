@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import Enum
 from uuid import UUID, uuid4
 
 from sqlmodel import Field, SQLModel
+
+from jdo.utils.datetime import utc_now
 
 
 class StakeholderType(str, Enum):
@@ -16,11 +18,6 @@ class StakeholderType(str, Enum):
     TEAM = "team"
     ORGANIZATION = "organization"
     SELF = "self"
-
-
-def utc_now() -> datetime:
-    """Get current UTC datetime."""
-    return datetime.now(UTC)
 
 
 class Stakeholder(SQLModel, table=True):

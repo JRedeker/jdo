@@ -31,7 +31,7 @@ uv run pytest                      # Tests (must pass)
 ### Type annotations required
 - All function parameters and returns must have type hints
 - Use `ClassVar` for mutable class attributes
-- Use `Iterator[Widget]` not bare generators for Textual compose methods
+
 - All source files must start with `from __future__ import annotations` (after docstring)
 - Use `TYPE_CHECKING` blocks only for imports that would cause circular dependencies
 
@@ -58,32 +58,12 @@ raise ValueError(msg)
 | Quotes | Double quotes |
 | Docstrings | Google convention |
 
-## Textual Widget Conventions
-
-```python
-from typing import ClassVar
-from collections.abc import Iterator
-from textual.binding import Binding
-from textual.widget import Widget
-
-class MyWidget(Widget):
-    # ClassVar required for mutable class attributes
-    BINDINGS: ClassVar[list[Binding]] = [
-        Binding("enter", "submit", "Submit"),
-    ]
-    
-    # Proper return type for compose
-    def compose(self) -> Iterator[Widget]:
-        yield SomeChild()
-```
-
 ## Known Tool Limitations
 
 ### Pyrefly false positives (safe to ignore at runtime)
 - SQLModel/SQLAlchemy column comparisons (`Commitment.status.in_([...])`)
 - SQLModel/SQLAlchemy `.order_by()` with datetime columns (`Entry.created_at`)
 - Rich `Text.append()` with certain argument types
-- Textual reactive attributes
 
 When pyrefly reports errors on working code, verify at runtime then document here.
 
@@ -141,7 +121,8 @@ jdo db downgrade
 
 | Tech | ID | Topics |
 |------|----|----- ---|
-| Textual | `/textualize/textual` | widgets, screens, bindings |
+| Rich | `/textualize/rich` | tables, panels, live display |
+| prompt_toolkit | `/prompt-toolkit/python-prompt-toolkit` | REPL, history |
 | Pydantic | `/websites/pydantic_dev` | models, validators |
 | PydanticAI | `/pydantic/pydantic-ai` | agents, tools |
 | pytest | `/pytest-dev/pytest` | fixtures, markers |
@@ -158,144 +139,64 @@ jdo db downgrade
 
 ```
 src/jdo/
-├── ai/           # AI agent, tools
-├── auth/         # API key authentication, screens
-├── commands/     # Command parser
+├── ai/           # AI agent, tools, extraction
+├── auth/         # API key authentication
+├── commands/     # Command parser and handlers
 ├── config/       # Settings, paths
 ├── db/           # Engine, session, migrations
 ├── models/       # SQLModel entities
-├── screens/      # Textual screens (HomeScreen, ChatScreen, etc.)
-├── widgets/      # Textual widgets (NavSidebar, DataPanel, etc.)
-└── app.py        # Main application
+├── output/       # Rich formatters for CLI output
+├── repl/         # REPL loop and session management
+└── cli.py        # CLI entry point
 
 tests/
 ├── unit/         # Fast isolated tests
 ├── integration/  # Database tests
-├── tui/          # Textual Pilot tests
-└── uat/          # AI-driven UAT tests
+├── repl/         # REPL loop tests
+└── output/       # Output formatter tests
 ```
 
-## Navigation Architecture
+## REPL Architecture
 
-The app uses a **NavSidebar** widget for navigation:
+The app uses a conversational REPL with hybrid input handling:
 
 | Component | Purpose |
 |-----------|---------|
-| `NavSidebar` | Persistent left sidebar with navigation items |
-| `HomeScreen` | Landing screen (being superseded by sidebar) |
-| `ChatScreen` | Main chat interface with AI |
-| `SettingsScreen` | Configuration and API key management |
+| `repl/loop.py` | Main REPL loop with prompt_toolkit |
+| `repl/session.py` | Session state (history, context, drafts) |
+| `output/formatters.py` | Rich formatters for entities |
 
-### Key Navigation Bindings
+### Key Commands
 
-| Key | Action |
-|-----|--------|
-| `[` | Toggle sidebar collapse |
-| `1-9` | Quick-nav to sidebar items |
-| `Tab` | Cycle focus between widgets |
-| `Escape` | Context-aware back/cancel |
-| `q` | Quit application |
+| Command | Action |
+|---------|--------|
+| `/help` | Show available commands |
+| `/list` | List commitments (default) |
+| `/list goals` | List all goals |
+| `/commit "..."` | Create a new commitment |
+| `exit` or `quit` | Exit the REPL |
 
-### Adding Navigation Items
+### Adding Slash Commands
 
-Edit `src/jdo/widgets/nav_sidebar.py`:
-
-```python
-NAV_ITEMS: list[NavItem | None] = [
-    NavItem(id="chat", label="Chat", shortcut="n"),
-    None,  # Separator
-    NavItem(id="goals", label="Goals", shortcut="g"),
-    # Add new items here...
-]
-```
-
-Handle selections in `src/jdo/app.py`:
+Edit `src/jdo/repl/loop.py` in `handle_slash_command()`:
 
 ```python
-def on_nav_sidebar_selected(self, message: NavSidebar.Selected) -> None:
-    handlers = {
-        "chat": self._nav_to_chat,
-        "goals": self._nav_to_goals,
-        # Add handlers here...
-    }
-    handler = handlers.get(message.item_id)
-    if handler:
-        handler()
+if command == "mycommand":
+    _handle_mycommand(args, db_session)
+    return True
 ```
 
-## AI-Driven UAT Testing
-
-The `tests/uat/` directory contains AI-driven User Acceptance Testing infrastructure.
-
-### Running UAT Tests
+## Testing
 
 ```bash
-# Run all UAT tests with mock AI (fast, free)
-uv run pytest tests/uat/ -v
+# Run all tests
+uv run pytest
 
-# Run only live AI tests (requires credentials)
-uv run pytest tests/uat/ -v -m live_ai
+# Run REPL tests
+uv run pytest tests/repl/ -v
 
-# Skip live AI tests
-uv run pytest tests/uat/ -v -m "not live_ai"
+# Run output formatter tests
+uv run pytest tests/output/ -v
 ```
 
-### UAT Components
 
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| `models.py` | tests/uat/ | Pydantic models for actions, scenarios, results |
-| `observer.py` | tests/uat/ | Captures UI state for AI consumption |
-| `driver.py` | tests/uat/ | Orchestrates AI-driven test execution |
-| `loader.py` | tests/uat/ | Loads scenarios from YAML files |
-| `mocks.py` | tests/uat/ | Mock AI responses for deterministic tests |
-| `scenarios/` | tests/uat/ | YAML scenario definitions |
-
-### Writing New Scenarios
-
-Create a YAML file in `tests/uat/scenarios/`:
-
-```yaml
-name: my_scenario
-description: What this scenario tests
-goal: |
-  Natural language description of what the AI should accomplish.
-  Be specific about the expected end state.
-
-preconditions:
-  - press:n   # Navigate to chat first
-
-success_criteria:
-  - screen:HomeScreen  # Must end on home screen
-  - no_errors          # No step failures
-  - completed          # AI signaled "done"
-
-max_steps: 30
-timeout_seconds: 90
-
-tags:
-  - smoke
-  - my_feature
-```
-
-### Adding Mock Responses
-
-For deterministic CI tests, add a mock in `tests/uat/mocks.py`:
-
-```python
-def create_my_scenario_mock() -> FunctionModel:
-    step = 0
-    def model_fn(messages, info):
-        nonlocal step
-        step += 1
-        actions = [
-            UATAction(action_type=ActionType.PRESS, target="n", reason="..."),
-            UATAction(action_type=ActionType.DONE, reason="..."),
-        ]
-        action = actions[min(step - 1, len(actions) - 1)]
-        return ModelResponse(parts=[TextPart(content=action.model_dump_json())])
-    return FunctionModel(model_fn)
-
-# Add to SCENARIO_MOCKS dict
-SCENARIO_MOCKS["my_scenario"] = create_my_scenario_mock
-```

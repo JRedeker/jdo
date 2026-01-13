@@ -187,12 +187,12 @@ The system SHALL adjust field requirements based on Vision context.
 The system SHALL surface Goals without Vision linkage for user attention.
 
 #### Scenario: List orphan goals
-- **WHEN** user executes `/show orphan-goals`
-- **THEN** the data panel shows all Goals where vision_id is NULL and status is "active"
+- **WHEN** user asks to see orphan goals or types `/list orphan-goals`
+- **THEN** the system shows all Goals where vision_id is NULL and status is "active"
 
 #### Scenario: Orphan goal indicator
 - **WHEN** displaying a goal without vision_id
-- **THEN** an optional indicator can show it's not linked to a vision (configurable)
+- **THEN** an optional indicator can show it's not linked to a vision
 
 #### Scenario: Suggest linking orphan goals
 - **WHEN** user views an orphan goal and active visions exist
@@ -240,27 +240,27 @@ The system SHALL display aggregated commitment progress when viewing a goal.
 
 ### Requirement: Goal Review Commands
 
-The system SHALL provide commands for goal review in the conversational TUI. These commands extend the `/goal` command defined in `tui-chat` capability.
+The system SHALL provide commands for goal review in the conversational CLI.
 
 #### Scenario: List goals due for review
-- **WHEN** user types `/goal review`
+- **WHEN** user asks about goals to review or types `/list goals review`
 - **THEN** the system lists all active goals where next_review_date <= today
 
 #### Scenario: Review specific goal
-- **WHEN** user types `/goal review <id>`
-- **THEN** the system displays the goal review interface for that goal
+- **WHEN** user asks to review a specific goal
+- **THEN** the AI displays the goal details for review
 
-#### Scenario: Review interface shows motivation
-- **WHEN** user enters goal review
+#### Scenario: Review shows motivation
+- **WHEN** user reviews a goal
 - **THEN** the motivation field is prominently displayed to reconnect with purpose
 
-#### Scenario: Review interface shows commitment progress
-- **WHEN** user enters goal review
+#### Scenario: Review shows commitment progress
+- **WHEN** user reviews a goal
 - **THEN** commitment progress summary is displayed
 
 #### Scenario: Review prompts reflection
-- **WHEN** user enters goal review
-- **THEN** the system prompts with reflection questions about alignment and next steps
+- **WHEN** user reviews a goal
+- **THEN** AI prompts with reflection questions about alignment and next steps
 
 ### Requirement: Goal Creation Prompts
 
@@ -299,7 +299,7 @@ The system SHALL offer only fixed review interval options to keep the experience
 The system SHALL display goals with emphasis on vision over completion.
 
 #### Scenario: Display vision prominently
-- **WHEN** viewing a goal in the data panel
+- **WHEN** viewing a goal
 - **THEN** solution_vision and motivation are displayed prominently above status
 
 #### Scenario: Show next review date

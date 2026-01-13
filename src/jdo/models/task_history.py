@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import Enum
 from uuid import UUID, uuid4
 
 from sqlmodel import Field, SQLModel
 
 from jdo.models.task import ActualHoursCategory, TaskStatus
+from jdo.utils.datetime import utc_now
 
 
 class TaskEventType(str, Enum):
@@ -19,11 +20,6 @@ class TaskEventType(str, Enum):
     COMPLETED = "completed"
     SKIPPED = "skipped"
     ABANDONED = "abandoned"
-
-
-def utc_now() -> datetime:
-    """Get current UTC datetime."""
-    return datetime.now(UTC)
 
 
 class TaskHistoryEntry(SQLModel, table=True):

@@ -139,11 +139,11 @@ The system SHALL calculate goal progress based on milestone completion.
 
 #### Scenario: Goal with milestones shows progress
 - **WHEN** user views a Goal that has Milestones
-- **THEN** the data panel shows: "Progress: X of Y milestones completed (Z%)"
+- **THEN** the output shows: "Progress: X of Y milestones completed (Z%)"
 
 #### Scenario: Goal without milestones shows no progress
 - **WHEN** user views a Goal that has no Milestones
-- **THEN** the data panel shows: "No milestones defined" with option to create
+- **THEN** the output shows: "No milestones defined" with option to create
 
 #### Scenario: Progress updates on milestone completion
 - **WHEN** a Milestone is marked completed

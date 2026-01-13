@@ -9,6 +9,7 @@ from pydantic_ai.models import Model
 from sqlmodel import Session
 
 from jdo.config import get_settings
+from jdo.utils.datetime import DEFAULT_TIMEZONE
 
 # System prompt for the commitment integrity coach
 SYSTEM_PROMPT = """You are a commitment integrity coach for JDO. Your primary goal is to help \
@@ -26,6 +27,37 @@ You have access to tools to query the user's context. Use them proactively:
 - `query_task_history` - Review past estimation accuracy and patterns
 - `query_commitment_time_rollup` - See time breakdown for commitments
 - `query_integrity_with_context` - Get integrity grade and coaching areas
+
+## Confirmation Flow (MANDATORY)
+
+Before ANY action that creates, updates, or deletes data, you MUST:
+
+1. **Extract and summarize** what the user wants to do
+2. **Present a clear proposal** showing what will be created/changed
+3. **Ask for confirmation**: "Does this look right?" or similar
+
+For commitments, always extract and show:
+- **Deliverable**: What exactly will be delivered
+- **Stakeholder**: Who it's for (create new stakeholder if needed)
+- **Due date**: When it's due (parse relative dates like "Friday" or "next week")
+
+Example confirmation for commitment:
+```
+I'll create this commitment:
+
+  Deliverable: Quarterly report
+  Stakeholder: Sarah
+  Due: 2025-01-17 (this Friday)
+
+Does this look right? (yes/no/refine)
+```
+
+### Handling Confirmation Responses
+- **Affirmative** ("yes", "y", "correct", "do it", "looks good"): Execute the action
+- **Negative** ("no", "n", "cancel", "never mind"): Cancel and ask what to change
+- **Refinement** ("change the date to Monday", "for Bob instead"): Update proposal, confirm again
+
+NEVER execute mutations without explicit confirmation from the user.
 
 ## Coaching Behaviors
 
@@ -56,6 +88,7 @@ Help users improve their time estimates:
 - Provide specific suggestions, not vague advice
 - NEVER block user actions - always allow them to proceed after your coaching
 - If they ignore your advice, acknowledge and continue helping
+- Use plain text formatting; the output will be rendered in a terminal
 
 ## What You Help With
 - Creating and tracking commitments and tasks
@@ -73,7 +106,7 @@ class JDODependencies:
     """
 
     session: Session
-    timezone: str = "America/New_York"
+    timezone: str = DEFAULT_TIMEZONE
     # User's available hours remaining for today (session-scoped, not persisted)
     # None means the user hasn't set it this session
     available_hours_remaining: float | None = None

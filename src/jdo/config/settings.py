@@ -10,6 +10,7 @@ from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from jdo.paths import get_database_path, get_log_file_path
+from jdo.utils.datetime import DEFAULT_TIMEZONE
 
 # Valid AI providers
 AIProvider = Literal["openai", "openrouter"]
@@ -50,7 +51,7 @@ class JDOSettings(BaseSettings):
     environment: str = "development"
 
     # Application settings
-    timezone: str = "America/New_York"
+    timezone: str = DEFAULT_TIMEZONE
 
     @model_validator(mode="after")
     def set_defaults(self) -> Self:

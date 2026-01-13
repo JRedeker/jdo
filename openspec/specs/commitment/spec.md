@@ -172,7 +172,7 @@ The system SHALL track commitments not linked to goals OR milestones.
 
 #### Scenario: Display orphan status
 - **WHEN** viewing an orphan commitment
-- **THEN** the data panel shows an indicator that it's not linked to goals or milestones
+- **THEN** the output shows an indicator that it's not linked to goals or milestones
 
 ### Requirement: Commitment Deletion with Milestone Link
 

@@ -1280,6 +1280,7 @@ dependencies = [
     { name = "httpx" },
     { name = "loguru" },
     { name = "platformdirs" },
+    { name = "prompt-toolkit" },
     { name = "pydantic" },
     { name = "pydantic-ai" },
     { name = "pydantic-settings" },
@@ -1288,7 +1289,6 @@ dependencies = [
     { name = "sentry-sdk" },
     { name = "sqlmodel" },
     { name = "tenacity" },
-    { name = "textual" },
 ]
 
 [package.dev-dependencies]
@@ -1298,7 +1298,6 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-httpx" },
-    { name = "pytest-textual-snapshot" },
     { name = "ruff" },
 ]
 
@@ -1309,6 +1308,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "loguru", specifier = ">=0.7.0" },
     { name = "platformdirs", specifier = ">=4.0.0" },
+    { name = "prompt-toolkit", specifier = ">=3.0.50" },
     { name = "pydantic", specifier = ">=2.10.3" },
     { name = "pydantic-ai", specifier = ">=0.1.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
@@ -1317,7 +1317,6 @@ requires-dist = [
     { name = "sentry-sdk", specifier = ">=2.0.0" },
     { name = "sqlmodel", specifier = ">=0.0.24" },
     { name = "tenacity", specifier = ">=8.2.0" },
-    { name = "textual", specifier = ">=0.89.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -1327,7 +1326,6 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
     { name = "pytest-cov", specifier = ">=4.0.0" },
     { name = "pytest-httpx", specifier = ">=0.30.0" },
-    { name = "pytest-textual-snapshot", specifier = ">=1.0.0" },
     { name = "ruff", specifier = ">=0.8.0" },
 ]
 
@@ -1338,18 +1336,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7b/6f/357efd7602486741aa73ffc0617fb310a29b588ed0fd69c2399acbb85b0c/jeepney-0.9.0.tar.gz", hash = "sha256:cf0e9e845622b81e4a28df94c40345400256ec608d0e55bb8a3feaa9163f5732", size = 106758, upload-time = "2025-02-27T18:51:01.684Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b2/a3/e137168c9c44d18eff0376253da9f1e9234d0239e0ee230d2fee6cea8e55/jeepney-0.9.0-py3-none-any.whl", hash = "sha256:97e5714520c16fc0a45695e5365a2e11b81ea79bba796e26f9f1d178cb182683", size = 49010, upload-time = "2025-02-27T18:51:00.104Z" },
-]
-
-[[package]]
-name = "jinja2"
-version = "3.1.6"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "markupsafe" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/df/bf/f7da0350254c0ed7c72f3e33cef02e048281fec7ecec5f032d4aac52226b/jinja2-3.1.6.tar.gz", hash = "sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d", size = 245115, upload-time = "2025-03-05T20:05:02.478Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl", hash = "sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67", size = 134899, upload-time = "2025-03-05T20:05:00.369Z" },
 ]
 
 [[package]]
@@ -1507,18 +1493,6 @@ wheels = [
 ]
 
 [[package]]
-name = "linkify-it-py"
-version = "2.0.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "uc-micro-py" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/2a/ae/bb56c6828e4797ba5a4821eec7c43b8bf40f69cda4d4f5f8c8a2810ec96a/linkify-it-py-2.0.3.tar.gz", hash = "sha256:68cda27e162e9215c17d786649d1da0021a451bdc436ef9e0fa0ba5234b9b048", size = 27946, upload-time = "2024-02-04T14:48:04.179Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/04/1e/b832de447dee8b582cac175871d2f6c3d5077cc56d5575cadba1fd1cccfa/linkify_it_py-2.0.3-py3-none-any.whl", hash = "sha256:6bcbc417b0ac14323382aef5c5192c0075bf8a9d6b41820a2b66371eac6b6d79", size = 19820, upload-time = "2024-02-04T14:48:02.496Z" },
-]
-
-[[package]]
 name = "lizard"
 version = "1.19.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1663,11 +1637,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/94/54/e7d793b573f298e1c9013b8c4dade17d481164aa517d1d7148619c2cedbf/markdown_it_py-4.0.0-py3-none-any.whl", hash = "sha256:87327c59b172c5011896038353a81343b6754500a08cd7a4973bb48c6d578147", size = 87321, upload-time = "2025-08-11T12:57:51.923Z" },
 ]
 
-[package.optional-dependencies]
-linkify = [
-    { name = "linkify-it-py" },
-]
-
 [[package]]
 name = "markupsafe"
 version = "3.0.3"
@@ -1765,18 +1734,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d6/2c/db9ae5ab1fcdd9cd2bcc7ca3b7361b712e30590b64d5151a31563af8f82d/mcp-1.24.0.tar.gz", hash = "sha256:aeaad134664ce56f2721d1abf300666a1e8348563f4d3baff361c3b652448efc", size = 604375, upload-time = "2025-12-12T14:19:38.205Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/61/0d/5cf14e177c8ae655a2fd9324a6ef657ca4cafd3fc2201c87716055e29641/mcp-1.24.0-py3-none-any.whl", hash = "sha256:db130e103cc50ddc3dffc928382f33ba3eaef0b711f7a87c05e7ded65b1ca062", size = 232896, upload-time = "2025-12-12T14:19:36.14Z" },
-]
-
-[[package]]
-name = "mdit-py-plugins"
-version = "0.5.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "markdown-it-py" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b2/fd/a756d36c0bfba5f6e39a1cdbdbfdd448dc02692467d83816dff4592a1ebc/mdit_py_plugins-0.5.0.tar.gz", hash = "sha256:f4918cb50119f50446560513a8e311d574ff6aaed72606ddae6d35716fe809c6", size = 44655, upload-time = "2025-08-11T07:25:49.083Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/fb/86/dd6e5db36df29e76c7a7699123569a4a18c1623ce68d826ed96c62643cae/mdit_py_plugins-0.5.0-py3-none-any.whl", hash = "sha256:07a08422fc1936a5d26d146759e9155ea466e842f5ab2f7d2266dd084c8dab1f", size = 57205, upload-time = "2025-08-11T07:25:47.597Z" },
 ]
 
 [[package]]
@@ -2737,22 +2694,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pytest-textual-snapshot"
-version = "1.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "jinja2" },
-    { name = "pytest" },
-    { name = "rich" },
-    { name = "syrupy" },
-    { name = "textual" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/8b/75/2ef17ae52fa5bc848ff2d1d7bc317a702cbd6d7ad733ca991b9f899dbbae/pytest_textual_snapshot-1.0.0.tar.gz", hash = "sha256:065217055ed833b8a16f2320a0613f39a0154e8d9fee63535f29f32c6414b9d7", size = 11071, upload-time = "2024-07-22T15:17:44.629Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/70/2e/4bf16ed78b382b3d7c1e545475ec8cf04346870be662815540faf8f16e8c/pytest_textual_snapshot-1.0.0-py3-none-any.whl", hash = "sha256:dd3a421491a6b1987ee7b4336d7f65299524924d2b0a297e69733b73b01570e1", size = 11171, upload-time = "2024-07-22T15:17:43.167Z" },
-]
-
-[[package]]
 name = "python-dateutil"
 version = "2.9.0.post0"
 source = { registry = "https://pypi.org/simple" }
@@ -3322,18 +3263,6 @@ wheels = [
 ]
 
 [[package]]
-name = "syrupy"
-version = "5.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pytest" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c1/90/1a442d21527009d4b40f37fe50b606ebb68a6407142c2b5cc508c34b696b/syrupy-5.0.0.tar.gz", hash = "sha256:3282fe963fa5d4d3e47231b16d1d4d0f4523705e8199eeb99a22a1bc9f5942f2", size = 48881, upload-time = "2025-09-28T21:15:12.783Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9d/9a/6c68aad2ccfce6e2eeebbf5bb709d0240592eb51ff142ec4c8fbf3c2460a/syrupy-5.0.0-py3-none-any.whl", hash = "sha256:c848e1a980ca52a28715cd2d2b4d434db424699c05653bd1158fb31cf56e9546", size = 49087, upload-time = "2025-09-28T21:15:11.639Z" },
-]
-
-[[package]]
 name = "temporalio"
 version = "1.20.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3359,23 +3288,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/0a/d4/2b0cd0fe285e14b36db076e78c93766ff1d529d70408bd1d2a5a84f1d929/tenacity-9.1.2.tar.gz", hash = "sha256:1169d376c297e7de388d18b4481760d478b0e99a777cad3a9c86e556f4b697cb", size = 48036, upload-time = "2025-04-02T08:25:09.966Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e5/30/643397144bfbfec6f6ef821f36f33e57d35946c44a2352d3c9f0ae847619/tenacity-9.1.2-py3-none-any.whl", hash = "sha256:f77bf36710d8b73a50b2dd155c97b870017ad21afe6ab300326b0371b3b05138", size = 28248, upload-time = "2025-04-02T08:25:07.678Z" },
-]
-
-[[package]]
-name = "textual"
-version = "6.9.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "markdown-it-py", extra = ["linkify"] },
-    { name = "mdit-py-plugins" },
-    { name = "platformdirs" },
-    { name = "pygments" },
-    { name = "rich" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/97/8c/774b53a1256fe2649e708b634334d5ce68568d178e55cf3099265c639051/textual-6.9.0.tar.gz", hash = "sha256:49201129a21f65cc16003ce3855cd941a4de7d58eac9489d0e390ba501d712b6", size = 1582278, upload-time = "2025-12-14T17:15:43.03Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9d/3c/76b607e07d5d63d32d4c4e2803f392913e8e07d5a489fa46f5c25e554ea9/textual-6.9.0-py3-none-any.whl", hash = "sha256:5ded2824fcfc7311b09ac440abb6fe248b3c1431d0403dc0d096795c4f18303c", size = 714791, upload-time = "2025-12-14T17:15:41.287Z" },
 ]
 
 [[package]]
@@ -3519,15 +3431,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/55/e3/70399cb7dd41c10ac53367ae42139cf4b1ca5f36bb3dc6c9d33acdb43655/typing_inspection-0.4.2.tar.gz", hash = "sha256:ba561c48a67c5958007083d386c3295464928b01faa735ab8547c5692e87f464", size = 75949, upload-time = "2025-10-01T02:14:41.687Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/dc/9b/47798a6c91d8bdb567fe2698fe81e0c6b7cb7ef4d13da4114b41d239f65d/typing_inspection-0.4.2-py3-none-any.whl", hash = "sha256:4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7", size = 14611, upload-time = "2025-10-01T02:14:40.154Z" },
-]
-
-[[package]]
-name = "uc-micro-py"
-version = "1.0.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/91/7a/146a99696aee0609e3712f2b44c6274566bc368dfe8375191278045186b8/uc-micro-py-1.0.3.tar.gz", hash = "sha256:d321b92cff673ec58027c04015fcaa8bb1e005478643ff4a500882eaab88c48a", size = 6043, upload-time = "2024-02-09T16:52:01.654Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/37/87/1f677586e8ac487e29672e4b17455758fce261de06a0d086167bb760361a/uc_micro_py-1.0.3-py3-none-any.whl", hash = "sha256:db1dffff340817673d7b466ec86114a9dc0e9d4d9b5ba229d9d60e5c12600cd5", size = 6229, upload-time = "2024-02-09T16:52:00.371Z" },
 ]
 
 [[package]]

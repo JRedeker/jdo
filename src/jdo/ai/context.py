@@ -1,4 +1,4 @@
-"""AI context management for conversational TUI.
+"""AI context management for conversational CLI.
 
 Handles message formatting, system prompts, and streaming support
 for the JDO conversational interface.

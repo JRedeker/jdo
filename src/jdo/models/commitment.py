@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import Column, ForeignKey, Uuid
 from sqlmodel import Field, SQLModel
 
-from jdo.models.base import utc_now
+from jdo.utils.datetime import DEFAULT_DUE_TIME, DEFAULT_TIMEZONE, utc_now
 
 
 class CommitmentStatus(str, Enum):
@@ -20,11 +20,6 @@ class CommitmentStatus(str, Enum):
     AT_RISK = "at_risk"
     COMPLETED = "completed"
     ABANDONED = "abandoned"
-
-
-def default_due_time() -> time:
-    """Default due time of 9:00 AM."""
-    return time(9, 0)
 
 
 class Commitment(SQLModel, table=True):
@@ -50,8 +45,8 @@ class Commitment(SQLModel, table=True):
         ),
     )
     due_date: date
-    due_time: time = Field(default_factory=default_due_time)
-    timezone: str = Field(default="America/New_York")
+    due_time: time = Field(default=DEFAULT_DUE_TIME)
+    timezone: str = Field(default=DEFAULT_TIMEZONE)
     status: CommitmentStatus = Field(default=CommitmentStatus.PENDING)
     completed_at: datetime | None = Field(default=None)
     notes: str | None = Field(default=None)

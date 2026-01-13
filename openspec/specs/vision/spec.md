@@ -117,7 +117,7 @@ The system SHALL support storing and displaying measurable success criteria for 
 
 #### Scenario: Store multiple metrics
 - **WHEN** user creates a Vision with metrics ["Publish 1 book", "Give 10 talks", "Train 100 practitioners"]
-- **THEN** all metrics are stored in the JSON array and displayed in the data panel
+- **THEN** all metrics are stored in the JSON array and displayed in the output
 
 #### Scenario: Empty metrics allowed
 - **WHEN** user creates a Vision without specifying metrics
@@ -125,7 +125,7 @@ The system SHALL support storing and displaying measurable success criteria for 
 
 #### Scenario: Display metrics in view
 - **WHEN** user views a Vision
-- **THEN** metrics are displayed as a bulleted list in the data panel
+- **THEN** metrics are displayed as a bulleted list in the output
 
 ### Requirement: Vision AI Assistance
 

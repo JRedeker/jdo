@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from enum import Enum
 from uuid import UUID, uuid4
 
 from sqlalchemy import JSON
 from sqlmodel import Column, Field, SQLModel
+
+from jdo.utils.datetime import today_date, utc_now
 
 
 class VisionStatus(str, Enum):
@@ -17,16 +19,6 @@ class VisionStatus(str, Enum):
     ACHIEVED = "achieved"
     EVOLVED = "evolved"
     ABANDONED = "abandoned"
-
-
-def utc_now() -> datetime:
-    """Get current UTC datetime."""
-    return datetime.now(UTC)
-
-
-def today_date() -> date:
-    """Get today's date in UTC."""
-    return datetime.now(UTC).date()
 
 
 def default_review_date() -> date:

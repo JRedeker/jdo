@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel
 
-from jdo.models.base import utc_now
+from jdo.utils.datetime import utc_now
 
 
 class CleanupPlanStatus(str, Enum):

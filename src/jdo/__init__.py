@@ -1,4 +1,4 @@
-"""JDO - A terminal application built with Textual."""
+"""JDO - A conversational CLI for commitment tracking."""
 
 from __future__ import annotations
 

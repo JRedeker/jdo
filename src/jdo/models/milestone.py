@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from enum import Enum
 from uuid import UUID, uuid4
 
 from sqlmodel import Field, SQLModel
+
+from jdo.utils.datetime import utc_now
 
 
 class MilestoneStatus(str, Enum):
@@ -16,11 +18,6 @@ class MilestoneStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     MISSED = "missed"
-
-
-def utc_now() -> datetime:
-    """Get current UTC datetime."""
-    return datetime.now(UTC)
 
 
 class Milestone(SQLModel, table=True):
@@ -81,4 +78,4 @@ class Milestone(SQLModel, table=True):
         """
         if self.status in (MilestoneStatus.COMPLETED, MilestoneStatus.MISSED):
             return False
-        return self.target_date < datetime.now(UTC).date()
+        return self.target_date < utc_now().date()

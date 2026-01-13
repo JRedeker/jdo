@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import date, timedelta
 from uuid import UUID
 
-from jdo.models.commitment import Commitment, CommitmentStatus, default_due_time
+from jdo.models.commitment import Commitment, CommitmentStatus
 from jdo.models.recurring_commitment import RecurringCommitment, TaskTemplate
 from jdo.models.task import Task, TaskStatus
 from jdo.recurrence.calculator import get_next_due_date
+from jdo.utils.datetime import DEFAULT_DUE_TIME
 
 # Default window in days for upcoming instance generation
 DEFAULT_GENERATION_WINDOW_DAYS = 7
@@ -35,7 +36,7 @@ def generate_instance(
         stakeholder_id=recurring.stakeholder_id,
         goal_id=recurring.goal_id,
         due_date=due_date,
-        due_time=recurring.due_time if recurring.due_time else default_due_time(),
+        due_time=recurring.due_time if recurring.due_time else DEFAULT_DUE_TIME,
         timezone=recurring.timezone,
         notes=recurring.notes,
         recurring_commitment_id=recurring.id,

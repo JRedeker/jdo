@@ -1,12 +1,12 @@
-# jdo ✨
+# jdo
 
 **Just Do One thing at a time**
 
-An AI-powered terminal app for people who want to achieve their goals without drowning in project management overhead. Have a conversation, and jdo turns your intentions into a structured plan you can actually follow through on.
+An AI-powered conversational CLI for people who want to achieve their goals without drowning in project management overhead. Have a conversation, and jdo turns your intentions into a structured plan you can actually follow through on.
 
 ---
 
-## 🤔 Why jdo?
+## Why jdo?
 
 ### The Problem with Todo Apps
 
@@ -24,7 +24,7 @@ Except you don't. Because life happens. Meetings run over. Energy crashes. And n
 
 ### A Different Philosophy
 
-jdo is built on a simple principle from the [Meta Performance™ Institute](https://metaperformanceinstitute.com/):
+jdo is built on a simple principle from the [Meta Performance Institute](https://metaperformanceinstitute.com/):
 
 > **Commitments are promises, not preferences.**
 
@@ -33,25 +33,15 @@ A commitment isn't a task you *might* do. It's a promise to a specific person (y
 This is what MPI calls **integrity**—not morality, but *workability*. The engine that makes everything else possible.
 
 **The three rules of integrity:**
-1. 🎯 **Do what you said, by when you said**
-2. 📢 **Notify stakeholders as soon as you know you can't**
-3. 🧹 **Clean up the mess caused by any broken commitment**
+1. **Do what you said, by when you said**
+2. **Notify stakeholders as soon as you know you can't**
+3. **Clean up the mess caused by any broken commitment**
 
 jdo doesn't let you dump 47 items into a list and forget about them. Every commitment has a stakeholder, a deliverable, and a due date. You make fewer promises—and you keep them.
 
-### How jdo is Different
-
-| | Todo Apps | Scheduling Apps | jdo |
-|:--|:--|:--|:--|
-| **Mental model** | Infinite list | Calendar blocks | Promises to people |
-| **Accountability** | None | Time pressure | Stakeholder relationships |
-| **When you can't deliver** | Mark incomplete, feel guilty | Reschedule, feel guilty | Notify stakeholder, clean up, maintain trust |
-| **Success metric** | Tasks checked off | Hours scheduled | Commitments kept |
-| **Core belief** | More organization = more done | Better scheduling = more done | Fewer promises kept = more done |
-
 ---
 
-## 💬 The Conversational Difference
+## The Conversational Difference
 
 Most productivity tools ask you to learn their system. jdo asks you one question: *What do you want to accomplish?*
 
@@ -59,21 +49,21 @@ Tell it in plain language. The AI extracts goals, milestones, commitments, and t
 
 ---
 
-## ⚡ Features
+## Features
 
 | | |
 |---|---|
-| 💬 **Conversational Interface** | Chat naturally—the AI structures your goals for you |
-| 🏗️ **Flexible Hierarchy** | Visions → Goals → Milestones → Commitments → Tasks |
-| ⌨️ **Keyboard-First Design** | Navigate everything without touching your mouse |
-| 🔄 **Recurring Commitments** | Set it once, generate instances automatically |
-| 💾 **Draft Recovery** | Crash mid-thought? Pick up right where you left off |
-| 🤖 **Multiple AI Providers** | Anthropic, OpenAI, or OpenRouter—your choice |
-| 🔒 **Local-First Storage** | Your data stays on your machine, always |
+| **Conversational Interface** | Chat naturally—the AI structures your goals for you |
+| **Flexible Hierarchy** | Visions, Goals, Milestones, Commitments, Tasks |
+| **Streaming AI Responses** | Responses appear token-by-token for a responsive feel |
+| **Hybrid Input** | Natural language primary, slash commands for power users |
+| **Recurring Commitments** | Set it once, generate instances automatically |
+| **Multiple AI Providers** | OpenAI or OpenRouter—your choice |
+| **Local-First Storage** | Your data stays on your machine, always |
 
 ---
 
-## 📦 Installation
+## Installation
 
 **Requirements:** Python 3.11+ and [uv](https://docs.astral.sh/uv/)
 
@@ -90,7 +80,7 @@ uv run jdo
 ```
 
 <details>
-<summary>🔧 Install uv if you don't have it</summary>
+<summary>Install uv if you don't have it</summary>
 
 ```bash
 # macOS/Linux
@@ -104,23 +94,18 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 **1. Configure your AI provider**
 
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="sk-..."
 ```
 
 <details>
-<summary>🔌 Using a different provider?</summary>
+<summary>Using OpenRouter?</summary>
 
 ```bash
-# OpenAI
-export OPENAI_API_KEY="sk-..."
-export JDO_AI_PROVIDER="openai"
-
-# OpenRouter
 export OPENROUTER_API_KEY="sk-or-..."
 export JDO_AI_PROVIDER="openrouter"
 ```
@@ -133,26 +118,73 @@ export JDO_AI_PROVIDER="openrouter"
 uv run jdo
 ```
 
-**3. Press `n` to start a new chat and describe what you want to accomplish.**
+**3. Start talking about what you want to accomplish.**
 
 ---
 
-## ⌨️ Keyboard Shortcuts
+## Example Conversation
 
 ```
-Navigation                      Views
-─────────────────────────────────────────────────
-n   New chat                    g   Goals
-s   Settings                    c   Commitments
-q   Quit                        v   Visions
-d   Toggle dark/light mode      m   Milestones
-                                h   Full hierarchy
-                                o   Orphan commitments
+> I need to send the quarterly report to Sarah by Friday
+
+I'll create a commitment:
+  Deliverable: Send quarterly report
+  Stakeholder: Sarah
+  Due: Friday, Jan 17
+
+Does this look right?
+
+> yes
+
+Created commitment #a1b2c3: Send quarterly report
+
+> show my commitments
+
+ID      Deliverable              Stakeholder    Due         Status
+------  -----------------------  -------------  ----------  --------
+a1b2c3  Send quarterly report    Sarah          Fri Jan 17  pending
+
+1 active commitment(s)
+
+> I want to get promoted to senior engineer this year
+
+I'll create a goal for you:
+  Title: Get promoted to senior engineer
+  Target: December 31, 2025
+
+Does this look right?
 ```
 
 ---
 
-## 🧠 How It Works
+## Slash Commands
+
+For power users who prefer instant, deterministic actions:
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Show available commands |
+| `/list` | List commitments (default) |
+| `/list goals` | List all goals |
+| `/list visions` | List all visions |
+| `/commit "..."` | Create a new commitment |
+
+Or just type naturally—the AI understands plain English.
+
+---
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `jdo` | Launch the conversational REPL |
+| `jdo capture "text"` | Quick capture for later triage |
+| `jdo db status` | Show database migration status |
+| `jdo db upgrade` | Apply pending migrations |
+
+---
+
+## How It Works
 
 ### The Hierarchy
 
@@ -170,39 +202,16 @@ Vision ─────────────── "Become financially indepen
                         └── Task ────── "Write course outline"
 ```
 
-### Example Conversation
-
-```
-You: I want to get promoted to senior engineer this year
-
- AI: I've created a goal for you:
-
-     Goal: "Get promoted to senior engineer"
-     Due: December 31, 2025
-
-     What would make this happen? Any specific milestones
-     you're thinking about?
-
-You: I need to lead a major project and improve my system design skills
-
- AI: Added two milestones:
-
-     • Lead a major project
-     • Improve system design skills
-
-     Want to break either of these down into specific tasks?
-```
-
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 ### Environment Variables
 
 | Variable | Default | Description |
 |:---------|:--------|:------------|
-| `JDO_AI_PROVIDER` | `anthropic` | Provider: `anthropic`, `openai`, `openrouter` |
-| `JDO_AI_MODEL` | `claude-sonnet-4-20250514` | Model identifier |
+| `JDO_AI_PROVIDER` | `openai` | Provider: `openai`, `openrouter` |
+| `JDO_AI_MODEL` | `gpt-4o` | Model identifier |
 | `JDO_TIMEZONE` | `America/New_York` | Your local timezone |
 | `JDO_DATABASE_PATH` | *(platform default)* | Custom database location |
 
@@ -218,11 +227,11 @@ All data is stored locally using platform-appropriate directories:
 
 **Files:**
 - `jdo.db` — SQLite database containing all your data
-- `auth.json` — OAuth tokens (if using browser-based auth)
+- `auth.json` — API credentials storage
 
 ---
 
-## 🛠️ Development
+## Development
 
 ### Setup
 
@@ -248,30 +257,30 @@ uv run pytest                           # Test
 ```
 src/jdo/
 ├── ai/         Agent, tools, context extraction
-├── auth/       OAuth flows, API key management
-├── commands/   Chat command parsing
+├── auth/       API key management
+├── commands/   Command parsing and handlers
 ├── config/     Settings, paths
 ├── db/         SQLite engine, migrations
 ├── models/     SQLModel entities
-├── screens/    Textual screens (home, chat, settings)
-├── widgets/    Reusable UI components
-└── app.py      Application entry point
+├── output/     Rich formatters for CLI output
+├── repl/       REPL loop and session management
+└── cli.py      CLI entry point
 ```
 
 ---
 
-## 📋 Requirements
+## Requirements
 
 - Python 3.11 or later
 - [uv](https://docs.astral.sh/uv/) package manager
 - Modern terminal with Unicode support
-- API key from Anthropic, OpenAI, or OpenRouter
+- API key from OpenAI or OpenRouter
 
 **Tested on:** macOS, Linux, Windows (Windows Terminal recommended)
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -280,10 +289,10 @@ src/jdo/
 
 ---
 
-## 📄 License
+## License
 
 MIT
 
 ---
 
-<sub>Built with 💜 using [Textual](https://textual.textualize.io/) · [PydanticAI](https://ai.pydantic.dev/) · [SQLModel](https://sqlmodel.tiangolo.com/) · [Rich](https://rich.readthedocs.io/)</sub>
+<sub>Built with [PydanticAI](https://ai.pydantic.dev/) · [SQLModel](https://sqlmodel.tiangolo.com/) · [Rich](https://rich.readthedocs.io/) · [prompt_toolkit](https://python-prompt-toolkit.readthedocs.io/)</sub>

@@ -12,7 +12,7 @@ from pydantic import Field as PydanticField
 from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel
 
-from jdo.models.base import utc_now
+from jdo.utils.datetime import DEFAULT_TIMEZONE, utc_now
 
 # Constants for validation ranges
 MIN_DAY_OF_WEEK = 0
@@ -87,7 +87,7 @@ class RecurringCommitment(SQLModel, table=True):
 
     # Time settings
     due_time: time | None = Field(default=None)
-    timezone: str = Field(default="America/New_York")
+    timezone: str = Field(default=DEFAULT_TIMEZONE)
 
     # Recurrence pattern
     recurrence_type: RecurrenceType

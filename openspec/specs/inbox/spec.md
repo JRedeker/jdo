@@ -1,7 +1,7 @@
 # inbox Specification
 
 ## Purpose
-TBD - created by archiving change add-inbox-triage. Update Purpose after archive.
+Define the inbox and triage system for capturing quick thoughts and processing them into structured entities.
 ## Requirements
 ### Requirement: CLI Capture Command
 
@@ -37,13 +37,9 @@ The system SHALL provide a `/triage` command to process inbox items.
 - **WHEN** user types `/triage` and there are no items needing triage
 - **THEN** the system responds "No items to triage. Your inbox is empty."
 
-#### Scenario: Triage available from chat
-- **WHEN** user is on the chat screen and types `/triage`
-- **THEN** triage mode starts in the current chat session
-
-#### Scenario: Triage available from home
-- **WHEN** user presses `t` on the home screen with items needing triage
-- **THEN** the system navigates to chat and starts triage mode
+#### Scenario: Triage available from REPL
+- **WHEN** user is in the REPL and says "let's triage" or types `/triage`
+- **THEN** triage mode starts in the conversation
 
 ### Requirement: AI Classification
 
@@ -134,15 +130,11 @@ The system SHALL detect vague input in chat and offer triage.
 - **THEN** AI proceeds with normal creation flow (e.g., suggests `/commit`)
 - **AND** no triage item is created
 
-### Requirement: Triage Workflow
+### Requirement: Triage Notifications
 
-The system SHALL provide triage access via NavSidebar with badge indicator.
+The system SHALL notify users of pending triage items.
 
-#### Scenario: Triage available from sidebar
-- **WHEN** user selects "Triage" from NavSidebar with items needing triage
-- **THEN** the system starts triage mode in the chat area
-
-#### Scenario: Triage badge shows count
-- **WHEN** items need triage
-- **THEN** NavSidebar shows badge with count on Triage item
+#### Scenario: Triage reminder on startup
+- **WHEN** user starts the REPL and items need triage
+- **THEN** a message shows the triage count (e.g., "You have 3 items to triage")
 

@@ -6,9 +6,10 @@ Parses expressions like "tomorrow", "next Friday", "December 20", "3pm".
 from __future__ import annotations
 
 import re
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date, time, timedelta
 
 from jdo.exceptions import ExtractionError
+from jdo.utils.datetime import DEFAULT_DUE_TIME, today_date
 
 # Days of week (lowercase for matching)
 DAYS_OF_WEEK = {
@@ -75,7 +76,7 @@ NAMED_TIMES = {
 }
 
 # Default time when not specified
-DEFAULT_TIME = time(9, 0)
+DEFAULT_TIME = DEFAULT_DUE_TIME
 
 # 12-hour clock constants
 NOON_HOUR = 12
@@ -88,15 +89,6 @@ class ParseError(ExtractionError):
 
 class VagueDateError(ParseError):
     """Raised when date expression is too vague."""
-
-
-def today_date() -> date:
-    """Get today's date (UTC).
-
-    Returns:
-        Today's date.
-    """
-    return datetime.now(UTC).date()
 
 
 def _parse_relative_date(text: str, today: date) -> date | None:

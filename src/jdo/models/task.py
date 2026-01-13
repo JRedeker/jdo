@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
@@ -10,6 +10,8 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, field_validator
 from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel
+
+from jdo.utils.datetime import utc_now
 
 
 class TaskStatus(str, Enum):
@@ -55,11 +57,6 @@ class EstimationConfidence(str, Enum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
-
-
-def utc_now() -> datetime:
-    """Get current UTC datetime."""
-    return datetime.now(UTC)
 
 
 class SubTask(BaseModel):

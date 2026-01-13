@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import JSON
 from sqlmodel import Column, Field, SQLModel
+
+from jdo.utils.datetime import utc_now
 
 
 class EntityType(str, Enum):
@@ -20,11 +22,6 @@ class EntityType(str, Enum):
     VISION = "vision"
     MILESTONE = "milestone"
     UNKNOWN = "unknown"  # For triage items captured without type
-
-
-def utc_now() -> datetime:
-    """Get current UTC datetime."""
-    return datetime.now(UTC)
 
 
 class Draft(SQLModel, table=True):
@@ -52,6 +49,6 @@ class Draft(SQLModel, table=True):
         Returns:
             True if draft is MORE than 7 days old (not exactly 7), False otherwise.
         """
-        expiration_threshold = datetime.now(UTC) - timedelta(days=7)
+        expiration_threshold = utc_now() - timedelta(days=7)
         # Use <= to ensure exactly 7 days is NOT expired (strictly more than 7 days)
         return self.created_at < expiration_threshold

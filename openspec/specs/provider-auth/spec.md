@@ -1,7 +1,7 @@
 # provider-auth Specification
 
 ## Purpose
-Define the authentication system for AI providers, supporting API key authentication for OpenAI and OpenRouter, with secure credential storage and TUI modal screens.
+Define the authentication system for AI providers, supporting API key authentication for OpenAI and OpenRouter, with secure credential storage and environment variable configuration.
 ## Requirements
 ### Requirement: Credential Storage
 
@@ -82,34 +82,6 @@ The system SHALL check environment variables for API keys before requiring manua
 
 ---
 
-### Requirement: API Key TUI Screen
-
-The system SHALL provide a Textual ModalScreen for entering API keys manually, using dismiss() to return success/failure status.
-
-#### Scenario: Display API key input
-
-- **GIVEN** the API key ModalScreen is pushed for a provider
-- **WHEN** the screen is displayed
-- **THEN** it shows the provider name
-- **AND** provides a masked Input widget (password=True) for the API key
-- **AND** displays a link to obtain an API key
-
-#### Scenario: Submit valid API key
-
-- **GIVEN** the API key screen is displayed
-- **WHEN** the user enters a non-empty API key and submits
-- **THEN** the system stores the credentials
-- **AND** displays success notification
-- **AND** calls dismiss(True) to return to the caller
-
-#### Scenario: Submit empty API key
-
-- **GIVEN** the API key screen is displayed
-- **WHEN** the user submits without entering a key
-- **THEN** the Input widget displays a validation error
-- **AND** does not store credentials
-- **AND** does not dismiss the screen
-
 ---
 
 ### Requirement: Credential Management
@@ -154,39 +126,17 @@ The system SHALL maintain a registry mapping provider IDs to their supported aut
 - **WHEN** auth methods for "openrouter" are queried
 - **THEN** the system returns API key as the only option
 
-### Requirement: Provider Selection Settings
+### Requirement: Provider Selection
 
-The system SHALL provide a settings menu for switching between configured AI providers. Active provider selection is stored via the JDOSettings model defined in the `app-config` spec (using environment variables or `.env` file with `JDO_` prefix).
+The system SHALL support provider selection via environment variables.
 
-#### Scenario: Access settings from sidebar
-- **WHEN** user selects "Settings" from NavSidebar or presses '9'
-- **THEN** the settings menu opens showing current provider and available options
+#### Scenario: Configure provider via environment
+- **WHEN** user sets `JDO_AI_PROVIDER=openai` or `JDO_AI_PROVIDER=openrouter`
+- **THEN** the specified provider is used for AI operations
 
-#### Scenario: Switch active provider via RadioSet
-- **GIVEN** multiple providers have valid credentials
-- **WHEN** user selects a different provider in the RadioSet widget
-- **THEN** the active provider is changed via `set_ai_provider()`
-- **AND** the change is persisted to the `.env` file
-- **AND** the "Current AI Configuration" display updates immediately
-
-#### Scenario: Show only authenticated providers in RadioSet
-- **WHEN** settings menu displays the provider RadioSet
-- **THEN** only providers with valid credentials (stored or from environment) appear as options
-- **AND** providers without credentials are not shown
-
-#### Scenario: Hide RadioSet when only one provider authenticated
-- **WHEN** exactly one provider has valid credentials
-- **THEN** the RadioSet is hidden (no selection needed)
-- **AND** the single authenticated provider is shown as static text
-
-#### Scenario: Pre-select current provider
-- **GIVEN** the settings screen is displayed
-- **WHEN** the RadioSet renders
-- **THEN** the RadioButton for `settings.ai_provider` is selected
-
-#### Scenario: Add new provider from settings
-- **WHEN** user selects "Add provider" or "Configure" button for an unauthenticated provider
-- **THEN** the API key auth flow is initiated
+#### Scenario: Default provider
+- **WHEN** `JDO_AI_PROVIDER` is not set
+- **THEN** the system defaults to "openai"
 
 ### Requirement: Atomic Credential Storage
 
@@ -203,21 +153,7 @@ The system SHALL write credentials atomically to prevent corruption on interrupt
 - **THEN** the temporary file is cleaned up
 - **AND** the original credentials file is unchanged
 
-### Requirement: Settings Access
 
-The system SHALL provide settings access via NavSidebar.
-
-#### Scenario: Access settings from sidebar
-- **WHEN** user selects "Settings" from NavSidebar or presses '9'
-- **THEN** the SettingsScreen opens showing current provider and available options
-
-#### Scenario: Switch active provider
-- **WHEN** user selects a different provider in settings
-- **THEN** the active provider is changed and persisted to the `.env` file
-
-#### Scenario: Show only configured providers
-- **WHEN** settings menu displays provider options
-- **THEN** only providers with valid credentials (stored or from environment) are selectable
 
 ### Requirement: Provider Auto-Selection on Startup
 
@@ -239,11 +175,11 @@ The system SHALL automatically select an authenticated provider when the configu
 - **THEN** "openai" is preferred if authenticated
 - **AND** the choice is persisted
 
-#### Scenario: Show modal when no providers authenticated
+#### Scenario: Show error when no providers authenticated
 - **GIVEN** no provider has valid credentials
 - **WHEN** the app starts
-- **THEN** the "AI not configured" modal is shown
-- **AND** user must configure credentials or quit
+- **THEN** an error message is shown explaining how to configure credentials
+- **AND** the REPL does not start
 
 #### Scenario: No auto-selection when configured provider works
 - **GIVEN** `JDO_AI_PROVIDER=openrouter` is configured
