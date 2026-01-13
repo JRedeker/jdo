@@ -146,6 +146,7 @@ ignore = [
 "src/jdo/uat/harness.py" = [
     "PLC0415", # Late import of repl.loop to avoid circular dependency
     "BLE001",  # Catch Exception to capture any REPL errors during UAT
+    "S101",    # Assert used for internal invariants (post_init guarantees)
 ]
 "src/jdo/uat/cleanup.py" = [
     "C901",    # cleanup_test_entities complexity needed to delete entities in correct order

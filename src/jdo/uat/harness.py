@@ -9,17 +9,14 @@ import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 from io import StringIO
-from typing import TYPE_CHECKING
 from unittest.mock import patch
 
+from pydantic_ai import Agent
 from rich.console import Console
 from sqlmodel import Session
 
 from jdo.ai.agent import JDODependencies, create_agent
 from jdo.repl.session import Session as REPLSession
-
-if TYPE_CHECKING:
-    from pydantic_ai import Agent
 
 
 @dataclass
@@ -52,8 +49,8 @@ class REPLTestHarness:
 
     db_session: Session
     repl_session: REPLSession = field(default_factory=REPLSession)
-    agent: Agent | None = field(default=None)
-    deps: JDODependencies | None = field(default=None)
+    _agent: Agent[JDODependencies, str] | None = field(default=None)
+    _deps: JDODependencies | None = field(default=None)
     _output_buffer: StringIO = field(default_factory=StringIO)
     _console: Console | None = field(default=None)
     _start_time: datetime = field(default_factory=datetime.now)
@@ -62,10 +59,10 @@ class REPLTestHarness:
 
     def __post_init__(self) -> None:
         """Initialize the harness components."""
-        if self.agent is None:
-            self.agent = create_agent()
-        if self.deps is None:
-            self.deps = JDODependencies(session=self.db_session)
+        if self._agent is None:
+            self._agent = create_agent()
+        if self._deps is None:
+            self._deps = JDODependencies(session=self.db_session)
         self._console = Console(
             file=self._output_buffer,
             force_terminal=True,
@@ -122,6 +119,10 @@ class REPLTestHarness:
 
         self._inputs_sent.append(user_input)
 
+        # These should always be set by __post_init__
+        assert self._agent is not None, "Agent not initialized"
+        assert self._deps is not None, "Dependencies not initialized"
+
         try:
             # Patch the console to capture output
             with patch("jdo.repl.loop.console", self._console):
@@ -129,8 +130,8 @@ class REPLTestHarness:
                     user_input,
                     self.repl_session,
                     self.db_session,
-                    self.agent,
-                    self.deps,
+                    self._agent,
+                    self._deps,
                 )
 
             output = REPLOutput(
