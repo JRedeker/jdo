@@ -1,4 +1,8 @@
-"""Integration test fixtures for JDO."""
+"""Integration test fixtures for JDO.
+
+These fixtures create real database connections with seeded data
+for testing database operations and workflows end-to-end.
+"""
 
 from collections.abc import Generator
 from datetime import date, timedelta
@@ -17,6 +21,7 @@ def populated_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[S
     """Create a database pre-seeded with test data.
 
     Creates stakeholders, goals, and commitments for integration testing.
+    Ensures proper cleanup of database connections to prevent resource warnings.
     """
     from jdo.config.settings import reset_settings
 
@@ -30,7 +35,8 @@ def populated_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[S
     create_db_and_tables()
     engine = get_engine()
 
-    with Session(engine) as session:
+    session = Session(engine)
+    try:
         # Create stakeholders
         self_stakeholder = Stakeholder(name="Self", type=StakeholderType.SELF)
         team_stakeholder = Stakeholder(name="Engineering Team", type=StakeholderType.TEAM)
@@ -63,9 +69,10 @@ def populated_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[S
         session.commit()
 
         yield session
-
-    reset_engine()
-    reset_settings()
+    finally:
+        session.close()
+        reset_engine()
+        reset_settings()
 
 
 @pytest.fixture

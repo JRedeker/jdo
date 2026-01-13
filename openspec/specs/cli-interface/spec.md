@@ -2,9 +2,7 @@
 
 ## Purpose
 Define the command-line REPL interface for JDO, including loop entry/exit handling, input history with prompt_toolkit, streaming AI response display, Rich console output, session state management, database initialization, and observability logging.
-
 ## Requirements
-
 ### Requirement: REPL Loop Entry Point
 
 The system SHALL provide a REPL (Read-Eval-Print Loop) as the primary interactive interface when `jdo` is invoked without subcommands.
@@ -70,35 +68,39 @@ The system SHALL provide input history navigation using prompt_toolkit.
 
 ### Requirement: Streaming AI Response Display
 
-The system SHALL display AI responses as they stream from the provider using Rich's `Live` display.
+The system SHALL display AI responses as they stream from the provider using Rich's `Live` display with Markdown rendering.
 
-<!-- Research Note: PydanticAI run_stream() returns async context manager. Rich's Live display
-     is the documented approach for streaming text, not console.status() + print(end="").
-     Source: ai.pydantic.dev/output/#streamed-results, rich.readthedocs.io/live.html -->
+<!-- Research: PydanticAI stream_markdown.py example renders Markdown on each chunk -->
+<!-- Source: https://github.com/pydantic/pydantic-ai/blob/main/examples/pydantic_ai_examples/stream_markdown.py -->
 
-#### Scenario: Display streaming text
+#### Scenario: Display streaming text with Markdown
 - **GIVEN** user has submitted input to the AI
 - **WHEN** AI begins responding to user input
 - **THEN** text appears incrementally as tokens arrive using Rich `Live` display
-- **AND** no blank waiting period before first token
-- **AND** display updates without terminal flicker
+- **AND** content is rendered as Markdown on each chunk update
+- **AND** headers, lists, code blocks, and emphasis are properly formatted
 
-#### Scenario: Thinking indicator
+#### Scenario: Animated thinking indicator
 - **GIVEN** user has submitted input to the AI
 - **WHEN** AI is processing but no tokens have arrived yet
-- **THEN** a "Thinking..." indicator is shown (separate from streaming display)
-- **AND** indicator disappears when first token arrives
+- **THEN** an animated spinner is shown with "Thinking..." text using `console.status()`
+- **AND** spinner uses "dots" animation style
+- **AND** `status.stop()` is called BEFORE `Live` display starts (no nesting)
 
-#### Scenario: Complete response formatting
-- **GIVEN** AI is streaming a response
-- **WHEN** AI response completes
-- **THEN** the full response is properly formatted
-- **AND** a newline separates response from next prompt
+<!-- Research: Must stop Status before starting Live to avoid display conflicts -->
+<!-- Source: https://rich.readthedocs.io/en/latest/reference/status.html -->
+
+#### Scenario: Markdown rendering fallback
+- **GIVEN** AI response contains content that fails markdown parsing
+- **WHEN** markdown rendering fails
+- **THEN** the response is displayed as plain text
+- **AND** no error is shown to the user
 
 #### Scenario: Streaming timeout
 - **GIVEN** AI is streaming a response
 - **WHEN** no tokens arrive for more than 30 seconds
 - **THEN** the streaming is cancelled
+- **AND** spinner is stopped (if still running)
 - **AND** user sees a timeout message
 - **AND** REPL returns to prompt
 
@@ -106,21 +108,42 @@ The system SHALL display AI responses as they stream from the provider using Ric
 - **GIVEN** AI is streaming a response
 - **WHEN** network connection is lost
 - **THEN** partial response is displayed (if any)
+- **AND** spinner is stopped (if still running)
 - **AND** user sees a connection error message
 - **AND** REPL returns to prompt
 
 #### Implementation Reference
 ```python
-# Correct pattern using PydanticAI + Rich Live
+# Correct pattern: Stop status BEFORE starting Live
 from rich.live import Live
+from rich.markdown import Markdown
 from rich.text import Text
 
-async with agent.run_stream(input, deps=deps, message_history=history) as result:
-    output = Text()
-    with Live(output, console=console, refresh_per_second=10) as live:
-        async for chunk in result.stream_text():
-            output.append(chunk)
-            live.update(output)
+status = console.status("[dim]Thinking...[/dim]", spinner="dots")
+status.start()
+
+full_response = ""
+first_chunk = True
+
+try:
+    async for chunk in stream_response(...):
+        if first_chunk:
+            status.stop()  # Stop BEFORE starting Live
+            live = Live('', console=console, vertical_overflow='visible')
+            live.start()
+            first_chunk = False
+        
+        full_response += chunk
+        try:
+            live.update(Markdown(full_response))
+        except Exception:
+            live.update(Text(full_response))
+    
+    if not first_chunk:
+        live.stop()
+finally:
+    if first_chunk:
+        status.stop()  # Never got chunks, still stop status
 ```
 
 ### Requirement: Rich Console Output
@@ -271,3 +294,57 @@ The system SHALL support multi-line input for longer messages.
 - **GIVEN** user has entered multi-line input
 - **WHEN** user presses Enter on a complete input
 - **THEN** the entire multi-line input is sent to AI
+
+### Requirement: Slash Command Auto-completion
+
+The system SHALL provide auto-completion for slash commands using prompt_toolkit.
+
+<!-- Research: WordCompleter is sufficient for ~10 commands; FuzzyCompleter deferred -->
+<!-- Source: https://python-prompt-toolkit.readthedocs.io/en/master/pages/asking_for_input.html -->
+
+#### Scenario: Tab-complete slash commands
+- **GIVEN** the REPL is awaiting user input
+- **WHEN** user types `/li` and presses Tab
+- **THEN** the input is completed to `/list` (or shows matching options)
+- **AND** matching is case-insensitive
+
+#### Scenario: Show completion options
+- **GIVEN** the REPL is awaiting user input
+- **WHEN** user types `/` and presses Tab
+- **THEN** a dropdown shows available commands: `/help`, `/list`, `/commit`, `/complete`, `/review`
+
+#### Scenario: Graceful handling when no completions match
+- **GIVEN** the REPL is awaiting user input
+- **WHEN** user types `/xyz` (no matching command) and presses Tab
+- **THEN** no completion dropdown is shown
+- **AND** the input remains unchanged
+- **AND** no error is displayed
+
+### Requirement: Bottom Toolbar Status Bar
+
+The system SHALL display an always-visible status bar at the bottom of the terminal using cached values.
+
+<!-- Research: Toolbar callback runs per keystroke; must use cached values, not live DB queries -->
+<!-- Source: https://python-prompt-toolkit.readthedocs.io/en/stable/pages/asking_for_input.html#adding-a-bottom-toolbar -->
+
+#### Scenario: Show commitment count
+- **GIVEN** the REPL is running
+- **WHEN** the prompt is displayed
+- **THEN** the bottom toolbar shows the cached number of active commitments
+
+#### Scenario: Show triage queue count
+- **GIVEN** the REPL is running
+- **WHEN** items exist in the triage queue
+- **THEN** the bottom toolbar shows the cached triage queue count
+
+#### Scenario: Show pending draft indicator
+- **GIVEN** the user has a pending draft awaiting confirmation
+- **WHEN** the prompt is displayed
+- **THEN** the bottom toolbar indicates a draft is pending (e.g., "[draft]")
+
+#### Scenario: Cached values update on data changes
+- **GIVEN** user creates, updates, or deletes an entity
+- **WHEN** the operation completes
+- **THEN** session cache is updated
+- **AND** toolbar reflects new values on next render
+

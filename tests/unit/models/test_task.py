@@ -559,3 +559,82 @@ class TestNotificationTask:
                 assert result.is_notification_task is True
 
         reset_engine()
+
+
+class TestSubTaskSerialization:
+    """Tests for SubTask serialization in Task.sub_tasks field."""
+
+    def test_serialize_subtasks_mixed_types(self) -> None:
+        """serialize_sub_tasks handles mixed SubTask and dict types."""
+        task = Task(
+            commitment_id=uuid4(),
+            title="Test",
+            scope="Test scope",
+            order=1,
+        )
+        mixed_subtasks: list[SubTask | dict[str, object]] = [
+            SubTask(description="Step 1"),
+            {"description": "Step 2", "completed": True},
+        ]
+        result = task.serialize_sub_tasks(mixed_subtasks)
+        assert len(result) == 2
+        assert result[0] == {"description": "Step 1", "completed": False}
+        assert result[1] == {"description": "Step 2", "completed": True}
+
+    def test_serialize_subtasks_none_returns_empty_list(self) -> None:
+        """serialize_sub_tasks returns empty list for None input."""
+        task = Task(
+            commitment_id=uuid4(),
+            title="Test",
+            scope="Test scope",
+            order=1,
+        )
+        result = task.serialize_sub_tasks(None)
+        assert result == []
+
+    def test_serialize_subtasks_with_subtask_objects(self) -> None:
+        """serialize_sub_tasks converts SubTask objects to dicts."""
+        task = Task(
+            commitment_id=uuid4(),
+            title="Test",
+            scope="Test scope",
+            order=1,
+        )
+        subtasks = [
+            SubTask(description="First step"),
+            SubTask(description="Second step", completed=True),
+        ]
+        result = task.serialize_sub_tasks(subtasks)
+        assert len(result) == 2
+        assert result[0] == {"description": "First step", "completed": False}
+        assert result[1] == {"description": "Second step", "completed": True}
+
+    def test_serialize_subtasks_with_dicts(self) -> None:
+        """serialize_sub_tasks passes through dicts unchanged."""
+        task = Task(
+            commitment_id=uuid4(),
+            title="Test",
+            scope="Test scope",
+            order=1,
+        )
+        dict_subtasks = [
+            {"description": "Dict step", "completed": False},
+        ]
+        result = task.serialize_sub_tasks(dict_subtasks)
+        assert len(result) == 1
+        assert result[0] == {"description": "Dict step", "completed": False}
+
+    def test_serialize_subtasks_with_other_objects(self) -> None:
+        """serialize_sub_tasks passes through other objects."""
+        task = Task(
+            commitment_id=uuid4(),
+            title="Test",
+            scope="Test scope",
+            order=1,
+        )
+        other_objects: list[object] = ["string", 123, None]
+        result = task.serialize_sub_tasks(other_objects)
+        assert len(result) == 3
+        assert result[0] == "string"
+        assert result[1] == 123
+        assert result[2] is None

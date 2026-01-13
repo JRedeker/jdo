@@ -37,6 +37,9 @@ dev = [
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=4.0.0",
     "pytest-httpx>=0.30.0",
+    "pytest-xdist>=3.5.0",
+    "pytest-timeout>=2.3.0",
+    "hypothesis>=6.100.0",
     "ruff>=0.8.0",
     "lizard>=1.17.0",
 ]
@@ -233,6 +236,14 @@ matches = "src/jdo/repl/loop.py"
 [tool.pyrefly.sub-config.errors]
 missing-attribute = false
 
+[[tool.pyrefly.sub-config]]
+# SQLModel model initialization in hypothesis tests
+matches = "tests/unit/recurrence/test_calculator_hypothesis.py"
+[tool.pyrefly.sub-config.errors]
+missing-argument = false
+unexpected-keyword = false
+unbound-name = false
+
 # ------------------------------------------------------------------------------
 # Pytest
 # ------------------------------------------------------------------------------
@@ -244,12 +255,18 @@ addopts = [
     "-ra",
     "-q",
     "--strict-markers",
+    "--timeout=30",
 ]
 markers = [
     "unit: Unit tests (fast, no external dependencies)",
     "integration: Integration tests (database, file system)",
     "repl: REPL tests (prompt_toolkit based)",
+    "slow: Slow tests that may need extended timeout",
 ]
+# Default timeout for all tests (30 seconds)
+timeout = 30
+# Method for timeout handling (signal is most reliable on Unix)
+timeout_method = "thread"
 
 # ------------------------------------------------------------------------------
 # Coverage
@@ -269,7 +286,7 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "raise NotImplementedError",
 ]
-fail_under = 70
+fail_under = 85
 show_missing = true
 skip_covered = false
 

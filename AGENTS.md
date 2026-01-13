@@ -189,14 +189,30 @@ if command == "mycommand":
 ## Testing
 
 ```bash
-# Run all tests
+# Run all tests (sequential)
 uv run pytest
 
-# Run REPL tests
-uv run pytest tests/repl/ -v
+# Run all tests in parallel (recommended)
+uv run pytest -n auto
 
-# Run output formatter tests
-uv run pytest tests/output/ -v
+# Run specific categories
+uv run pytest -m unit
+uv run pytest -m integration
+
+# Check coverage
+uv run pytest --cov=src/jdo
+
+# See full testing guide
+# See docs/TESTING.md for best practices
 ```
+
+## Testing Best Practices
+
+1. **Isolation**: Use `db_session` fixture for database tests. It handles auto-rollback and connection cleanup.
+2. **Parallelism**: Ensure tests are independent to support `pytest-xdist`. Avoid shared global state.
+3. **Robustness**: Use `hypothesis` for functions with complex input space (dates, recurrence).
+4. **Safety**: All tests have a 30s timeout. Use `@pytest.mark.timeout(N)` for slower tests.
+5. **No Warnings**: Fix all resource warnings (unclosed DB connections) in fixtures.
+
 
 

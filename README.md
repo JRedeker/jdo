@@ -251,8 +251,11 @@ uv run jdo                              # Run the app
 uv run ruff check --fix src/ tests/     # Lint
 uv run ruff format src/ tests/          # Format
 uvx pyrefly check src/                  # Type check
-uv run pytest                           # Test
+uv run pytest -n auto                   # Test (parallel)
 ```
+
+See [docs/TESTING.md](docs/TESTING.md) for detailed testing guidelines.
+
 
 ### Structure
 

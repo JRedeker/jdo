@@ -1,4 +1,8 @@
-"""Shared pytest fixtures for JDO tests."""
+"""Shared pytest fixtures for JDO tests.
+
+This module provides core fixtures used across all test types.
+See docs/TESTING.md for best practices and usage guidelines.
+"""
 
 from collections.abc import Generator
 from pathlib import Path
@@ -14,6 +18,9 @@ def db_engine():
 
     Uses StaticPool to ensure the same connection is reused,
     which is required for in-memory SQLite databases.
+
+    The engine is properly disposed after the test to prevent
+    resource warnings about unclosed database connections.
     """
     engine = create_engine(
         "sqlite://",
@@ -21,8 +28,11 @@ def db_engine():
         poolclass=StaticPool,
     )
     SQLModel.metadata.create_all(engine)
-    yield engine
-    engine.dispose()
+    try:
+        yield engine
+    finally:
+        # Ensure all connections are closed before disposal
+        engine.dispose()
 
 
 @pytest.fixture
@@ -30,11 +40,15 @@ def db_session(db_engine) -> Generator[Session, None, None]:
     """Create a database session for testing.
 
     Yields a session from the test engine and rolls back
-    any changes after the test completes.
+    any changes after the test completes. The session is
+    explicitly closed to prevent resource warnings.
     """
-    with Session(db_engine) as session:
+    session = Session(db_engine)
+    try:
         yield session
         session.rollback()
+    finally:
+        session.close()
 
 
 @pytest.fixture
@@ -69,6 +83,7 @@ def test_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     from jdo.config.settings import get_settings
 
-    yield get_settings()
-
-    reset_settings()
+    try:
+        yield get_settings()
+    finally:
+        reset_settings()
