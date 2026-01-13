@@ -1,5 +1,8 @@
 # output-formatting Specification
 
+## Purpose
+Define the Rich library output formatters for displaying JDO entities (commitments, goals, visions, milestones, tasks), integrity dashboard, confirmation proposals, triage items, error messages, and progress indicators in the terminal.
+
 ## Requirements
 
 ### Requirement: Commitment List Formatting
