@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from rich import box
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -47,7 +48,7 @@ def format_vision_list(visions: list[Vision]) -> Table:
     Returns:
         Rich Table ready for display.
     """
-    table = Table(title="Visions")
+    table = Table(title="Visions", box=box.ROUNDED)
     table.add_column("ID", style="dim", width=6)
     table.add_column("Title", width=30)
     table.add_column("Timeframe", width=12)

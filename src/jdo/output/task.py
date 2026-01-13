@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from rich import box
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -47,7 +48,7 @@ def format_task_list(tasks: list[Task]) -> Table:
     Returns:
         Rich Table ready for display.
     """
-    table = Table(title="Tasks")
+    table = Table(title="Tasks", box=box.ROUNDED)
     table.add_column("ID", style="dim", width=6)
     table.add_column("Title", width=30)
     table.add_column("Status", width=12)

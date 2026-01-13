@@ -69,7 +69,8 @@ class Session:
     """Session state for the REPL.
 
     Tracks conversation history with token-based pruning,
-    current entity context, pending drafts, and snoozed vision IDs.
+    current entity context, pending drafts, snoozed vision IDs,
+    and cached counts for toolbar display.
     """
 
     def __init__(self) -> None:
@@ -78,6 +79,9 @@ class Session:
         self.entity_context = EntityContext()
         self.pending_draft: PendingDraft | None = None
         self.snoozed_vision_ids: set[UUID] = set()
+        # Cached counts for bottom toolbar (avoid DB queries per keystroke)
+        self.cached_commitment_count: int = 0
+        self.cached_triage_count: int = 0
 
     def add_user_message(self, content: str) -> None:
         """Add a user message to history.
@@ -172,3 +176,17 @@ class Session:
             List of message dicts with 'role' and 'content' keys.
         """
         return self.message_history.copy()
+
+    def update_cached_counts(
+        self, commitment_count: int | None = None, triage_count: int | None = None
+    ) -> None:
+        """Update cached counts for toolbar display.
+
+        Args:
+            commitment_count: Active commitment count (if provided).
+            triage_count: Triage queue count (if provided).
+        """
+        if commitment_count is not None:
+            self.cached_commitment_count = commitment_count
+        if triage_count is not None:
+            self.cached_triage_count = triage_count

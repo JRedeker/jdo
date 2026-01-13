@@ -272,45 +272,53 @@ async def process_ai_input(
     Returns:
         The complete AI response text.
     """
-    # Show thinking indicator
-    console.print("[dim]Thinking...[/dim]", end="")
+    # Show animated thinking spinner
+    status = console.status("[dim]Thinking...[/dim]", spinner="dots")
+    status.start()
 
     response_text = ""
     first_chunk = True
+    live = None
 
     try:
         async with asyncio.timeout(AI_STREAM_TIMEOUT_SECONDS):
-            output = Text()
-            with Live(output, console=console, refresh_per_second=10, transient=False) as live:
-                async for chunk in stream_response(
-                    agent,
-                    user_input,
-                    deps,
-                    message_history=session.message_history,
-                ):
-                    if first_chunk:
-                        # Clear "Thinking..." on first token
-                        console.print("\r" + " " * 20 + "\r", end="")
-                        first_chunk = False
-                    output.append(chunk)
-                    response_text += chunk
-                    live.update(output)
+            async for chunk in stream_response(
+                agent,
+                user_input,
+                deps,
+                message_history=session.message_history,
+            ):
+                if first_chunk:
+                    # Stop spinner BEFORE starting Live (avoid nesting)
+                    status.stop()
+                    live = Live("", console=console, refresh_per_second=10, transient=False)
+                    live.start()
+                    first_chunk = False
 
-        # If we never got any chunks, clear the thinking indicator
-        if first_chunk:
-            console.print("\r" + " " * 20 + "\r", end="")
+                response_text += chunk
+                # Render as Markdown during streaming
+                try:
+                    live.update(Markdown(response_text))
+                except Exception:  # noqa: BLE001 - fallback on any markdown error
+                    live.update(Text(response_text))
+
+        # Stop live display if it was started
+        if live:
+            live.stop()
 
     except TimeoutError:
-        if first_chunk:
-            console.print("\r" + " " * 20 + "\r", end="")
         console.print("[yellow]The AI took too long to respond. Please try again.[/yellow]")
         return ""
     except (OSError, ConnectionError) as e:
         # Handle network-related errors specifically
-        if first_chunk:
-            console.print("\r" + " " * 20 + "\r", end="")
         console.print(f"[red]Error communicating with AI: {e}[/red]")
         return ""
+    finally:
+        # Always ensure spinner is stopped
+        if first_chunk:
+            status.stop()
+        if live:
+            live.stop()
 
     console.print()  # Newline after response
     return response_text
@@ -479,6 +487,10 @@ def _confirm_draft(
                 f"[green]Created commitment #{str(commitment.id)[:6]}: "
                 f"{commitment.deliverable}[/green]"
             )
+            # Update cached counts for toolbar after entity creation
+            session.update_cached_counts(
+                commitment_count=_get_active_commitment_count(db_session),
+            )
             session.clear_pending_draft()
             return True
 
@@ -615,7 +627,7 @@ def _list_goals(db_session: DBSession) -> None:
         console.print(format_empty_list("goal"))
         return
 
-    table = Table(title="Goals")
+    table = Table(title="Goals", box=box.ROUNDED)
     table.add_column("ID", style="dim", width=6)
     table.add_column("Title", width=30)
     table.add_column("Status", width=12)
@@ -639,7 +651,7 @@ def _list_visions(db_session: DBSession) -> None:
         console.print(format_empty_list("vision"))
         return
 
-    table = Table(title="Visions")
+    table = Table(title="Visions", box=box.ROUNDED)
     table.add_column("ID", style="dim", width=6)
     table.add_column("Title", width=30)
     table.add_column("Timeframe", width=15)
@@ -703,6 +715,37 @@ async def _process_user_input(
     return True
 
 
+def _get_active_commitment_count(db_session: DBSession) -> int:
+    """Get count of active commitments for toolbar.
+
+    Args:
+        db_session: Database session.
+
+    Returns:
+        Count of active commitments.
+    """
+    active_statuses = [
+        CommitmentStatus.PENDING,
+        CommitmentStatus.IN_PROGRESS,
+        CommitmentStatus.AT_RISK,
+    ]
+    statement = select(Commitment).where(Commitment.status.in_(active_statuses))
+    return len(list(db_session.exec(statement).all()))
+
+
+# Slash commands for auto-completion
+SLASH_COMMANDS = [
+    "/help",
+    "/list",
+    "/list commitments",
+    "/list goals",
+    "/list visions",
+    "/commit",
+    "/complete",
+    "/review",
+]
+
+
 async def repl_loop() -> None:
     """Main REPL loop.
 
@@ -722,10 +765,30 @@ async def repl_loop() -> None:
         deps = JDODependencies(session=db_session)
         session = Session()
 
-        # Create prompt session with history
+        # Initialize cached counts for toolbar
+        session.update_cached_counts(
+            commitment_count=_get_active_commitment_count(db_session),
+            triage_count=get_triage_count(db_session),
+        )
+
+        # Create toolbar callback using cached values
+        def get_toolbar_text() -> str:
+            """Generate bottom toolbar text from cached counts."""
+            draft_indicator = " [draft]" if session.has_pending_draft else ""
+            return (
+                f" {session.cached_commitment_count} active | "
+                f"{session.cached_triage_count} triage{draft_indicator}"
+            )
+
+        # Create prompt session with history, auto-completion, and toolbar
+        completer = WordCompleter(SLASH_COMMANDS, ignore_case=True)
         prompt_session: PromptSession[str] = PromptSession(
             history=InMemoryHistory(),
             message="> ",
+            completer=completer,
+            complete_while_typing=False,
+            bottom_toolbar=get_toolbar_text,
+            refresh_interval=1.0,
         )
 
         # Show startup guidance (first-run, at-risk, triage, vision review reminders)

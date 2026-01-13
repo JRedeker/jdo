@@ -1,5 +1,8 @@
 # cli-interface Specification
 
+## Purpose
+Define the command-line REPL interface for JDO, including loop entry/exit handling, input history with prompt_toolkit, streaming AI response display, Rich console output, session state management, database initialization, and observability logging.
+
 ## Requirements
 
 ### Requirement: REPL Loop Entry Point

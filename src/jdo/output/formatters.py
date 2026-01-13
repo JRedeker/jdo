@@ -8,6 +8,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING
 
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -67,7 +68,7 @@ def format_commitment_list(commitments: list[Commitment]) -> Table:
     Returns:
         Rich Table ready for display.
     """
-    table = Table(title="Commitments")
+    table = Table(title="Commitments", box=box.ROUNDED)
     table.add_column("ID", style="dim", width=6)
     table.add_column("Deliverable", width=30)
     table.add_column("Stakeholder", width=15)
