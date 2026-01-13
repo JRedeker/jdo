@@ -301,6 +301,7 @@ The system SHALL provide auto-completion for slash commands using prompt_toolkit
 
 <!-- Research: WordCompleter is sufficient for ~10 commands; FuzzyCompleter deferred -->
 <!-- Source: https://python-prompt-toolkit.readthedocs.io/en/master/pages/asking_for_input.html -->
+<!-- Note: NestedCompleter would be better for hierarchical commands but is out of scope -->
 
 #### Scenario: Tab-complete slash commands
 - **GIVEN** the REPL is awaiting user input
@@ -311,7 +312,7 @@ The system SHALL provide auto-completion for slash commands using prompt_toolkit
 #### Scenario: Show completion options
 - **GIVEN** the REPL is awaiting user input
 - **WHEN** user types `/` and presses Tab
-- **THEN** a dropdown shows available commands: `/help`, `/list`, `/commit`, `/complete`, `/review`
+- **THEN** a dropdown shows available commands: `/help`, `/list`, `/commit`, `/complete`, `/review`, `/exit`, `/quit`
 
 #### Scenario: Graceful handling when no completions match
 - **GIVEN** the REPL is awaiting user input
@@ -319,6 +320,8 @@ The system SHALL provide auto-completion for slash commands using prompt_toolkit
 - **THEN** no completion dropdown is shown
 - **AND** the input remains unchanged
 - **AND** no error is displayed
+
+> **Note**: Logging is N/A for exit commands because exit is a signal, not a command that affects state. No structured logging required.
 
 ### Requirement: Bottom Toolbar Status Bar
 

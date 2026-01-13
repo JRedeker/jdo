@@ -213,6 +213,8 @@ For power users who prefer instant, deterministic actions:
 | `/commit "..."` | Create a new commitment |
 | `/complete <id>` | Mark a commitment as complete |
 | `/review` | Review visions due for quarterly review |
+| `/exit` | Exit the REPL |
+| `/quit` | Exit the REPL |
 
 Or just type naturally—the AI understands plain English.
 

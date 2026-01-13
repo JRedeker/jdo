@@ -12,6 +12,7 @@ from jdo.repl.loop import (
     _get_at_risk_commitments,
     _handle_confirmation,
     _is_first_run,
+    _process_user_input,
     _show_startup_guidance,
     check_credentials,
     handle_slash_command,
@@ -688,3 +689,225 @@ class TestUpdateDashboardCacheIntegrity:
 
         # Verify truncation (not rounding)
         assert session.cached_integrity_score == 91
+
+
+class TestExitSlashCommands:
+    """Tests for /exit and /quit slash commands."""
+
+    @pytest.fixture
+    def mock_db_session(self):
+        """Create a mock database session."""
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_agent(self):
+        """Create a mock AI agent."""
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_deps(self):
+        """Create mock agent dependencies."""
+        return MagicMock()
+
+    @patch("jdo.repl.loop.console")
+    async def test_slash_exit_returns_false(
+        self, mock_console, mock_db_session, mock_agent, mock_deps
+    ):
+        """/exit returns False to exit the REPL."""
+
+        session = Session()
+        result = await _process_user_input("/exit", session, mock_db_session, mock_agent, mock_deps)
+
+        assert result is False
+        mock_console.print.assert_called_once_with(GOODBYE_MESSAGE)
+
+    @patch("jdo.repl.loop.console")
+    async def test_slash_quit_returns_false(
+        self, mock_console, mock_db_session, mock_agent, mock_deps
+    ):
+        """/quit returns False to exit the REPL."""
+
+        session = Session()
+        result = await _process_user_input("/quit", session, mock_db_session, mock_agent, mock_deps)
+
+        assert result is False
+        mock_console.print.assert_called_once_with(GOODBYE_MESSAGE)
+
+    @patch("jdo.repl.loop.console")
+    async def test_slash_exit_with_trailing_args(
+        self, mock_console, mock_db_session, mock_agent, mock_deps
+    ):
+        """/exit foo still exits (trailing args ignored)."""
+
+        session = Session()
+        result = await _process_user_input(
+            "/exit foo bar", session, mock_db_session, mock_agent, mock_deps
+        )
+
+        assert result is False
+        mock_console.print.assert_called_once_with(GOODBYE_MESSAGE)
+
+    @patch("jdo.repl.loop.console")
+    async def test_slash_quit_with_trailing_args(
+        self, mock_console, mock_db_session, mock_agent, mock_deps
+    ):
+        """/quit bar still exits (trailing args ignored)."""
+
+        session = Session()
+        result = await _process_user_input(
+            "/quit bar", session, mock_db_session, mock_agent, mock_deps
+        )
+
+        assert result is False
+        mock_console.print.assert_called_once_with(GOODBYE_MESSAGE)
+
+    @patch("jdo.repl.loop.console")
+    async def test_slash_exit_case_insensitive(
+        self, mock_console, mock_db_session, mock_agent, mock_deps
+    ):
+        """/EXIT and /Exit work (case-insensitive)."""
+
+        session = Session()
+
+        result = await _process_user_input("/EXIT", session, mock_db_session, mock_agent, mock_deps)
+        assert result is False
+
+        mock_console.reset_mock()
+        result = await _process_user_input("/Exit", session, mock_db_session, mock_agent, mock_deps)
+        assert result is False
+
+    @patch("jdo.repl.loop.console")
+    async def test_slash_quit_case_insensitive(
+        self, mock_console, mock_db_session, mock_agent, mock_deps
+    ):
+        """/QUIT and /Quit work (case-insensitive)."""
+
+        session = Session()
+
+        result = await _process_user_input("/QUIT", session, mock_db_session, mock_agent, mock_deps)
+        assert result is False
+
+        mock_console.reset_mock()
+        result = await _process_user_input("/Quit", session, mock_db_session, mock_agent, mock_deps)
+        assert result is False
+
+    @patch("jdo.repl.loop.console")
+    async def test_plain_exit_still_works(
+        self, mock_console, mock_db_session, mock_agent, mock_deps
+    ):
+        """Plain 'exit' (without slash) still works (regression test)."""
+
+        session = Session()
+        result = await _process_user_input("exit", session, mock_db_session, mock_agent, mock_deps)
+
+        assert result is False
+        mock_console.print.assert_called_once_with(GOODBYE_MESSAGE)
+
+    @patch("jdo.repl.loop.console")
+    async def test_plain_quit_still_works(
+        self, mock_console, mock_db_session, mock_agent, mock_deps
+    ):
+        """Plain 'quit' (without slash) still works (regression test)."""
+
+        session = Session()
+        result = await _process_user_input("quit", session, mock_db_session, mock_agent, mock_deps)
+
+        assert result is False
+        mock_console.print.assert_called_once_with(GOODBYE_MESSAGE)
+
+
+class TestProcessUserInputEdgeCases:
+    """Tests for edge cases in _process_user_input function."""
+
+    @pytest.fixture
+    def mock_db_session(self):
+        """Create a mock database session."""
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_agent(self):
+        """Create a mock AI agent."""
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_deps(self):
+        """Create mock agent dependencies."""
+        return MagicMock()
+
+    @patch("jdo.repl.loop.console")
+    async def test_empty_string_input_returns_early(
+        self, mock_console, mock_db_session, mock_agent, mock_deps
+    ):
+        """Empty string input should return True without calling AI.
+
+        Regression test for bug where empty input caused API error:
+        'messages: at least one message is required'
+        """
+
+        session = Session()
+
+        # Empty input should be handled gracefully
+        result = await _process_user_input("", session, mock_db_session, mock_agent, mock_deps)
+
+        assert result is True  # Continue loop
+        # Should NOT add empty message to history
+        assert len(session.message_history) == 0
+
+    @patch("jdo.repl.loop.console")
+    async def test_whitespace_only_input_returns_early(
+        self, mock_console, mock_db_session, mock_agent, mock_deps
+    ):
+        """Whitespace-only input should return True without calling AI.
+
+        Regression test for bug where whitespace input caused API error.
+        """
+
+        session = Session()
+
+        # Whitespace-only input should be handled gracefully
+        result = await _process_user_input("   ", session, mock_db_session, mock_agent, mock_deps)
+
+        assert result is True  # Continue loop
+        # Should NOT add whitespace-only message to history
+        assert len(session.message_history) == 0
+
+    @patch("jdo.repl.loop.console")
+    async def test_tabs_only_input_returns_early(
+        self, mock_console, mock_db_session, mock_agent, mock_deps
+    ):
+        """Tab characters only input should return True without calling AI."""
+
+        session = Session()
+
+        result = await _process_user_input("\t\t", session, mock_db_session, mock_agent, mock_deps)
+
+        assert result is True
+        assert len(session.message_history) == 0
+
+    @patch("jdo.repl.loop.console")
+    async def test_newlines_only_input_returns_early(
+        self, mock_console, mock_db_session, mock_agent, mock_deps
+    ):
+        """Newline characters only input should return True without calling AI."""
+
+        session = Session()
+
+        result = await _process_user_input("\n\n", session, mock_db_session, mock_agent, mock_deps)
+
+        assert result is True
+        assert len(session.message_history) == 0
+
+    @patch("jdo.repl.loop.console")
+    async def test_mixed_whitespace_input_returns_early(
+        self, mock_console, mock_db_session, mock_agent, mock_deps
+    ):
+        """Mixed whitespace input should return True without calling AI."""
+
+        session = Session()
+
+        result = await _process_user_input(
+            "  \t\n  ", session, mock_db_session, mock_agent, mock_deps
+        )
+
+        assert result is True
+        assert len(session.message_history) == 0

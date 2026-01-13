@@ -83,7 +83,7 @@ WELCOME_MESSAGE = """\
 I'm your commitment tracking assistant. Tell me what you need to do,
 and I'll help you track it.
 
-[dim]Type 'exit' or 'quit' to leave. Press Ctrl+C to cancel input.[/dim]
+[dim]Type 'exit', 'quit', '/exit', or '/quit' to leave. Press Ctrl+C to cancel input.[/dim]
 """
 
 # Goodbye message shown on REPL exit
@@ -552,6 +552,7 @@ def _handle_help() -> None:
 [cyan]/commit "..."[/cyan]            - Create a new commitment
 [cyan]/complete <id>[/cyan]           - Mark a commitment as complete
 [cyan]/review[/cyan]                  - Review visions due for quarterly review
+[cyan]/exit[/cyan] or [cyan]/quit[/cyan]          - Exit the REPL
 
 [bold]Examples:[/bold]
   /commit "send report to Sarah by Friday"
@@ -559,6 +560,7 @@ def _handle_help() -> None:
   /complete abc123
 
 [dim]Or just type naturally - I understand plain English![/dim]
+[dim]Type 'exit', 'quit', or press Ctrl+D to leave.[/dim]
 """
     )
 
@@ -793,8 +795,15 @@ async def _process_user_input(
     Returns:
         True to continue the loop, False to exit.
     """
-    # Handle exit commands
-    if user_input.lower() in ("exit", "quit"):
+    # Skip empty or whitespace-only input
+    # This prevents API errors when the input has no content
+    if not user_input or not user_input.strip():
+        return True
+
+    # Handle exit commands (with or without slash, case-insensitive)
+    # Uses startswith for /exit and /quit to allow trailing args like "/exit foo"
+    lower_input = user_input.lower()
+    if lower_input in ("exit", "quit") or lower_input.startswith(("/exit", "/quit")):
         console.print(GOODBYE_MESSAGE)
         return False
 
@@ -1080,6 +1089,8 @@ SLASH_COMMANDS = [
     "/commit",
     "/complete",
     "/review",
+    "/exit",
+    "/quit",
 ]
 
 

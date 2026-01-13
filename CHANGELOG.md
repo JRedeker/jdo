@@ -10,6 +10,7 @@ When a feature spec is archived, it should be added here and removed from `ROADM
 ### Added
 
 #### REPL & Startup
+- **add-exit-slash-commands**: Added `/exit` and `/quit` slash commands for graceful REPL exit with case-insensitive matching and trailing argument support
 - **add-startup-restoration**: Vision review notices on startup with non-blocking `/review` command and session-only snooze
 - **enhance-visual-output**: Animated thinking spinner, slash command auto-completion, bottom toolbar with cached stats, markdown AI response rendering, rounded table borders
 
