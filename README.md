@@ -168,6 +168,7 @@ For power users who prefer instant, deterministic actions:
 | `/list goals` | List all goals |
 | `/list visions` | List all visions |
 | `/commit "..."` | Create a new commitment |
+| `/review` | Review visions due for quarterly review |
 
 Or just type naturally—the AI understands plain English.
 

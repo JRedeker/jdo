@@ -37,9 +37,14 @@ Architectural research completed. Key findings:
   - `cli-interface` - Input features (auto-complete, toolbar, markdown streaming)
   - `output-formatting` - Visual components (spinner, rounded tables)
 - Affected code:
-  - `src/jdo/repl/loop.py` - Spinner, auto-complete, toolbar, markdown
+  - `src/jdo/repl/loop.py` - Spinner, auto-complete, toolbar, markdown streaming
   - `src/jdo/repl/session.py` - Add cached count fields
-  - `src/jdo/output/formatters.py` - Rounded tables
+  - `src/jdo/output/formatters.py` - Rounded tables (commitment list)
+  - `src/jdo/output/goal.py` - Rounded tables (goal list)
+  - `src/jdo/output/vision.py` - Rounded tables (vision list)
+  - `src/jdo/output/milestone.py` - Rounded tables (milestone list)
+  - `src/jdo/output/task.py` - Rounded tables (task list)
+  - `src/jdo/output/integrity.py` - N/A (uses box=None intentionally for metrics)
 
 ## Research Sources
 

@@ -12,9 +12,12 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.history import InMemoryHistory
+from rich import box
 from rich.console import Console
 from rich.live import Live
+from rich.markdown import Markdown
 from rich.table import Table
 from rich.text import Text
 from sqlalchemy.exc import SQLAlchemyError

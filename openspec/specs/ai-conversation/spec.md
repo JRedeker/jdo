@@ -175,6 +175,37 @@ The system SHALL provide helpful guidance at appropriate moments.
 - **THEN** AI may provide a brief status summary (e.g., "You have 3 active commitments, 1 due tomorrow")
 - **AND** AI asks how it can help
 
+#### Scenario: Vision review notice
+- **GIVEN** user has a Vision with next_review_date <= today
+- **AND** the vision has not been snoozed this session
+- **WHEN** user starts a new REPL session
+- **THEN** the system displays a non-blocking notice: "Your vision '[title]' is due for review. Type /review to reflect on it."
+- **AND** the REPL prompt appears immediately (no blocking)
+
+#### Scenario: Vision review snooze
+- **GIVEN** user sees a vision review notice
+- **WHEN** user continues without typing /review
+- **THEN** the vision is marked as snoozed for this session only
+- **AND** the notice will appear again on next REPL session
+
+#### Scenario: Multiple visions due for review
+- **GIVEN** user has multiple Visions with next_review_date <= today
+- **WHEN** user starts a new REPL session
+- **THEN** the system shows a consolidated notice: "You have N visions due for review. Type /review to start."
+
+#### Scenario: No visions due for review
+- **GIVEN** user has Visions but all have next_review_date > today
+- **WHEN** user starts a new REPL session
+- **THEN** no vision review notice is displayed
+- **AND** other startup guidance (at-risk commitments, triage) still appears normally
+
+#### Scenario: Vision query error during startup
+- **GIVEN** user starts a new REPL session
+- **WHEN** the database query for due visions fails
+- **THEN** the error is logged but does not block startup
+- **AND** the REPL prompt appears normally
+- **AND** other startup guidance still displays
+
 ## Requirements (Modified)
 
 ### Requirement: AI Message Handling

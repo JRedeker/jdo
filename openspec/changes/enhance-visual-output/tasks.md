@@ -47,10 +47,14 @@
 ## 5. Rounded Table Borders
 
 - [ ] 5.1 Import `box` from rich.box in formatters.py
-- [ ] 5.2 Update `format_commitment_list()`: `Table(title="Commitments", box=box.ROUNDED)`
-- [ ] 5.3 Update goal table in loop.py `_list_goals()`
-- [ ] 5.4 Update vision table in loop.py `_list_visions()`
-- [ ] 5.5 Update any other Table instances in output modules
+- [ ] 5.2 Update `format_commitment_list()` in `src/jdo/output/formatters.py`: `Table(title="Commitments", box=box.ROUNDED)`
+- [ ] 5.3 Update `format_goal_list()` in `src/jdo/output/goal.py`: `Table(title="Goals", box=box.ROUNDED)`
+- [ ] 5.4 Update `format_vision_list()` in `src/jdo/output/vision.py`: `Table(title="Visions", box=box.ROUNDED)`
+- [ ] 5.5 Update `format_milestone_list()` in `src/jdo/output/milestone.py`: `Table(title="Milestones", box=box.ROUNDED)`
+- [ ] 5.6 Update `format_task_list()` in `src/jdo/output/task.py`: `Table(title="Tasks", box=box.ROUNDED)`
+- [ ] 5.7 Update inline tables in `src/jdo/repl/loop.py` `_list_goals()` and `_list_visions()`: add `box=box.ROUNDED`
+- [ ] 5.8 Verify: `src/jdo/output/integrity.py` uses `box=None` intentionally (no change needed)
+  - Note: Metrics table uses `box=None` for compact inline display, not entity list
 
 ## 6. Validation and Cleanup
 

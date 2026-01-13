@@ -18,6 +18,13 @@ The system SHALL provide auto-completion for slash commands using prompt_toolkit
 - **WHEN** user types `/` and presses Tab
 - **THEN** a dropdown shows available commands: `/help`, `/list`, `/commit`, `/complete`, `/review`
 
+#### Scenario: Graceful handling when no completions match
+- **GIVEN** the REPL is awaiting user input
+- **WHEN** user types `/xyz` (no matching command) and presses Tab
+- **THEN** no completion dropdown is shown
+- **AND** the input remains unchanged
+- **AND** no error is displayed
+
 ### Requirement: Bottom Toolbar Status Bar
 
 The system SHALL display an always-visible status bar at the bottom of the terminal using cached values.
