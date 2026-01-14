@@ -20,6 +20,7 @@ from sqlmodel import Session, select
 
 from jdo.ai.agent import JDODependencies
 from jdo.ai.time_context import format_time_context_for_ai, get_time_context
+from jdo.db.persistence import PersistenceService, ValidationError
 from jdo.db.session import get_session
 from jdo.db.task_history_service import TaskHistoryService
 from jdo.db.time_rollup_service import TimeRollupService
@@ -463,8 +464,92 @@ def _register_time_coaching_tools(agent: Agent[JDODependencies, str]) -> None:
         return "\n".join(lines)
 
 
+def _register_mutation_tools(agent: Agent[JDODependencies, str]) -> None:
+    """Register data mutation tools for creating/updating entities."""
+
+    @agent.tool_plain
+    def create_commitment(
+        deliverable: str,
+        stakeholder: str,
+        due_date: str,
+        due_time: str | None = None,
+        goal_id: str | None = None,
+        milestone_id: str | None = None,
+    ) -> str:
+        """Create a new commitment.
+
+        Args:
+            deliverable: What will be delivered.
+            stakeholder: Who the commitment is for.
+            due_date: When it's due (YYYY-MM-DD format).
+            due_time: Optional time (HH:MM format).
+            goal_id: Optional UUID of linked goal.
+            milestone_id: Optional UUID of linked milestone.
+
+        Returns:
+            Confirmation message with commitment ID.
+        """
+        with get_session() as session:
+            service = PersistenceService(session)
+
+            try:
+                commitment = service.save_commitment(
+                    {
+                        "deliverable": deliverable,
+                        "stakeholder": stakeholder,
+                        "due_date": due_date,
+                        "due_time": due_time,
+                        "goal_id": goal_id,
+                        "milestone_id": milestone_id,
+                    }
+                )
+                session.commit()
+            except ValidationError as e:
+                session.rollback()
+                return f"Error creating commitment: {e}"
+            else:
+                return f"Created commitment '{commitment.deliverable}' (ID: {commitment.id})"
+
+    @agent.tool_plain
+    def add_task_to_commitment(
+        title: str,
+        commitment_id: str,
+        scope: str | None = None,
+        estimated_hours: float | None = None,
+    ) -> str:
+        """Add a task to an existing commitment.
+
+        Args:
+            title: Task title.
+            commitment_id: UUID of parent commitment.
+            scope: What "done" means (defaults to title).
+            estimated_hours: Optional time estimate.
+
+        Returns:
+            Confirmation message with task ID.
+        """
+        with get_session() as session:
+            service = PersistenceService(session)
+
+            try:
+                task = service.save_task(
+                    {
+                        "title": title,
+                        "scope": scope,
+                        "commitment_id": commitment_id,
+                        "estimated_hours": estimated_hours,
+                    }
+                )
+                session.commit()
+            except ValidationError as e:
+                session.rollback()
+                return f"Error adding task: {e}"
+            else:
+                return f"Added task '{task.title}' to commitment (Task ID: {task.id})"
+
+
 def register_tools(agent: Agent[JDODependencies, str]) -> None:
-    """Register all query tools with the agent.
+    """Register all query and mutation tools with the agent.
 
     Args:
         agent: The PydanticAI agent to register tools with.
@@ -473,4 +558,5 @@ def register_tools(agent: Agent[JDODependencies, str]) -> None:
     _register_commitment_tools(agent)
     _register_milestone_vision_tools(agent)
     _register_time_coaching_tools(agent)
+    _register_mutation_tools(agent)
     logger.debug("AI agent tools registered")

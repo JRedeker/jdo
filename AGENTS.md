@@ -166,6 +166,26 @@ The app uses a conversational REPL with hybrid input handling:
 | `repl/session.py` | Session state (history, context, drafts) |
 | `output/formatters.py` | Rich formatters for entities |
 
+### AI Agent Tools
+
+The AI agent has access to tools for both querying and mutating data:
+
+**Query Tools**:
+- `query_current_commitments` - List active commitments
+- `query_overdue_commitments` - List past-due commitments
+- `query_user_time_context` - Check available hours and allocation
+- `query_task_history` - Review past task completion patterns
+- `query_commitment_time_rollup` - Get time breakdown for a commitment
+- `query_integrity_with_context` - Get integrity metrics and coaching areas
+
+**Mutation Tools**:
+- `create_commitment` - Create a new commitment
+- `add_task_to_commitment` - Add a task to an existing commitment
+
+The AI agent automatically uses these tools when you describe work. For example:
+- "I need to send the report to Sarah by Friday" → creates a commitment
+- "Add a task to review the spec" → adds a task to an existing commitment
+
 ### Key Commands
 
 | Command | Action |

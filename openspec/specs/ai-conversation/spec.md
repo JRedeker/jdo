@@ -287,6 +287,29 @@ The system SHALL invoke the AI agent for natural language input in the REPL (sla
 - **THEN** the tool is invoked
 - **AND** tool results are incorporated into AI response
 
+#### AI Tool Capabilities
+
+The AI agent has access to both query and mutation tools:
+
+**Query Tools**:
+- `query_current_commitments` - List active commitments
+- `query_overdue_commitments` - List past-due commitments
+- `query_commitments_for_goal` - Get commitments linked to a goal
+- `query_milestones_for_goal` - Get milestones for a goal
+- `query_visions_due_for_review` - List visions needing review
+- `query_user_time_context` - Check available hours and allocation
+- `query_task_history` - Review past task completion patterns
+- `query_commitment_time_rollup` - Get time breakdown for a commitment
+- `query_integrity_with_context` - Get integrity metrics and coaching areas
+
+**Mutation Tools**:
+- `create_commitment` - Create a new commitment (deliverable, stakeholder, due date)
+- `add_task_to_commitment` - Add a task to an existing commitment
+
+The AI agent automatically uses these tools to fulfill user requests. For example:
+- "I need to send the report to Sarah by Friday" → calls `create_commitment`
+- "Add a task to review the spec" → calls `add_task_to_commitment`
+
 ### Requirement: Hybrid Input Handling
 
 The system SHALL support both natural language and slash commands as input methods.

@@ -109,6 +109,8 @@ class TestCreateAgent:
         assert "query_current_commitments" in tool_names
         assert "query_overdue_commitments" in tool_names
         assert "query_visions_due_for_review" in tool_names
+        assert "create_commitment" in tool_names
+        assert "add_task_to_commitment" in tool_names
 
     def test_agent_without_tools_option(self) -> None:
         """create_agent_with_model can skip tool registration."""
