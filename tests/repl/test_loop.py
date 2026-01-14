@@ -3,12 +3,15 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from prompt_toolkit.formatted_text import HTML
 
 from jdo.repl.loop import (
     FIRST_RUN_MESSAGE,
     GOODBYE_MESSAGE,
     NO_CREDENTIALS_MESSAGE,
     WELCOME_MESSAGE,
+    _create_prompt_session,
+    _create_toolbar_callback,
     _get_at_risk_commitments,
     _handle_confirmation,
     _is_first_run,
@@ -1048,3 +1051,96 @@ class TestKeyBindings:
 
         mock_console.clear.assert_called_once()
         mock_show.assert_called_once_with(session)
+
+
+class TestToolbarStyling:
+    """Tests for visual styling of toolbar and prompt."""
+
+    def test_toolbar_callback_returns_html(self):
+        """_create_toolbar_callback returns a function that produces HTML."""
+        get_toolbar = _create_toolbar_callback()
+        result = get_toolbar()
+
+        assert isinstance(result, HTML)
+
+    def test_toolbar_contains_f1_shortcut(self):
+        """Toolbar includes F1=Help shortcut."""
+        get_toolbar = _create_toolbar_callback()
+        result = get_toolbar()
+
+        # HTML value contains the formatted text
+        assert "<b>F1</b>=Help" in result.value
+
+    def test_toolbar_contains_f5_shortcut(self):
+        """Toolbar includes F5=Refresh shortcut."""
+        get_toolbar = _create_toolbar_callback()
+        result = get_toolbar()
+
+        assert "<b>F5</b>=Refresh" in result.value
+
+    def test_toolbar_contains_commit_shortcut(self):
+        """Toolbar includes /c=commit shortcut."""
+        get_toolbar = _create_toolbar_callback()
+        result = get_toolbar()
+
+        assert "<b>/c</b>=commit" in result.value
+
+    def test_toolbar_contains_list_shortcut(self):
+        """Toolbar includes /l=list shortcut."""
+        get_toolbar = _create_toolbar_callback()
+        result = get_toolbar()
+
+        assert "<b>/l</b>=list" in result.value
+
+    def test_toolbar_contains_view_shortcut(self):
+        """Toolbar includes /v=view shortcut."""
+        get_toolbar = _create_toolbar_callback()
+        result = get_toolbar()
+
+        assert "<b>/v</b>=view" in result.value
+
+    def test_toolbar_shortcuts_separated_by_double_space(self):
+        """Shortcuts are separated by double spaces for readability."""
+        get_toolbar = _create_toolbar_callback()
+        result = get_toolbar()
+
+        # Should have double spaces between shortcuts
+        assert "  " in result.value
+
+    def test_prompt_session_accepts_html_toolbar(self):
+        """PromptSession is created successfully with HTML toolbar."""
+        from prompt_toolkit.key_binding import KeyBindings
+
+        get_toolbar = _create_toolbar_callback()
+        kb = KeyBindings()
+
+        # Should not raise - PromptSession accepts HTML toolbar
+        session = _create_prompt_session(get_toolbar, kb)
+
+        assert session is not None
+
+    def test_prompt_session_has_styled_message(self):
+        """PromptSession has HTML-styled prompt message."""
+        from prompt_toolkit.key_binding import KeyBindings
+
+        get_toolbar = _create_toolbar_callback()
+        kb = KeyBindings()
+
+        session = _create_prompt_session(get_toolbar, kb)
+
+        # The message should be HTML for cyan colored prompt
+        assert isinstance(session.message, HTML)
+        assert "<ansicyan>" in session.message.value
+        assert "<b>></b>" in session.message.value
+
+    def test_prompt_session_has_style_dict(self):
+        """PromptSession has a style dictionary for toolbar styling."""
+        from prompt_toolkit.key_binding import KeyBindings
+
+        get_toolbar = _create_toolbar_callback()
+        kb = KeyBindings()
+
+        session = _create_prompt_session(get_toolbar, kb)
+
+        # Session should have a style applied
+        assert session.style is not None

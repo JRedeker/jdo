@@ -14,9 +14,11 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.key_binding.key_processor import KeyPressEvent
+from prompt_toolkit.styles import Style
 from rich import box
 from rich.console import Console
 from rich.live import Live
@@ -1141,64 +1143,55 @@ def _create_key_bindings(
     return kb
 
 
-def _create_toolbar_callback(session: Session) -> Callable[[], str]:
-    """Create toolbar text callback using cached session values.
-
-    Args:
-        session: Session state with cached counts.
+def _create_toolbar_callback() -> Callable[[], HTML]:
+    """Create toolbar text callback showing keyboard shortcuts.
 
     Returns:
-        Function that generates toolbar text.
+        Function that generates toolbar HTML with keyboard shortcuts.
     """
 
-    def get_toolbar_text() -> str:
-        parts = [
-            f"{session.cached_commitment_count} active",
-            f"{session.cached_triage_count} triage",
-        ]
-        # Show current entity context if set
-        if session.entity_context.is_set:
-            ctx = session.entity_context
-            entity_display = f"{ctx.entity_type}:{ctx.short_id}"
-            if ctx.display_name:
-                # Truncate display name if too long (toolbar has limited space)
-                max_name_len = 20
-                name = (
-                    ctx.display_name[:max_name_len] + "..."
-                    if len(ctx.display_name) > max_name_len
-                    else ctx.display_name
-                )
-                entity_display = f"{ctx.entity_type}:{ctx.short_id} '{name}'"
-            parts.append(f"[{entity_display}]")
-        elif session.current_activity:
-            parts.append(f"[{session.current_activity}]")
-        return " | ".join(parts)
+    def get_toolbar_text() -> HTML:
+        # Display keyboard shortcuts for discoverability
+        # Uses theme-adaptive ANSI colors (no hex codes)
+        return HTML(
+            "<b>F1</b>=Help  <b>F5</b>=Refresh  <b>/c</b>=commit  <b>/l</b>=list  <b>/v</b>=view"
+        )
 
     return get_toolbar_text
 
 
 def _create_prompt_session(
-    get_toolbar_text: Callable[[], str],
+    get_toolbar_text: Callable[[], HTML],
     key_bindings: KeyBindings,
 ) -> PromptSession[str]:
     """Create prompt session with history, auto-completion, toolbar, and key bindings.
 
     Args:
-        get_toolbar_text: Callback function for toolbar text.
+        get_toolbar_text: Callback function for toolbar HTML.
         key_bindings: Keyboard shortcuts (F1, F5, Ctrl+L).
 
     Returns:
         Configured prompt session.
     """
     completer = WordCompleter(SLASH_COMMANDS, ignore_case=True)
+
+    # Theme-adaptive styling using ANSI color names (no hex codes)
+    # This respects user's terminal theme (light/dark mode)
+    style = Style.from_dict(
+        {
+            "bottom-toolbar": "fg:ansibrightblack noreverse",
+        }
+    )
+
     return PromptSession(
         history=InMemoryHistory(),
-        message="> ",
+        message=HTML("<ansicyan><b>></b></ansicyan> "),
         completer=completer,
         complete_while_typing=False,
         bottom_toolbar=get_toolbar_text,
         refresh_interval=1.0,
         key_bindings=key_bindings,
+        style=style,
     )
 
 
@@ -1225,6 +1218,9 @@ async def _main_repl_loop(
         try:
             # Show activity heading if we're in the middle of something
             _show_activity_heading(session)
+
+            # Add visual spacing before prompt for breathing room
+            console.print()
 
             user_input = await prompt_session.prompt_async()
 
@@ -1269,7 +1265,7 @@ async def repl_loop() -> None:
     with get_session() as db_session:
         session, deps = _setup_session_state(db_session)
 
-        get_toolbar_text = _create_toolbar_callback(session)
+        get_toolbar_text = _create_toolbar_callback()
         key_bindings = _create_key_bindings(session, db_session)
         prompt_session = _create_prompt_session(get_toolbar_text, key_bindings)
 
