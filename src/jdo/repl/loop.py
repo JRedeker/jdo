@@ -920,6 +920,12 @@ async def _process_user_input(
     if session.has_pending_draft and _handle_confirmation(user_input, session, db_session):
         return True
 
+    # Clear screen and show fresh dashboard before AI responds
+    # This gives a clean view: dashboard + user's request + AI response
+    console.clear()
+    _show_dashboard(session)
+    console.print(f"[dim]> {user_input}[/dim]\n")
+
     # Add user message to history
     session.add_user_message(user_input)
 
@@ -1229,9 +1235,6 @@ async def _main_repl_loop(
 
             if not await _process_user_input(user_input, session, db_session, agent, deps):
                 break
-
-            # Show dashboard before next prompt
-            _show_dashboard(session)
 
         except KeyboardInterrupt:
             console.print("\n[dim]Input cancelled.[/dim]")

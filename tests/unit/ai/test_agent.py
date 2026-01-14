@@ -71,18 +71,18 @@ class TestCreateAgent:
         assert "commitment integrity coach" in system_prompt
         assert "Today's date" in system_prompt  # Dynamic date injection
 
-    def test_agent_has_commitment_first_coaching(self) -> None:
-        """Agent system prompt contains Commitment-First Coaching section."""
+    def test_agent_has_user_led_interaction_style(self) -> None:
+        """Agent system prompt contains user-led interaction style section."""
         from jdo.ai.agent import create_agent_with_model
 
         agent = create_agent_with_model(TestModel())
 
         system_prompt = agent._system_prompts[0]
-        # Verify the Commitment-First Coaching section exists
-        assert "Commitment-First Coaching" in system_prompt
-        # Verify key coaching behaviors are present
-        assert "What will you deliver" in system_prompt
-        assert "who needs it" in system_prompt
+        # Verify the Interaction Style section exists
+        assert "User-Led Conversations" in system_prompt
+        # Verify key user-led behaviors are present
+        assert "Ask, don't suggest" in system_prompt
+        assert "Never generate ideas" in system_prompt
 
     async def test_agent_can_run_with_test_model(self) -> None:
         """Agent can be run with TestModel for testing."""
